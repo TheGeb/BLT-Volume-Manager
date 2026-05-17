@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restic Backup Browser</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Restic Backup Browser</p>
+        <h1>Backup Explorer</h1>
+        <p class="description">Browse restic snapshots in S3 storage, add or remove tags, and filter by name or date.
+        </p>
+      </div>
+      <button id="themeToggle" class="button button-secondary">Toggle Light Mode</button>
+    </header>
+
+    <div id="repoInitBanner" class="init-banner" style="display:none;">
+      <span>Restic repository not initialized.</span>
+      <button id="initRepoButton" class="button">Initialize Repository</button>
+    </div>
+
+    <section class="panel">
+      <div class="row gap">
+        <label>
+          Volume
+          <select id="volumeSelect" class="input">
+            <option value="">All volumes</option>
+          </select>
+        </label>
+        <button id="createLockButton" class="button button-secondary">Create lock</button>
+        <button id="deleteLocksButton" class="button button-secondary">Delete volume locks</button>
+        <span id="lockStatus" class="lock-status"></span>
+      </div>
+      <div class="row gap" style="margin-top: 16px;">
+        <input id="searchInput" class="input" type="search" placeholder="Filter by name, path, or tag" />
+        <button id="refreshButton" class="button">Refresh</button>
+        <button id="sortButton" class="button button-secondary">Sort by newest</button>
+      </div>
+    </section>
+
+    <section class="panel table-panel">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Snapshot ID</th>
+            <th>Paths</th>
+            <th>Tags</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="snapshotTable"></tbody>
+      </table>
+      <div id="statusMessage" class="status"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
