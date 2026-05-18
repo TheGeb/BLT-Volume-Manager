@@ -203,6 +203,36 @@ func (m *Manager) Init() error {
 	return m.initRepository()
 }
 
+type RepoStats struct {
+	TotalSize           int64 `json:"total_size"`
+	TotalFileCount      int64 `json:"total_file_count"`
+	TotalBlobCount      int64 `json:"total_blob_count"`
+	TotalUncompressedSize int64 `json:"total_uncompressed_size"`
+	CompressedSize      int64 `json:"compressed_size"`
+	UniqueBlobCount     int64 `json:"unique_blob_count"`
+	UniqueBlobSize      int64 `json:"unique_blob_size"`
+}
+
+func (m *Manager) Stats() (*RepoStats, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd, err := resticCommand(ctx, "stats", "--json", "--mode", "raw-data")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("restic stats: %w", err)
+	}
+
+	var stats RepoStats
+	if err := json.Unmarshal(out, &stats); err != nil {
+		return nil, fmt.Errorf("parse restic stats: %w", err)
+	}
+	return &stats, nil
+}
+
 func resticRepository() (string, error) {
 	repo := strings.TrimSpace(os.Getenv("RESTIC_REPOSITORY"))
 	if repo == "" {
@@ -234,7 +264,7 @@ func (m *Manager) repositoryExists() (bool, error) {
 
 func isRepositoryMissing(output string) bool {
 	out := strings.ToLower(output)
-	return strings.Contains(out, "repository") && (strings.Contains(out, "not found") || strings.Contains(out, "does not exist") || strings.Contains(out, "unable to open") || strings.Contains(out, "not initialized"))
+	return strings.Contains(out, "not found") || strings.Contains(out, "does not exist") || strings.Contains(out, "not initialized")
 }
 
 func (m *Manager) initRepository() error {

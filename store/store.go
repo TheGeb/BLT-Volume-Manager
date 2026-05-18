@@ -132,6 +132,27 @@ func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
 	return objects, nil
 }
 
+func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
+	var prefixes []string
+	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
+		Bucket:    aws.String(s.opts.AwsBucketName),
+		Prefix:    aws.String(prefix),
+		Delimiter: aws.String(delimiter),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		for _, cp := range page.CommonPrefixes {
+			if cp.Prefix != nil {
+				prefixes = append(prefixes, *cp.Prefix)
+			}
+		}
+	}
+	return prefixes, nil
+}
+
 func (s *S3rw) DeleteLockObjects() error {
 	objects, err := s.ListObjects(s.opts.AwsLockFolder)
 	if err != nil {

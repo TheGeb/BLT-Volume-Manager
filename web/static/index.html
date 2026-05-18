@@ -17,7 +17,28 @@
         <p class="description">Browse restic snapshots in S3 storage, add or remove tags, and filter by name or date.
         </p>
       </div>
-      <button id="themeToggle" class="button button-secondary">Toggle Light Mode</button>
+      <div class="topbar-actions">
+        <button id="refreshButton" class="button-icon" title="Refresh">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+        <button id="themeToggle" class="button-icon" title="Toggle light/dark mode">
+          <svg id="themeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <div id="repoInitBanner" class="init-banner" style="display:none;">
@@ -25,40 +46,67 @@
       <button id="initRepoButton" class="button">Initialize Repository</button>
     </div>
 
-    <section class="panel">
-      <div class="row gap">
-        <label>
-          Volume
-          <select id="volumeSelect" class="input">
-            <option value="">All volumes</option>
-          </select>
-        </label>
-        <button id="createLockButton" class="button button-secondary">Create lock</button>
-        <button id="deleteLocksButton" class="button button-secondary">Delete volume locks</button>
-        <span id="lockStatus" class="lock-status"></span>
-      </div>
-      <div class="row gap" style="margin-top: 16px;">
-        <input id="searchInput" class="input" type="search" placeholder="Filter by name, path, or tag" />
-        <button id="refreshButton" class="button">Refresh</button>
-        <button id="sortButton" class="button button-secondary">Sort by newest</button>
+    <div id="errorBanner" class="init-banner" style="display:none;border-color:var(--red);color:var(--red);">
+      <span id="errorBannerText"></span>
+    </div>
+
+    <section class="panel toolbar-panel">
+      <div class="toolbar-row">
+        <input id="volumeFilterInput" class="volume-filter-input" type="search" placeholder="Filter volumes..." />
+        <div id="volumePills" class="volume-pills"></div>
       </div>
     </section>
 
-    <section class="panel table-panel">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Snapshot ID</th>
-            <th>Paths</th>
-            <th>Tags</th>
-            <th>Date</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="snapshotTable"></tbody>
-      </table>
-      <div id="statusMessage" class="status"></div>
+    <section id="statsPanel" class="panel stats-panel">
+      <h2 class="stats-heading">Overview</h2>
+      <div id="statsGrid" class="stats-grid"></div>
     </section>
+
+    <div id="volumeView" class="split" style="display:none;">
+      <section id="lockPanel" class="panel lock-panel" style="display:none;">
+        <div id="lockPanelContent">
+          <h2 class="lock-panel-title">Lock</h2>
+          <div class="lock-info">
+            <div id="lockStatusText" class="lock-status-text">No lock</div>
+            <div id="lockOwner" class="lock-owner"></div>
+            <div id="lockExpiry" class="lock-expiry"></div>
+          </div>
+          <div class="lock-actions">
+            <button id="createLockButton" class="button button-block">Create lock</button>
+            <button id="deleteLocksButton" class="button button-secondary button-block">Delete locks</button>
+          </div>
+        </div>
+        <div id="lockPanelSkeleton" style="display:none;">
+          <div class="skeleton" style="height:28px;width:120px;border-radius:6px;margin-bottom:12px;"></div>
+          <div class="skeleton" style="height:18px;width:160px;border-radius:6px;margin-bottom:8px;"></div>
+          <div class="skeleton" style="height:18px;width:200px;border-radius:6px;margin-bottom:20px;"></div>
+          <div class="skeleton" style="height:40px;border-radius:999px;"></div>
+          <div class="skeleton" style="height:40px;border-radius:999px;margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="row gap" style="margin-bottom:16px;">
+          <input id="searchInput" class="input" type="search" placeholder="Filter by name, path, or tag" />
+          <button id="sortButton" class="button button-secondary">Sort by newest</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Snapshot ID</th>
+                <th>Paths</th>
+                <th>Tags</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="snapshotTable"></tbody>
+          </table>
+        </div>
+        <div id="statusMessage" class="status"></div>
+      </section>
+    </div>
   </div>
 
   <script src="app.js"></script>
