@@ -11,6 +11,4 @@ func (l *LockOwner) GetRemainingTimeinSeconds() int64 {
     return l.ExpiryTime - time.Now().Unix()
 }
 
-type LockCounter struct {
-    Counter int `json:"counter"`
-}
+

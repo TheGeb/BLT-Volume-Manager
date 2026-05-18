@@ -4,6 +4,7 @@ const state = {
   selectedVolume: '',
   query: '',
   sortNewestFirst: true,
+  hostname: 'webadmin',
 };
 
 const snapshotTable = document.getElementById('snapshotTable');
@@ -275,10 +276,16 @@ async function refreshLockStatus() {
 }
 
 async function createVolumeLock(volumeName) {
+  const ownerName = prompt('Lock owner name:', state.hostname);
+  if (!ownerName) {
+    return;
+  }
   showStatus(`Creating lock for volume ${volumeName}...`);
   try {
     const response = await fetch(`/api/volume/${encodeURIComponent(volumeName)}/locks`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner: ownerName }),
     });
     if (!response.ok) {
       const body = await response.json();
@@ -314,6 +321,7 @@ async function checkRepoStatus() {
     if (!response.ok) return;
     const data = await response.json();
     repoInitBanner.style.display = data.initialized ? 'none' : 'flex';
+    if (data.hostname) state.hostname = data.hostname;
   } catch {
     // ignore
   }

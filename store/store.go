@@ -3,13 +3,11 @@ package store
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -85,143 +83,75 @@ func NewS3Store(opts S3StoreOpts) (*S3rw, error) {
 	}, nil
 }
 
-func (s *S3rw) GetLockOwner() (*LockOwner, error) {
-	bucketKey := s.opts.AwsLockFolder + "owner.json"
-	getLockOwnerObject := &s3.GetObjectInput{
+func (s *S3rw) PutObject(key string, data []byte) error {
+	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.opts.AwsBucketName),
-		Key:    &bucketKey,
-	}
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(data),
+	})
+	return err
+}
 
-	output, err := s.s3Client.GetObject(context.Background(), getLockOwnerObject)
-
+func (s *S3rw) ReadObject(key string) ([]byte, error) {
+	output, err := s.s3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.opts.AwsBucketName),
+		Key:    aws.String(key),
+	})
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("getting lock owner (bucket=%s, key=%s): %w", s.opts.AwsBucketName, bucketKey, err)
+		return nil, err
 	}
-
-	body, err := io.ReadAll(output.Body)
 	defer output.Body.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("error reading the lock owner file")
-	}
-
-	var lockOwner LockOwner
-	err = json.Unmarshal(body, &lockOwner)
-	if err != nil {
-		return nil, fmt.Errorf("error reading the owner file")
-	}
-
-	return &lockOwner, nil
+	return io.ReadAll(output.Body)
 }
 
-func (s *S3rw) GetLockCounter() (*LockCounter, error) {
-	bucketKey := s.opts.AwsLockFolder + "counter.json"
-	getLockOwnerObject := &s3.GetObjectInput{
+func (s *S3rw) DeleteObject(key string) error {
+	_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.opts.AwsBucketName),
-		Key:    &bucketKey,
-	}
+		Key:    aws.String(key),
+	})
+	return err
+}
 
-	output, err := s.s3Client.GetObject(context.Background(), getLockOwnerObject)
-	if err != nil {
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			return nil, nil
+func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
+	var objects []types.Object
+	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.opts.AwsBucketName),
+		Prefix: aws.String(prefix),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.Background())
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("error getting the lock counter")
+		objects = append(objects, page.Contents...)
 	}
-
-	body, err := io.ReadAll(output.Body)
-	defer output.Body.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("error reading the lock counter file")
-	}
-
-	b := string(body)
-	if b == "" {
-		return nil, fmt.Errorf("error reading the lock counter file")
-	}
-
-	c, e := strconv.Atoi(b)
-	if e != nil {
-		return nil, fmt.Errorf("error reading the lock counter file")
-	}
-
-	return &LockCounter{
-		Counter: c,
-	}, nil
-}
-
-func (s *S3rw) SetLockCounter(c LockCounter) error {
-	contents := strconv.Itoa(c.Counter)
-	bucketKey := s.opts.AwsLockFolder + "counter.json"
-	putObjectRequest := &s3.PutObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
-		Key:    aws.String(bucketKey),
-		Body:   strings.NewReader(contents),
-	}
-
-	_, err := s.s3Client.PutObject(context.Background(), putObjectRequest)
-
-	if err != nil {
-		return fmt.Errorf("setting lock counter %d (bucket=%s, key=%s): %w", c.Counter, s.opts.AwsBucketName, bucketKey, err)
-	}
-	return nil
-}
-
-func (s *S3rw) SetLockOwner(owner LockOwner) error {
-	jsonData, err := json.Marshal(owner)
-	if err != nil {
-		return fmt.Errorf("unable to set lock owner, Error marshalling")
-	}
-
-	bucketKey := s.opts.AwsLockFolder + "owner.json"
-	putObjectRequest := &s3.PutObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
-		Key:    aws.String(bucketKey),
-		Body:   bytes.NewReader(jsonData),
-	}
-
-	_, err = s.s3Client.PutObject(context.Background(), putObjectRequest)
-	if err != nil {
-		return fmt.Errorf("setting lock owner %s (bucket=%s, key=%s): %w", owner.Name, s.opts.AwsBucketName, bucketKey, err)
-	}
-
-	return nil
-}
-
-func (s *S3rw) RollBackLockOwner() error {
-	bucketKey := s.opts.AwsLockFolder + "owner.json"
-	deleteObjectRequest := &s3.DeleteObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
-		Key:    aws.String(bucketKey),
-	}
-
-	_, err := s.s3Client.DeleteObject(context.Background(), deleteObjectRequest)
-	if err != nil {
-		return fmt.Errorf("rolling back lock owner (bucket=%s, key=%s): %w", s.opts.AwsBucketName, bucketKey, err)
-	}
-
-	return nil
+	return objects, nil
 }
 
 func (s *S3rw) DeleteLockObjects() error {
-	ownerKey := s.opts.AwsLockFolder + "owner.json"
-	counterKey := s.opts.AwsLockFolder + "counter.json"
-
-	for _, key := range []string{ownerKey, counterKey} {
-		_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-			Bucket: aws.String(s.opts.AwsBucketName),
-			Key:    aws.String(key),
-		})
-		if err != nil {
-			return fmt.Errorf("deleting lock object %s (bucket=%s): %w", key, s.opts.AwsBucketName, err)
+	objects, err := s.ListObjects(s.opts.AwsLockFolder)
+	if err != nil {
+		return fmt.Errorf("listing lock objects (prefix=%s): %w", s.opts.AwsLockFolder, err)
+	}
+	if len(objects) == 0 {
+		return nil
+	}
+	idents := make([]types.ObjectIdentifier, 0, len(objects))
+	for _, obj := range objects {
+		if obj.Key != nil {
+			idents = append(idents, types.ObjectIdentifier{Key: obj.Key})
 		}
 	}
-
+	_, err = s.s3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+		Bucket: aws.String(s.opts.AwsBucketName),
+		Delete: &types.Delete{Objects: idents},
+	})
+	if err != nil {
+		return fmt.Errorf("batch deleting lock objects (bucket=%s): %w", s.opts.AwsBucketName, err)
+	}
 	return nil
 }

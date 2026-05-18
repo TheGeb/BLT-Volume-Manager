@@ -148,7 +148,13 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 		}
 		respondJSON(w, status)
 	case http.MethodPost:
-		lock, err := s.createVolumeLock(volumeName)
+		var reqBody struct {
+			Owner string `json:"owner"`
+		}
+		if r.Body != nil {
+			json.NewDecoder(r.Body).Decode(&reqBody)
+		}
+		lock, err := s.createVolumeLock(volumeName, reqBody.Owner)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -175,31 +181,51 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error
 		return nil, err
 	}
 
-	owner, err := rw.GetLockOwner()
+	folder := "volume-locks/" + volumeName + "/"
+	objects, err := rw.ListObjects(folder)
 	if err != nil {
-		return nil, fmt.Errorf("get lock owner: %w", err)
+		return nil, fmt.Errorf("list lock objects: %w", err)
 	}
 
-	counter, err := rw.GetLockCounter()
-	if err != nil {
-		return nil, fmt.Errorf("get lock counter: %w", err)
-	}
+	sort.Slice(objects, func(i, j int) bool {
+		ti, tj := objects[i].LastModified, objects[j].LastModified
+		if ti != nil && tj != nil && !ti.Equal(*tj) {
+			return ti.Before(*tj)
+		}
+		return *objects[i].Key < *objects[j].Key
+	})
 
 	result := map[string]interface{}{
 		"volume": volumeName,
-		"locked": owner != nil,
+		"locked": false,
 	}
-	if owner != nil {
+
+	for _, obj := range objects {
+		if obj.Key == nil {
+			continue
+		}
+		raw, err := rw.ReadObject(*obj.Key)
+		if err != nil || raw == nil {
+			continue
+		}
+		var owner store.LockOwner
+		if err := json.Unmarshal(raw, &owner); err != nil {
+			continue
+		}
+		if owner.GetRemainingTimeinSeconds() <= 0 {
+			rw.DeleteObject(*obj.Key)
+			continue
+		}
+		result["locked"] = true
 		result["owner"] = owner.Name
 		result["expires_in"] = owner.GetRemainingTimeinSeconds()
+		break
 	}
-	if counter != nil {
-		result["counter"] = counter.Counter
-	}
+
 	return result, nil
 }
 
-func (s *Server) createVolumeLock(volumeName string) (map[string]interface{}, error) {
+func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]interface{}, error) {
 	if s.s3Bucket == "" {
 		return nil, errors.New("S3_LOCK_BUCKET, RESTIC_REPOSITORY, or S3_ENDPOINT must be configured")
 	}
@@ -209,15 +235,59 @@ func (s *Server) createVolumeLock(volumeName string) (map[string]interface{}, er
 		return nil, err
 	}
 
-	ownerName := fmt.Sprintf("webadmin-%s-%d", mustHostname(), os.Getpid())
-	expiry := time.Now().Add(12 * time.Hour).Unix()
-
-	if err := rw.SetLockOwner(store.LockOwner{Name: ownerName, ExpiryTime: expiry}); err != nil {
-		return nil, fmt.Errorf("set lock owner: %w", err)
+	if ownerName == "" {
+		ownerName = fmt.Sprintf("webadmin-%s-%d", mustHostname(), os.Getpid())
 	}
-	if err := rw.SetLockCounter(store.LockCounter{Counter: 1}); err != nil {
-		rw.RollBackLockOwner()
-		return nil, fmt.Errorf("set lock counter: %w", err)
+	expiry := time.Now().Add(12 * time.Hour).Unix()
+	folder := "volume-locks/" + volumeName + "/"
+	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, time.Now().UnixNano())
+
+	proposal := store.LockOwner{Name: ownerName, ExpiryTime: expiry}
+	data, err := json.Marshal(proposal)
+	if err != nil {
+		return nil, fmt.Errorf("marshal proposal: %w", err)
+	}
+	if err := rw.PutObject(myKey, data); err != nil {
+		return nil, fmt.Errorf("create proposal: %w", err)
+	}
+
+	objects, err := rw.ListObjects(folder)
+	if err != nil {
+		rw.DeleteObject(myKey)
+		return nil, fmt.Errorf("list proposals: %w", err)
+	}
+
+	sort.Slice(objects, func(i, j int) bool {
+		ti, tj := objects[i].LastModified, objects[j].LastModified
+		if ti != nil && tj != nil && !ti.Equal(*tj) {
+			return ti.Before(*tj)
+		}
+		return *objects[i].Key < *objects[j].Key
+	})
+
+	first := true
+	for _, obj := range objects {
+		if obj.Key == nil {
+			continue
+		}
+		raw, err := rw.ReadObject(*obj.Key)
+		if err != nil || raw == nil {
+			continue
+		}
+		var o store.LockOwner
+		if err := json.Unmarshal(raw, &o); err != nil {
+			continue
+		}
+		if o.GetRemainingTimeinSeconds() <= 0 {
+			rw.DeleteObject(*obj.Key)
+			continue
+		}
+		first = *obj.Key == myKey
+		break
+	}
+	if !first {
+		rw.DeleteObject(myKey)
+		return nil, errors.New("another lock proposal was earlier")
 	}
 
 	return map[string]interface{}{
@@ -261,7 +331,7 @@ func (s *Server) handleRepoStatus(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	respondJSON(w, map[string]bool{"initialized": exists})
+	respondJSON(w, map[string]interface{}{"initialized": exists, "hostname": mustHostname()})
 }
 
 func (s *Server) handleRepoInit(w http.ResponseWriter, r *http.Request) {
