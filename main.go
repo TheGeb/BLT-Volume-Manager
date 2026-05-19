@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/docker-s3-volume-plugin/driver"
-	"github.com/example/docker-s3-volume-plugin/web"
+	"github.com/example/blt-volume-manager/driver"
+	"github.com/example/blt-volume-manager/web"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	var httpOnly bool
 	flag.StringVar(&dataDir, "data-dir", "/var/lib/docker-volumes", "root directory for volumes")
 	flag.StringVar(&socketPath, "socket", "/run/docker/plugins/s3vol.sock", "unix socket for docker plugin (empty disables plugin)")
-	flag.StringVar(&httpAddr, "http-addr", ":8080", "HTTP address for the restic backup browser UI")
+	flag.StringVar(&httpAddr, "http-addr", ":8080", "HTTP address for the BLT Volume Manager UI")
 	flag.BoolVar(&httpOnly, "http-only", false, "start only the HTTP UI and do not launch the Docker volume plugin")
 	flag.Parse()
 
@@ -43,7 +43,7 @@ func main() {
 		mux := http.NewServeMux()
 		web.NewServer(drv.ResticManager(), lockBucket, s3Endpoint, s3Region).Register(mux)
 		go func() {
-			log.Printf("serving restic UI on http://%s", httpAddr)
+			log.Printf("serving BLT Volume Manager on http://%s", httpAddr)
 			if err := http.ListenAndServe(httpAddr, mux); err != nil {
 				log.Fatalf("http server: %v", err)
 			}

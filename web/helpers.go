@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/example/docker-s3-volume-plugin/restic"
+	"github.com/example/blt-volume-manager/restic"
 )
 
 func mustHostname() string {

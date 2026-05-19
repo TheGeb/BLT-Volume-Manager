@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/docker-s3-volume-plugin/locker"
-	"github.com/example/docker-s3-volume-plugin/restic"
+	"github.com/example/blt-volume-manager/locker"
+	"github.com/example/blt-volume-manager/restic"
 )
 
 type VolumeInfo struct {

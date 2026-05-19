@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/example/docker-s3-volume-plugin/restic"
+	"github.com/example/blt-volume-manager/restic"
 )
 
 //go:embed static/*

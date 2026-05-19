@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/example/docker-s3-volume-plugin/store"
+	"github.com/example/blt-volume-manager/store"
 )
 
 func init() {

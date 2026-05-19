@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/docker-s3-volume-plugin/store"
+	"github.com/example/blt-volume-manager/store"
 )
 
 func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {

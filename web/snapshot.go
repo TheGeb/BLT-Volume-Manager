@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/example/docker-s3-volume-plugin/restic"
+	"github.com/example/blt-volume-manager/restic"
 )
 
 func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {

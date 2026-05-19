@@ -1,6 +1,6 @@
-# Docker S3 Volume Plugin (prototype)
+# BLT Volume Manager
 
-This project implements a Docker volume plugin that uses restic to backup volumes to S3 and uses locking to coordinate access between multiple hosts.
+**Backups + Locks + Transferring** — A Docker volume plugin that uses restic to backup volumes to S3 and uses locking to coordinate access between multiple hosts.
 
 Features
 
@@ -37,7 +37,7 @@ Notes & next steps
 - Ensure `restic` is installed in the runtime image and environment variables `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) are set for S3.
 - Optionally set `RESTIC_AUTO_INIT=1` or `RESTIC_INIT_IF_MISSING=1` to automatically initialize the repository when it does not exist.
 
-A simple browser-based Restic backup explorer is available when you start the binary with `--http-addr`, for example `--http-addr ":8080"`.
+A browser-based UI is available when you start the binary with `--http-addr`, for example `--http-addr ":8080"`.
 
 Example run
 

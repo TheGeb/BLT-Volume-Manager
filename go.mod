@@ -1,4 +1,4 @@
-module github.com/example/docker-s3-volume-plugin
+module github.com/example/blt-volume-manager
 
 go 1.25.0
 
