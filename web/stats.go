@@ -220,6 +220,10 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	s.statsMu.RLock()
 	cached := s.statsCache
 	s.statsMu.RUnlock()
+	if cached == nil {
+		respondError(w, nil, http.StatusServiceUnavailable)
+		return
+	}
 	respondJSON(w, cached)
 }
 

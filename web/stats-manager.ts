@@ -26,20 +26,36 @@ class StatsManager {
     }
   }
 
-  async load(): Promise<void> {
+  async load(retries = 10, delay = 2000): Promise<void> {
     const hasData = this.grid.querySelector('.stat-card') !== null || this.grid.querySelector('.stat-card-graph') !== null;
     if (!hasData) this.showSkeleton();
-    try {
-      const resp = await fetch('/api/stats');
-      if (resp.ok) {
-        const data = await resp.json() as StatsResponse;
-        this.render(data);
-      }
-    } catch {
-      if (!hasData) {
-        throw new Error('Cannot reach server for stats');
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const resp = await fetch('/api/stats');
+        if (resp.status === 503) {
+          if (attempt < retries - 1) { await this.sleep(delay); continue; }
+          if (!hasData) throw new Error('Stats not yet available');
+          return;
+        }
+        if (resp.ok) {
+          const data = await resp.json() as StatsResponse;
+          if (!data || !data.snapshots) {
+            if (attempt < retries - 1) { await this.sleep(delay); continue; }
+            if (!hasData) throw new Error('Stats not yet available');
+            return;
+          }
+          this.render(data);
+          return;
+        }
+      } catch {
+        if (!hasData && attempt >= retries - 1) throw new Error('Cannot reach server for stats');
+        await this.sleep(delay);
       }
     }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(r => setTimeout(r, ms));
   }
 
   render(data: StatsResponse): void {

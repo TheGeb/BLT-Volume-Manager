@@ -47,7 +47,11 @@ func snapshotMatchesVolume(snapshot restic.Snapshot, volume string) bool {
 func respondError(w http.ResponseWriter, err error, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	msg := "unknown error"
+	if err != nil {
+		msg = err.Error()
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 func respondJSON(w http.ResponseWriter, v interface{}) {
