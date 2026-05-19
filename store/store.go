@@ -9,12 +9,16 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
+
+// LogS3 is a callback for structured S3 call logging. Set by the web server.
+var LogS3 func(op, bucket, key string, dur time.Duration, err error)
 
 type S3rw struct {
 	s3Client *s3.Client
@@ -84,19 +88,27 @@ func NewS3Store(opts S3StoreOpts) (*S3rw, error) {
 }
 
 func (s *S3rw) PutObject(key string, data []byte) error {
+	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.opts.AwsBucketName),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
+	if LogS3 != nil {
+		LogS3("PutObject", s.opts.AwsBucketName, key, time.Since(start), err)
+	}
 	return err
 }
 
 func (s *S3rw) ReadObject(key string) ([]byte, error) {
+	start := time.Now()
 	output, err := s.s3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.opts.AwsBucketName),
 		Key:    aws.String(key),
 	})
+	if LogS3 != nil {
+		LogS3("GetObject", s.opts.AwsBucketName, key, time.Since(start), err)
+	}
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
@@ -109,14 +121,19 @@ func (s *S3rw) ReadObject(key string) ([]byte, error) {
 }
 
 func (s *S3rw) DeleteObject(key string) error {
+	start := time.Now()
 	_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.opts.AwsBucketName),
 		Key:    aws.String(key),
 	})
+	if LogS3 != nil {
+		LogS3("DeleteObject", s.opts.AwsBucketName, key, time.Since(start), err)
+	}
 	return err
 }
 
 func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
+	start := time.Now()
 	var objects []types.Object
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(s.opts.AwsBucketName),
@@ -125,14 +142,21 @@ func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
+			if LogS3 != nil {
+				LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), err)
+			}
 			return nil, err
 		}
 		objects = append(objects, page.Contents...)
+	}
+	if LogS3 != nil {
+		LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), nil)
 	}
 	return objects, nil
 }
 
 func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
+	start := time.Now()
 	var prefixes []string
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
 		Bucket:    aws.String(s.opts.AwsBucketName),
@@ -142,6 +166,9 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
+			if LogS3 != nil {
+				LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), err)
+			}
 			return nil, err
 		}
 		for _, cp := range page.CommonPrefixes {
@@ -149,6 +176,9 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 				prefixes = append(prefixes, *cp.Prefix)
 			}
 		}
+	}
+	if LogS3 != nil {
+		LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), nil)
 	}
 	return prefixes, nil
 }

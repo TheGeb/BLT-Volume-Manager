@@ -5,5 +5,5 @@
     "outDir": "static",
     "sourceMap": false
   },
-  "files": ["app.ts"]
+  "include": ["*.ts"]
 }
