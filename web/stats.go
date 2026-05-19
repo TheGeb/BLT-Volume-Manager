@@ -242,8 +242,13 @@ func (s *Server) handlePills(w http.ResponseWriter, r *http.Request) {
 	}
 	s.pillsMu.RLock()
 	pills := s.pillsCache
+	at := s.pillsCacheAt
 	s.pillsMu.RUnlock()
-	respondJSON(w, map[string]interface{}{"volumes": pills})
+	resp := map[string]interface{}{"volumes": pills}
+	if !at.IsZero() {
+		resp["cached_at"] = at.UTC().Format(time.RFC3339)
+	}
+	respondJSON(w, resp)
 }
 
 func (s *Server) handleVolumes(w http.ResponseWriter, r *http.Request) {

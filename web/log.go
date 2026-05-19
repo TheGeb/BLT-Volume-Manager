@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/example/blt-volume-manager/store"
@@ -14,6 +15,7 @@ func init() {
 }
 
 type logEntry struct {
+	Level     string `json:"level"`
 	Event     string `json:"event"`
 	Method    string `json:"method,omitempty"`
 	Path      string `json:"path,omitempty"`
@@ -32,7 +34,7 @@ func logJSON(e logEntry) {
 }
 
 func logS3Call(op, bucket, key string, dur time.Duration, err error) {
-	e := logEntry{Event: "s3_call", Op: op, Bucket: bucket, Key: key, DurationMs: dur.Milliseconds()}
+	e := logEntry{Level: "debug", Event: "s3_call", Op: op, Bucket: bucket, Key: key, DurationMs: dur.Milliseconds()}
 	if err != nil {
 		e.Error = err.Error()
 	}
@@ -45,7 +47,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(lw, r)
 		dur := time.Since(start)
+		level := "debug"
+		if r.Method == "GET" && strings.HasSuffix(r.URL.Path, ".js") {
+			level = "trace"
+		}
 		e := logEntry{
+			Level:      level,
 			Event:      "http_request",
 			Method:     r.Method,
 			Path:       r.URL.Path,

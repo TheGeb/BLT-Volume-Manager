@@ -227,6 +227,12 @@ h1 {
   gap: 8px;
 }
 
+.pills-cached {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
 .volume-pills {
   display: flex;
   flex-wrap: wrap;

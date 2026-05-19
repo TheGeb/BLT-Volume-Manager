@@ -46,8 +46,9 @@ class PillsManager {
         if (!data.volumes || data.volumes.length === 0) {
           if (attempt < retries - 1) { await this.sleep(delay); continue; }
         }
-        this.setState({ volumes: data.volumes ?? [] });
+        this.setState({ volumes: data.volumes ?? [], pillsCachedAt: data.cached_at });
         this.render();
+        this.renderCachedAt(this.container.parentElement!);
         return;
       } catch { await this.sleep(delay); }
     }
@@ -71,6 +72,16 @@ class PillsManager {
       this.container.appendChild(pill);
     });
     });
+  }
+
+  renderCachedAt(parent: HTMLElement): void {
+    const at = this.getState().pillsCachedAt;
+    if (!at) return;
+    parent.querySelectorAll('.pills-cached').forEach(el => el.remove());
+    const el = document.createElement('div');
+    el.className = 'pills-cached';
+    el.textContent = `Cached: ${new Date(at).toLocaleString()}`;
+    parent.appendChild(el);
   }
 
   handleContainerClick(e: MouseEvent): void {
