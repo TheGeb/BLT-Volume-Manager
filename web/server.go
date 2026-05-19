@@ -28,7 +28,7 @@ type Server struct {
 
 func NewServer(r *restic.Manager, s3Bucket string, s3Endpoint string, s3Region string) *Server {
 	s := &Server{restic: r, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
-	s.refreshStats()
+	go s.refreshStats()
 	go s.statsLoop()
 	return s
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Server) statsLoop() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(12 * time.Hour)
 	defer ticker.Stop()
 	for range ticker.C {
 		s.refreshStats()

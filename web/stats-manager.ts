@@ -126,10 +126,17 @@ class StatsManager {
 
     const parent = this.grid.parentElement!;
     parent.querySelectorAll('.stat-sub').forEach(el => el.remove());
+    const parts: string[] = [];
     if (data.snapshots.newest || data.snapshots.oldest) {
+      parts.push(`Newest: ${data.snapshots.newest ? new Date(data.snapshots.newest).toLocaleString() : '-'}  ·  Oldest: ${data.snapshots.oldest ? new Date(data.snapshots.oldest).toLocaleString() : '-'}`);
+    }
+    if (data.cached_at) {
+      parts.push(`Cached: ${new Date(data.cached_at).toLocaleString()}`);
+    }
+    if (parts.length > 0) {
       const sub = document.createElement('div');
       sub.className = 'stat-sub';
-      sub.textContent = `Newest: ${data.snapshots.newest ? new Date(data.snapshots.newest).toLocaleString() : '-'}  ·  Oldest: ${data.snapshots.oldest ? new Date(data.snapshots.oldest).toLocaleString() : '-'}`;
+      sub.textContent = parts.join('  ·  ');
       parent.appendChild(sub);
     }
     });

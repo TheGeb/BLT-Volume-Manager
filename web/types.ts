@@ -50,6 +50,7 @@ interface StatsResponse {
     expired_volumes?: string[];
   };
   total_volumes?: number;
+  cached_at?: string;
 }
 
 interface AppState {

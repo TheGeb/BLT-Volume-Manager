@@ -36,16 +36,25 @@ class PillsManager {
     }
   }
 
-  async load(): Promise<void> {
+  async load(retries = 5, delay = 2000): Promise<void> {
     this.showSkeleton();
-    try {
-      const resp = await fetch('/api/pills');
-      if (resp.ok) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const resp = await fetch('/api/pills');
+        if (!resp.ok) { await this.sleep(delay); continue; }
         const data = await resp.json();
-        this.setState({ volumes: data.volumes });
+        if (!data.volumes || data.volumes.length === 0) {
+          if (attempt < retries - 1) { await this.sleep(delay); continue; }
+        }
+        this.setState({ volumes: data.volumes ?? [] });
         this.render();
-      }
-    } catch { /* fall through */ }
+        return;
+      } catch { await this.sleep(delay); }
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(r => setTimeout(r, ms));
   }
 
   render(): void {
