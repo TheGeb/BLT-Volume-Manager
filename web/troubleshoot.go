@@ -7,24 +7,27 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	go func() {
-		if err := s.restic.Check(); err != nil {
-			logInfo("check_failed")
-		} else {
-			logInfo("check_ok")
-		}
-	}()
-	respondJSON(w, map[string]string{"status": "check started"})
+	err := s.restic.Check(true)
+	if err != nil {
+		logInfo("check_failed")
+		respondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	logInfo("check_ok")
+	respondJSON(w, map[string]string{"status": "Check completed, repository is healthy."})
 }
 
-func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRepair(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := s.restic.Unlock(); err != nil {
+	err := s.restic.Repair()
+	if err != nil {
+		logInfo("repair_failed")
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	respondJSON(w, map[string]string{"status": "locks removed"})
+	logInfo("repair_ok")
+	respondJSON(w, map[string]string{"status": "Repair completed, index rebuilt and stale restic locks have been cleared."})
 }

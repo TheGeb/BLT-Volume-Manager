@@ -10,14 +10,6 @@ import (
 	"github.com/example/blt-volume-manager/store"
 )
 
-func (s *Server) statsLoop() {
-	ticker := time.NewTicker(12 * time.Hour)
-	defer ticker.Stop()
-	for range ticker.C {
-		s.refreshStats()
-	}
-}
-
 func (s *Server) refreshStats() {
 	snapshotStats := map[string]interface{}{
 		"total": 0, "hot": 0, "cold": 0, "excluded": 0, "volumes": 0,
@@ -220,8 +212,10 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	cached := s.statsCache
 	s.statsMu.RUnlock()
 	if cached == nil {
-		respondError(w, nil, http.StatusServiceUnavailable)
-		return
+		s.refreshStats()
+		s.statsMu.RLock()
+		cached = s.statsCache
+		s.statsMu.RUnlock()
 	}
 	respondJSON(w, cached)
 }
@@ -247,6 +241,13 @@ func (s *Server) handlePills(w http.ResponseWriter, r *http.Request) {
 	pills := s.pillsCache
 	at := s.pillsCacheAt
 	s.pillsMu.RUnlock()
+	if len(pills) == 0 {
+		s.refreshStats()
+		s.pillsMu.RLock()
+		pills = s.pillsCache
+		at = s.pillsCacheAt
+		s.pillsMu.RUnlock()
+	}
 	resp := map[string]interface{}{"volumes": pills}
 	if !at.IsZero() {
 		resp["cached_at"] = at.UTC().Format(time.RFC3339)

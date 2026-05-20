@@ -20,7 +20,7 @@ class App {
   private initBanner: HTMLDivElement;
   private refreshBtn: HTMLButtonElement;
   private checkBtn: HTMLButtonElement;
-  private unlockBtn: HTMLButtonElement;
+  private repairBtn: HTMLButtonElement;
   private statsPanel: HTMLElement;
   private volumeView: HTMLElement;
   private themeToggle: HTMLButtonElement;
@@ -53,7 +53,7 @@ class App {
     this.themeIcon = document.getElementById('themeIcon') as HTMLElement;
     this.refreshBtn = document.getElementById('refreshButton') as HTMLButtonElement;
     this.checkBtn = document.getElementById('checkButton') as HTMLButtonElement;
-    this.unlockBtn = document.getElementById('unlockButton') as HTMLButtonElement;
+    this.repairBtn = document.getElementById('repairButton') as HTMLButtonElement;
     this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
     this.initRepoBtn = document.getElementById('initRepoButton') as HTMLButtonElement;
     this.initBanner = document.getElementById('repoInitBanner') as HTMLDivElement;
@@ -84,9 +84,11 @@ class App {
     this._statusEl.style.color = isError ? 'var(--red)' : '';
   }
 
-  static setErrorBanner(msg: string): void {
+  static setBanner(msg: string, isError = false): void {
     if (msg) {
       App._bannerText.textContent = msg;
+      App._banner.style.borderColor = isError ? 'var(--red)' : 'var(--border)';
+      App._banner.style.color = isError ? 'var(--red)' : 'var(--text)';
       App._banner.style.display = '';
     } else {
       App._banner.style.display = 'none';
@@ -116,11 +118,11 @@ class App {
     deleteLocksButton.addEventListener('click', () => this.lockMgr.deleteLocks());
 
     this.refreshBtn.addEventListener('click', async () => {
-      App.setErrorBanner('');
+      App.setBanner('');
       try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
       await Promise.all([
-        this.statsMgr.load().catch(e => App.setErrorBanner(e.message)),
-        this.snapMgr.load().catch(e => App.setErrorBanner(e.message)),
+        this.statsMgr.load().catch(e => App.setBanner(e.message, true)),
+        this.snapMgr.load().catch(e => App.setBanner(e.message, true)),
       ]);
       if (this.state.selectedVolume) this.lockMgr.refresh();
     });
@@ -133,32 +135,50 @@ class App {
     });
 
     this.checkBtn.addEventListener('click', async () => {
-      App.showStatus('Checking repository...');
+      this.checkBtn.disabled = true;
+      this.checkBtn.textContent = 'Checking...';
+      App.setBanner('');
+      App.showStatus('Checking repository integrity...');
       try {
         const resp = await fetch('/api/repo/check', { method: 'POST' });
         if (resp.ok) {
-          App.showStatus('Check started – see server logs for results.');
+          const d = await resp.json();
+          App.showStatus(d.status);
+          App.setBanner(d.status);
         } else {
           const b = await resp.json();
           throw new Error(b.error || 'check failed');
         }
       } catch (err) {
         App.showStatus((err as Error).message, true);
+        App.setBanner((err as Error).message, true);
+      } finally {
+        this.checkBtn.disabled = false;
+        this.checkBtn.textContent = 'Check';
       }
     });
 
-    this.unlockBtn.addEventListener('click', async () => {
-      App.showStatus('Removing stale locks...');
+    this.repairBtn.addEventListener('click', async () => {
+      this.repairBtn.disabled = true;
+      this.repairBtn.textContent = 'Repairing...';
+      App.setBanner('');
+      App.showStatus('Running repair (unlock + rebuild index)...');
       try {
-        const resp = await fetch('/api/repo/unlock', { method: 'POST' });
+        const resp = await fetch('/api/repo/repair', { method: 'POST' });
         if (resp.ok) {
-          App.showStatus('Stale locks removed.');
+          const d = await resp.json();
+          App.showStatus(d.status);
+          App.setBanner(d.status);
         } else {
           const b = await resp.json();
-          throw new Error(b.error || 'unlock failed');
+          throw new Error(b.error || 'repair failed');
         }
       } catch (err) {
         App.showStatus((err as Error).message, true);
+        App.setBanner((err as Error).message, true);
+      } finally {
+        this.repairBtn.disabled = false;
+        this.repairBtn.textContent = 'Repair';
       }
     });
 
@@ -175,8 +195,8 @@ class App {
     await Promise.all([
       this.checkRepoStatus(),
       this.pillsMgr.load(),
-      this.snapMgr.load().catch(e => App.setErrorBanner(e.message)),
-      this.statsMgr.load().catch(e => App.setErrorBanner(e.message)),
+      this.snapMgr.load().catch(e => App.setBanner(e.message, true)),
+      this.statsMgr.load().catch(e => App.setBanner(e.message, true)),
     ]);
   }
 
@@ -199,17 +219,17 @@ class App {
         let msg = 'Failed to check repository status';
         try { const b = await resp.json(); if (b.error) msg = b.error; } catch {}
         App.showStatus(msg, true);
-        App.setErrorBanner(msg);
+        App.setBanner(msg, true);
         return;
       }
       const data = await resp.json() as RepoStatus;
       this.initBanner.style.display = data.initialized ? 'none' : 'flex';
       if (data.hostname) this.state.hostname = data.hostname;
-      if (data.initialized !== false) App.setErrorBanner('');
+      if (data.initialized !== false) App.setBanner('');
     } catch {
       const msg = 'Cannot reach server';
       App.showStatus(msg, true);
-      App.setErrorBanner(msg);
+      App.setBanner(msg, true);
     }
   }
 

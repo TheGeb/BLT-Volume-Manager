@@ -27,10 +27,7 @@ type Server struct {
 }
 
 func NewServer(r *restic.Manager, s3Bucket string, s3Endpoint string, s3Region string) *Server {
-	s := &Server{restic: r, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
-	go s.refreshStats()
-	go s.statsLoop()
-	return s
+	return &Server{restic: r, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
@@ -45,7 +42,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)
 	inner.HandleFunc("/api/pills", s.handlePills)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
-	inner.HandleFunc("/api/repo/unlock", s.handleUnlock)
+	inner.HandleFunc("/api/repo/repair", s.handleRepair)
 
 	uiFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

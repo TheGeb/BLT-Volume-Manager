@@ -63,14 +63,14 @@ class PillsManager {
     const filter = st.volumeFilter;
     const matched = filter ? st.volumes.filter(v => v.toLowerCase().includes(filter)) : st.volumes;
     fadeIn(this.container, () => {
-    this.container.innerHTML = '';
-    matched.forEach(volume => {
-      const pill = document.createElement('button');
-      pill.className = 'volume-pill' + (volume === st.selectedVolume ? ' active' : '');
-      pill.dataset.volume = volume;
-      pill.textContent = volume;
-      this.container.appendChild(pill);
-    });
+      this.container.innerHTML = '';
+      matched.forEach(volume => {
+        const pill = document.createElement('button');
+        pill.className = 'volume-pill' + (volume === st.selectedVolume ? ' active' : '');
+        pill.dataset.volume = volume;
+        pill.textContent = volume;
+        this.container.appendChild(pill);
+      });
     });
   }
 

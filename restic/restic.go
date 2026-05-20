@@ -51,7 +51,7 @@ func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "snapshots", "--json")
+	cmd, err := resticCommand(ctx, "snapshots", "--no-lock", "--json")
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +110,9 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 	defer cancel()
 
 	// Build snapshots command depending on preference
-	args := []string{"snapshots", "--last", "1", "--json"}
+	args := []string{"snapshots", "--no-lock", "--last", "1", "--json"}
 	if preferred == "hot" || preferred == "cold" {
-		args = []string{"snapshots", "--tag", preferred, "--last", "1", "--json"}
+		args = []string{"snapshots", "--no-lock", "--tag", preferred, "--last", "1", "--json"}
 	}
 	cmd, err := resticCommand(ctx, args...)
 	if err != nil {
@@ -222,7 +222,7 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "stats", "--json", "--mode", "raw-data")
+	cmd, err := resticCommand(ctx, "stats", "--no-lock", "--json", "--mode", "raw-data")
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +236,18 @@ func (m *Manager) Stats() (*RepoStats, error) {
 		return nil, fmt.Errorf("parse restic stats: %w", err)
 	}
 	return &stats, nil
+}
+
+func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd, err := resticCommand(ctx, "restore", snapshotID, "--target", target)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func resticRepository() (string, error) {
@@ -253,7 +265,7 @@ func (m *Manager) repositoryExists() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "snapshots", "--json")
+	cmd, err := resticCommand(ctx, "snapshots", "--no-lock", "--json")
 	if err != nil {
 		return false, err
 	}
@@ -282,10 +294,30 @@ func (m *Manager) initRepository() error {
 	return cmd.Run()
 }
 
-func (m *Manager) Check() error {
+func (m *Manager) Check(noLock bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	cmd, err := resticCommand(ctx, "check")
+	args := []string{"check"}
+	if noLock {
+		args = append(args, "--no-lock")
+	}
+	cmd, err := resticCommand(ctx, args...)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (m *Manager) Repair() error {
+	// Unlock first, then rebuild index.
+	if err := m.Unlock(); err != nil {
+		log.Printf("repair: unlock failed (continuing): %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	cmd, err := resticCommand(ctx, "repair", "index", "--no-lock")
 	if err != nil {
 		return err
 	}
@@ -312,7 +344,15 @@ func resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, "restic", append([]string{"-r", repo, "--no-lock"}, args...)...)
+	global := []string{"-r", repo}
+	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+	case "trace":
+		global = append(global, "--verbose=2")
+	case "debug":
+		global = append(global, "--verbose=1")
+	}
+
+	cmd := exec.CommandContext(ctx, "restic", append(global, args...)...)
 	cmd.Env = os.Environ()
 	return cmd, nil
 }

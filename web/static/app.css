@@ -162,6 +162,12 @@ h1 {
   cursor: default;
 }
 
+.button-xs {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+}
+
 .split {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -231,6 +237,17 @@ h1 {
   font-size: 0.75rem;
   color: var(--muted);
   margin-top: 8px;
+}
+
+.troubleshoot-panel {
+  padding: 16px 24px;
+}
+
+.troubleshoot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .volume-pills {

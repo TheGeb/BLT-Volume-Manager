@@ -132,7 +132,33 @@ class SnapshotManager {
       const timeCell = document.createElement('td');
       timeCell.textContent = new Date(sn.time).toLocaleString();
       row.appendChild(timeCell);
-      row.appendChild(document.createElement('td'));
+
+      const actionCell = document.createElement('td');
+      const restoreBtn = document.createElement('button');
+      restoreBtn.className = 'button button-secondary button-xs';
+      restoreBtn.textContent = 'Restore';
+      restoreBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const target = prompt('Target path for restore:', '/tmp/restore/' + sn.short_id);
+        if (!target) return;
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'Restoring...';
+        try {
+          const resp = await fetch(`/api/snapshot/${encodeURIComponent(sn.id)}/restore?path=${encodeURIComponent(target)}`, { method: 'POST' });
+          if (!resp.ok) {
+            const b = await resp.json();
+            throw new Error(b.error || 'restore failed');
+          }
+          App.showStatus(`Restore of ${sn.short_id} started – see server logs for results.`);
+        } catch (err) {
+          App.showStatus((err as Error).message, true);
+        } finally {
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = 'Restore';
+        }
+      });
+      actionCell.appendChild(restoreBtn);
+      row.appendChild(actionCell);
       this.table.appendChild(row);
     });
 

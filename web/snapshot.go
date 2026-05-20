@@ -41,12 +41,34 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/snapshot/"), "/")
-	if len(parts) != 2 || parts[1] != "tag" {
+	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore") {
 		http.NotFound(w, r)
 		return
 	}
 
 	snapshotID := parts[0]
+
+	if parts[1] == "restore" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		target := r.URL.Query().Get("path")
+		if target == "" {
+			http.Error(w, "missing path query parameter", http.StatusBadRequest)
+			return
+		}
+		go func() {
+			if err := s.restic.RestoreSnapshot(snapshotID, target); err != nil {
+				logInfo("restore_failed: " + err.Error())
+			} else {
+				logInfo("restore_ok")
+			}
+		}()
+		respondJSON(w, map[string]string{"status": "restore started – see server logs for results"})
+		return
+	}
+
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
 		http.Error(w, "missing tag", http.StatusBadRequest)
