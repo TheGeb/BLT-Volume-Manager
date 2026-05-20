@@ -10,27 +10,60 @@ import (
 	"github.com/example/blt-volume-manager/store"
 )
 
+const (
+	levelError = iota
+	levelInfo
+	levelDebug
+	levelTrace
+)
+
+var levelNames = map[string]int{
+	"error": levelError,
+	"info":  levelInfo,
+	"debug": levelDebug,
+	"trace": levelTrace,
+}
+
+var currentLevel int
+
 func init() {
 	store.LogS3 = logS3Call
+	lvl := os.Getenv("LOG_LEVEL")
+	if lvl == "" {
+		lvl = "info"
+	}
+	if v, ok := levelNames[strings.ToLower(lvl)]; ok {
+		currentLevel = v
+	} else {
+		currentLevel = levelInfo
+	}
 }
 
 type logEntry struct {
-	Level     string `json:"level"`
-	Event     string `json:"event"`
-	Method    string `json:"method,omitempty"`
-	Path      string `json:"path,omitempty"`
-	Status    int    `json:"status,omitempty"`
-	DurationMs int64 `json:"duration_ms,omitempty"`
-	Error     string `json:"error,omitempty"`
-	Op        string `json:"op,omitempty"`
-	Bucket    string `json:"bucket,omitempty"`
-	Key       string `json:"key,omitempty"`
-	Time      string `json:"time"`
+	Level      string `json:"level"`
+	Event      string `json:"event"`
+	Method     string `json:"method,omitempty"`
+	Path       string `json:"path,omitempty"`
+	Status     int    `json:"status,omitempty"`
+	DurationMs int64  `json:"duration_ms,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Op         string `json:"op,omitempty"`
+	Bucket     string `json:"bucket,omitempty"`
+	Key        string `json:"key,omitempty"`
+	Time       string `json:"time"`
 }
 
 func logJSON(e logEntry) {
+	v, ok := levelNames[e.Level]
+	if !ok || v > currentLevel {
+		return
+	}
 	e.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	json.NewEncoder(os.Stdout).Encode(e)
+}
+
+func logInfo(event string) {
+	logJSON(logEntry{Level: "info", Event: event})
 }
 
 func logS3Call(op, bucket, key string, dur time.Duration, err error) {

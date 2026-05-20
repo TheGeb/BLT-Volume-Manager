@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -209,7 +208,7 @@ func (s *Server) refreshStats() {
 	s.pillsCacheAt = time.Now()
 	s.pillsMu.Unlock()
 
-	log.Println("[stats] refreshed")
+	logInfo("stats_refreshed")
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {

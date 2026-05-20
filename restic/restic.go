@@ -33,6 +33,11 @@ func (m *Manager) Backup(path, tag string) error {
 	if tag != "" {
 		args = append(args, "--tag", tag)
 	}
+	compression := os.Getenv("RESTIC_COMPRESSION")
+	if compression == "" {
+		compression = "auto"
+	}
+	args = append(args, "--compression", compression)
 	cmd, err := resticCommand(context.Background(), args...)
 	if err != nil {
 		return err
