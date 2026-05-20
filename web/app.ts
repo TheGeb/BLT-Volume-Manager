@@ -19,6 +19,8 @@ class App {
   private initRepoBtn: HTMLButtonElement;
   private initBanner: HTMLDivElement;
   private refreshBtn: HTMLButtonElement;
+  private checkBtn: HTMLButtonElement;
+  private unlockBtn: HTMLButtonElement;
   private statsPanel: HTMLElement;
   private volumeView: HTMLElement;
   private themeToggle: HTMLButtonElement;
@@ -50,6 +52,8 @@ class App {
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
     this.themeIcon = document.getElementById('themeIcon') as HTMLElement;
     this.refreshBtn = document.getElementById('refreshButton') as HTMLButtonElement;
+    this.checkBtn = document.getElementById('checkButton') as HTMLButtonElement;
+    this.unlockBtn = document.getElementById('unlockButton') as HTMLButtonElement;
     this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
     this.initRepoBtn = document.getElementById('initRepoButton') as HTMLButtonElement;
     this.initBanner = document.getElementById('repoInitBanner') as HTMLDivElement;
@@ -126,6 +130,36 @@ class App {
       this.state.sortNewestFirst = !this.state.sortNewestFirst;
       sortButton.textContent = this.state.sortNewestFirst ? 'Sort by newest' : 'Sort by oldest';
       this.snapMgr.render();
+    });
+
+    this.checkBtn.addEventListener('click', async () => {
+      App.showStatus('Checking repository...');
+      try {
+        const resp = await fetch('/api/repo/check', { method: 'POST' });
+        if (resp.ok) {
+          App.showStatus('Check started – see server logs for results.');
+        } else {
+          const b = await resp.json();
+          throw new Error(b.error || 'check failed');
+        }
+      } catch (err) {
+        App.showStatus((err as Error).message, true);
+      }
+    });
+
+    this.unlockBtn.addEventListener('click', async () => {
+      App.showStatus('Removing stale locks...');
+      try {
+        const resp = await fetch('/api/repo/unlock', { method: 'POST' });
+        if (resp.ok) {
+          App.showStatus('Stale locks removed.');
+        } else {
+          const b = await resp.json();
+          throw new Error(b.error || 'unlock failed');
+        }
+      } catch (err) {
+        App.showStatus((err as Error).message, true);
+      }
     });
 
     this.initRepoBtn.addEventListener('click', () => this.initRepo());

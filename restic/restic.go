@@ -282,13 +282,37 @@ func (m *Manager) initRepository() error {
 	return cmd.Run()
 }
 
+func (m *Manager) Check() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd, err := resticCommand(ctx, "check")
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (m *Manager) Unlock() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd, err := resticCommand(ctx, "unlock")
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	repo, err := resticRepository()
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, "restic", append([]string{"-r", repo}, args...)...)
+	cmd := exec.CommandContext(ctx, "restic", append([]string{"-r", repo, "--no-lock"}, args...)...)
 	cmd.Env = os.Environ()
 	return cmd, nil
 }

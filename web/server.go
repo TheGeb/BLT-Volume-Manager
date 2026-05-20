@@ -44,6 +44,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/stats", s.handleStats)
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)
 	inner.HandleFunc("/api/pills", s.handlePills)
+	inner.HandleFunc("/api/repo/check", s.handleCheck)
+	inner.HandleFunc("/api/repo/unlock", s.handleUnlock)
 
 	uiFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
