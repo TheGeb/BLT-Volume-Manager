@@ -22,6 +22,7 @@ class App {
   private checkBtn: HTMLButtonElement;
   private repairBtn: HTMLButtonElement;
   private statsPanel: HTMLElement;
+  private troubleshootPanel: HTMLElement;
   private volumeView: HTMLElement;
   private themeToggle: HTMLButtonElement;
   private themeIcon: HTMLElement;
@@ -58,6 +59,7 @@ class App {
     this.initRepoBtn = document.getElementById('initRepoButton') as HTMLButtonElement;
     this.initBanner = document.getElementById('repoInitBanner') as HTMLDivElement;
     this.statsPanel = document.getElementById('statsPanel') as HTMLElement;
+    this.troubleshootPanel = document.getElementById('troubleshootPanel') as HTMLElement;
     this.volumeView = volumeView;
 
     App._statusEl = statusMessage;
@@ -87,11 +89,11 @@ class App {
   static setBanner(msg: string, isError = false): void {
     if (msg) {
       App._bannerText.textContent = msg;
-      App._banner.style.borderColor = isError ? 'var(--red)' : 'var(--border)';
       App._banner.style.color = isError ? 'var(--red)' : 'var(--text)';
-      App._banner.style.display = '';
+      App._banner.style.borderColor = isError ? 'var(--red)' : 'var(--border)';
+      App._banner.classList.add('visible');
     } else {
-      App._banner.style.display = 'none';
+      App._banner.classList.remove('visible');
     }
   }
 
@@ -203,10 +205,12 @@ class App {
   private onVolumeChange(vol: string): void {
     if (vol) {
       this.statsPanel.style.display = 'none';
+      this.troubleshootPanel.style.display = 'none';
       this.volumeView.style.display = 'grid';
       this.lockMgr.refresh();
     } else {
       this.statsPanel.style.display = '';
+      this.troubleshootPanel.style.display = '';
       this.volumeView.style.display = 'none';
     }
     this.snapMgr.render();

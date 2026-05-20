@@ -35,8 +35,7 @@ class SnapshotManager {
   }
 
   async load(): Promise<void> {
-    const hasData = !!this.table.querySelector('td');
-    if (!hasData) this.showSkeleton();
+    this.showSkeleton();
     try {
       const resp = await fetch('/api/snapshots');
       if (!resp.ok) {

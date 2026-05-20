@@ -12,10 +12,7 @@
   <div class="page-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">BLT Volume Manager</p>
-        <h1>Volume Manager</h1>
-        <p class="description">Browse backups, manage locks, and transfer data across volumes.
-        </p>
+        <h1>BLT Volume Manager</h1>
       </div>
       <div class="topbar-actions">
         <button id="refreshButton" class="button-icon" title="Refresh">
@@ -46,7 +43,7 @@
       <button id="initRepoButton" class="button">Initialize Repository</button>
     </div>
 
-    <div id="errorBanner" class="init-banner" style="display:none;border-color:var(--red);color:var(--red);">
+    <div id="errorBanner" class="init-banner init-banner-error">
       <span id="errorBannerText"></span>
     </div>
 
@@ -62,7 +59,7 @@
       <div id="statsGrid" class="stats-grid"></div>
     </section>
 
-    <section class="panel troubleshoot-panel">
+    <section id="troubleshootPanel" class="panel troubleshoot-panel">
       <h2 class="stats-heading">Troubleshooting</h2>
       <div class="troubleshoot-actions">
         <button id="checkButton" class="button button-secondary" title="Check repository integrity">Check</button>

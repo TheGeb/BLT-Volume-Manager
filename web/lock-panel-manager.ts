@@ -12,6 +12,7 @@ class LockPanelManager {
   private deleteBtn: HTMLButtonElement;
   private getState: () => AppState;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private contentHeight = 0;
 
   constructor(
     panel: HTMLElement, content: HTMLElement, skeletonEl: HTMLElement,
@@ -33,6 +34,9 @@ class LockPanelManager {
   showSkeleton(): void {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     this.panel.style.display = '';
+    if (this.content.style.display !== 'none') {
+      this.contentHeight = this.content.scrollHeight;
+    }
     this.content.style.display = 'none';
     this.skeleton.style.display = 'block';
   }
@@ -65,9 +69,10 @@ class LockPanelManager {
     this.content.style.display = '';
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
 
-    const currentH = this.content.offsetHeight;
+    const startH = this.contentHeight;
     this.content.style.transition = 'none';
     this.content.style.height = '';
+    this.contentHeight = 0;
 
     if (data.locked) {
       this.statusText.textContent = 'Locked';
@@ -92,8 +97,8 @@ class LockPanelManager {
     this.deleteBtn.disabled = !data.locked;
 
     const newH = this.content.scrollHeight;
-    if (currentH > 0 && newH !== currentH) {
-      this.content.style.height = `${currentH}px`;
+    if (startH > 0 && newH !== startH) {
+      this.content.style.height = `${startH}px`;
       requestAnimationFrame(() => {
         this.content.style.transition = 'height 0.25s ease';
         this.content.style.height = `${newH}px`;

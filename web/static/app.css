@@ -400,6 +400,20 @@ h1 {
   color: #fbbf24;
 }
 
+.init-banner.init-banner-error {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--red);
+}
+
+.init-banner.init-banner-error.visible {
+  visibility: visible;
+  opacity: 1;
+}
+
 .stats-panel {
   margin-bottom: 20px;
 }
