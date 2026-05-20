@@ -28,7 +28,7 @@ class PillsManager {
     const gap = 8;
     const containerWidth = this.container.offsetWidth || 600;
     const perRow = Math.max(1, Math.floor((containerWidth + gap) / (pillWidth + gap)));
-    for (let i = 0; i < perRow * 2; i++) {
+    for (let i = 0; i < perRow; i++) {
       const pill = document.createElement('div');
       pill.className = 'skeleton skeleton-pill';
       pill.style.width = `${pillWidth}px`;

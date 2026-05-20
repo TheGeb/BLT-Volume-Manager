@@ -32,6 +32,7 @@ class LockPanelManager {
 
   showSkeleton(): void {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.panel.style.display = '';
     this.content.style.display = 'none';
     this.skeleton.style.display = 'block';
   }
