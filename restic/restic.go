@@ -507,7 +507,9 @@ func resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 		global = append(global, "--verbose=1")
 	}
 
-	cmd := exec.CommandContext(ctx, "restic", append(global, args...)...)
+	fullArgs := append(global, args...)
+	log.Printf("restic %s", strings.Join(fullArgs, " "))
+	cmd := exec.CommandContext(ctx, "restic", fullArgs...)
 	cmd.Env = os.Environ()
 	return cmd, nil
 }
