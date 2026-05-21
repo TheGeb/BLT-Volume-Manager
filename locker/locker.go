@@ -15,6 +15,7 @@ type Locker interface {
 
 type Lock interface {
 	Release() error
+	IsValid() (bool, error)
 }
 
 // Simple file-based locker that creates a lock file using O_EXCL.
@@ -55,4 +56,12 @@ func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 func (fl *fileLock) Release() error {
 	return os.Remove(fl.path)
+}
+
+func (fl *fileLock) IsValid() (bool, error) {
+	_, err := os.Stat(fl.path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return err == nil, err
 }

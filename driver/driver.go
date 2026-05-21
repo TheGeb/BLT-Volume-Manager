@@ -230,30 +230,38 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 			if err != nil {
 				log.Printf("check restore-point: %v", err)
 			} else if snapID != "" {
-				log.Printf("restore-point found for %s (%s)", name, snapID)
-
-				// Backup current state to restic with "rollback" tag before restoring.
-				log.Printf("backing up current state (rollback) for %s", name)
-				if err := d.restic.Backup(volPath, "rollback"); err != nil {
-					log.Printf("rollback backup failed: %v", err)
-				}
-
-				snapDir := filepath.Join(d.root, "snapshots")
-				preSnap, snapErr := snapshot.Create(volPath, snapDir, name+"-pre-restore")
-				if snapErr != nil {
-					log.Printf("pre-restore snapshot: %v", snapErr)
-				}
-				if err := d.restic.RestoreSnapshot(snapID, volPath); err != nil {
-					log.Printf("restore-point restore failed: %v", err)
+				// Guard the destructive restore-point flow with lock validity.
+				valid, verr := vi.Lock.IsValid()
+				if verr != nil {
+					log.Printf("restore-point: lock check failed: %v", verr)
+				} else if !valid {
+					log.Printf("restore-point: lock no longer held, skipping restore")
 				} else {
-					log.Printf("restore-point restored, removing tag")
-					if err := d.restic.UntagSnapshot(snapID, "restore-point"); err != nil {
-						log.Printf("remove restore-point tag: %v", err)
+					log.Printf("restore-point found for %s (%s)", name, snapID)
+
+					// Backup current state to restic with "rollback" tag before restoring.
+					log.Printf("backing up current state (rollback) for %s", name)
+					if err := d.restic.Backup(volPath, "rollback"); err != nil {
+						log.Printf("rollback backup failed: %v", err)
 					}
-				}
-				if preSnap != nil {
-					if err := snapshot.Remove(preSnap); err != nil {
-						log.Printf("cleanup pre-restore snapshot: %v", err)
+
+					snapDir := filepath.Join(d.root, "snapshots")
+					preSnap, snapErr := snapshot.Create(volPath, snapDir, name+"-pre-restore")
+					if snapErr != nil {
+						log.Printf("pre-restore snapshot: %v", snapErr)
+					}
+					if err := d.restic.RestoreSnapshot(snapID, volPath); err != nil {
+						log.Printf("restore-point restore failed: %v", err)
+					} else {
+						log.Printf("restore-point restored, removing tag")
+						if err := d.restic.UntagSnapshot(snapID, "restore-point"); err != nil {
+							log.Printf("remove restore-point tag: %v", err)
+						}
+					}
+					if preSnap != nil {
+						if err := snapshot.Remove(preSnap); err != nil {
+							log.Printf("cleanup pre-restore snapshot: %v", err)
+						}
 					}
 				}
 			}

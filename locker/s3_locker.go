@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/example/blt-volume-manager/store"
@@ -113,6 +114,49 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 func (l *s3Lock) Release() error {
 	return l.rw.DeleteObject(l.myKey)
+}
+
+func (l *s3Lock) IsValid() (bool, error) {
+	// Extract folder prefix from myKey (everything up to and including last /).
+	folder := l.myKey
+	if idx := strings.LastIndex(folder, "/"); idx >= 0 {
+		folder = folder[:idx+1]
+	}
+
+	objects, err := l.rw.ListObjects(folder)
+	if err != nil {
+		return false, fmt.Errorf("list lock objects: %w", err)
+	}
+
+	sort.Slice(objects, func(i, j int) bool {
+		ti, tj := objects[i].LastModified, objects[j].LastModified
+		if ti != nil && tj != nil && !ti.Equal(*tj) {
+			return ti.Before(*tj)
+		}
+		return *objects[i].Key < *objects[j].Key
+	})
+
+	for _, obj := range objects {
+		if obj.Key == nil {
+			continue
+		}
+		raw, err := l.rw.ReadObject(*obj.Key)
+		if err != nil || raw == nil {
+			continue
+		}
+		var o store.LockOwner
+		if err := json.Unmarshal(raw, &o); err != nil {
+			continue
+		}
+		if o.GetRemainingTimeinSeconds() <= 0 {
+			l.rw.DeleteObject(*obj.Key)
+			continue
+		}
+		// First valid proposal — is it ours?
+		return *obj.Key == l.myKey, nil
+	}
+
+	return false, nil
 }
 
 func (s *s3Locker) lockFolder(name string) string {
