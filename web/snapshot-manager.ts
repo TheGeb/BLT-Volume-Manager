@@ -81,7 +81,32 @@ class SnapshotManager {
       return;
     }
 
-    filtered.forEach(sn => {
+      // Warn if a volume has multiple restore-point snapshots
+      const rpByVolume: Record<string, string[]> = {};
+      filtered.forEach(sn => {
+        if (sn.tags.includes('restore-point')) {
+          sn.paths.forEach(p => {
+            const vol = extractVolumeName(p);
+            if (vol) {
+              if (!rpByVolume[vol]) rpByVolume[vol] = [];
+              rpByVolume[vol].push(sn.short_id);
+            }
+          });
+        }
+      });
+      Object.entries(rpByVolume).forEach(([vol, ids]) => {
+        if (ids.length > 1) {
+          const wr = document.createElement('tr');
+          wr.className = 'warning-row';
+          const wc = document.createElement('td');
+          wc.colSpan = 5;
+          wc.innerHTML = `<span style="color:var(--yellow)">\u26a0</span> Volume <strong>${vol}</strong> has <strong>${ids.length}</strong> restore-point snapshots: ${ids.join(', ')}. Only one should exist.`;
+          wr.appendChild(wc);
+          this.table.appendChild(wr);
+        }
+      });
+
+      filtered.forEach(sn => {
       const row = document.createElement('tr');
       const idCell = document.createElement('td');
       idCell.className = 'copy-id';
@@ -102,7 +127,8 @@ class SnapshotManager {
       const tagsCell = document.createElement('td');
       const tagList = document.createElement('div');
       tagList.className = 'tag-list';
-      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold');
+      const isRestorePoint = sn.tags.includes('restore-point');
+      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold' || t === 'restore-point');
       const isExcluded = sn.tags.includes('excluded');
       if (visibleTags.length === 0) {
         tagList.textContent = 'No tags';
@@ -157,6 +183,28 @@ class SnapshotManager {
         }
       });
       actionCell.appendChild(restoreBtn);
+
+      const rpBtn = document.createElement('button');
+      rpBtn.className = 'button button-secondary button-xs';
+      rpBtn.textContent = isRestorePoint ? '\u229b Restore Point' : '\u2295 Set Restore Point';
+      rpBtn.style.marginLeft = '6px';
+      if (isRestorePoint) {
+        rpBtn.style.borderColor = 'var(--accent)';
+        rpBtn.style.color = 'var(--accent)';
+      }
+      rpBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        rpBtn.disabled = true;
+        try {
+          await this.addTag(sn.id, 'restore-point');
+          App.showStatus(`Snapshot ${sn.short_id} set as restore point.`);
+        } catch (err) {
+          App.showStatus((err as Error).message, true);
+        } finally {
+          rpBtn.disabled = false;
+        }
+      });
+      actionCell.appendChild(rpBtn);
       row.appendChild(actionCell);
       this.table.appendChild(row);
     });

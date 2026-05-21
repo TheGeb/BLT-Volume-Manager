@@ -272,6 +272,139 @@ func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
 	return cmd.Run()
 }
 
+// volumeNameFromPath extracts the volume name from a path.
+// Handles /volumes/<name> paths and snapshot paths like <name>-cold-snap.
+func volumeNameFromPath(path string) string {
+	marker := "/volumes/"
+	if idx := strings.Index(path, marker); idx >= 0 {
+		rest := strings.TrimPrefix(path[idx+len(marker):], "/")
+		if parts := strings.SplitN(rest, "/", 2); len(parts) > 0 && parts[0] != "" {
+			return parts[0]
+		}
+	}
+	// Snapshot paths: .../<name>-cold-snap or .../<name>-pre-restore
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	last := parts[len(parts)-1]
+	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
+		if strings.HasSuffix(last, suffix) {
+			return strings.TrimSuffix(last, suffix)
+		}
+	}
+	return ""
+}
+
+// SetRestorePoint tags a snapshot as the restore-point for its volume.
+// It ensures exclusivity by removing the tag from any other snapshot
+// that belongs to the same volume.
+func (m *Manager) SetRestorePoint(snapshotID string) error {
+	snapshots, err := m.ListSnapshots()
+	if err != nil {
+		return fmt.Errorf("list snapshots: %w", err)
+	}
+
+	// Find the target snapshot and determine its volume name.
+	targetVolume := ""
+	for _, snap := range snapshots {
+		if snap.ShortID == snapshotID || snap.ID == snapshotID {
+			for _, p := range snap.Paths {
+				if v := volumeNameFromPath(p); v != "" {
+					targetVolume = v
+					break
+				}
+			}
+			break
+		}
+	}
+	if targetVolume == "" {
+		return fmt.Errorf("snapshot %s not found or could not determine volume", snapshotID)
+	}
+
+	// Untag any other snapshot for the same volume that has "restore-point".
+	for _, snap := range snapshots {
+		if snap.ShortID == snapshotID || snap.ID == snapshotID {
+			continue
+		}
+		if !hasTag(snap.Tags, "restore-point") {
+			continue
+		}
+		snapVolume := ""
+		for _, p := range snap.Paths {
+			if v := volumeNameFromPath(p); v != "" {
+				snapVolume = v
+				break
+			}
+		}
+		if snapVolume != targetVolume {
+			continue
+		}
+		// Remove from the conflicting snapshot.
+		id := snap.ShortID
+		if id == "" {
+			id = snap.ID
+		}
+		if err := m.UntagSnapshot(id, "restore-point"); err != nil {
+			return fmt.Errorf("remove restore-point from %s: %w", id, err)
+		}
+	}
+
+	// Tag the target.
+	return m.TagSnapshot(snapshotID, "restore-point")
+}
+
+// FindRestorePoint returns the most recent snapshot with "restore-point" tag
+// whose paths match the given volume path. Returns empty string if none found.
+func (m *Manager) FindRestorePoint(volPath string) (string, error) {
+	snapshots, err := m.ListSnapshots()
+	if err != nil {
+		return "", fmt.Errorf("list snapshots: %w", err)
+	}
+
+	targetVolume := volumeNameFromPath(volPath)
+	if targetVolume == "" {
+		return "", nil
+	}
+
+	var candidates []Snapshot
+	for _, snap := range snapshots {
+		if !hasTag(snap.Tags, "restore-point") {
+			continue
+		}
+		for _, p := range snap.Paths {
+			if volumeNameFromPath(p) == targetVolume {
+				candidates = append(candidates, snap)
+				break
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return "", nil
+	}
+
+	// Return the most recent one.
+	id := candidates[0].ShortID
+	if id == "" {
+		id = candidates[0].ID
+	}
+	for _, c := range candidates[1:] {
+		if c.Time.After(candidates[0].Time) {
+			id = c.ShortID
+			if id == "" {
+				id = c.ID
+			}
+		}
+	}
+	return id, nil
+}
+
+func hasTag(tags []string, target string) bool {
+	for _, t := range tags {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
+
 func resticRepository() (string, error) {
 	repo := strings.TrimSpace(os.Getenv("RESTIC_REPOSITORY"))
 	if repo == "" {

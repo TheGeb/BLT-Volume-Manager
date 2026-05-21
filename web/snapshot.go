@@ -77,9 +77,16 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		if err := s.restic.TagSnapshot(snapshotID, tag); err != nil {
-			respondError(w, err, http.StatusInternalServerError)
-			return
+		if tag == "restore-point" {
+			if err := s.restic.SetRestorePoint(snapshotID); err != nil {
+				respondError(w, err, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			if err := s.restic.TagSnapshot(snapshotID, tag); err != nil {
+				respondError(w, err, http.StatusInternalServerError)
+				return
+			}
 		}
 		respondJSON(w, map[string]string{"status": "tag added"})
 	case http.MethodDelete:

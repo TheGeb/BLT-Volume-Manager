@@ -221,6 +221,42 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 		log.Printf("Mount: failed to acquire lock: %v", err)
 	} else {
 		vi.Lock = lock
+
+		// If the volume is cold (has an fsType), check for restore-point.
+		if vi.FsType != "" {
+			snapID, err := d.restic.FindRestorePoint(volPath)
+			if err != nil {
+				log.Printf("check restore-point: %v", err)
+			} else if snapID != "" {
+				log.Printf("restore-point found for %s (%s)", name, snapID)
+
+				// Backup current state to restic with "rollback" tag before restoring.
+				log.Printf("backing up current state (rollback) for %s", name)
+				if err := d.restic.Backup(volPath, "rollback"); err != nil {
+					log.Printf("rollback backup failed: %v", err)
+				}
+
+				snapDir := filepath.Join(d.root, "snapshots")
+				preSnap, snapErr := snapshot.Create(volPath, snapDir, name+"-pre-restore")
+				if snapErr != nil {
+					log.Printf("pre-restore snapshot: %v", snapErr)
+				}
+				if err := d.restic.RestoreSnapshot(snapID, volPath); err != nil {
+					log.Printf("restore-point restore failed: %v", err)
+				} else {
+					log.Printf("restore-point restored, removing tag")
+					if err := d.restic.UntagSnapshot(snapID, "restore-point"); err != nil {
+						log.Printf("remove restore-point tag: %v", err)
+					}
+				}
+				if preSnap != nil {
+					if err := snapshot.Remove(preSnap); err != nil {
+						log.Printf("cleanup pre-restore snapshot: %v", err)
+					}
+				}
+			}
+		}
+
 		ctx2, cancel := context.WithCancel(context.Background())
 		vi.cancel = cancel
 		d.startHotSchedule(ctx2, name, volPath)
