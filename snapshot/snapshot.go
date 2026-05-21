@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,6 +36,7 @@ type SnapInfo struct {
 }
 
 func Detect(path string) Type {
+	log.Printf("stat -f -c %%T %s", path)
 	cmd := exec.Command("stat", "-f", "-c", "%T", path)
 	out, err := cmd.Output()
 	if err != nil {
@@ -56,6 +58,7 @@ func InitBtrfs(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("create parent: %w", err)
 	}
+	log.Printf("btrfs subvolume create %s", path)
 	cmd := exec.Command("btrfs", "subvolume", "create", path)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("btrfs subvolume create: %w\n%s", err, string(out))
@@ -75,6 +78,7 @@ func InitZFS(path, parentDataset string) (string, error) {
 		return "", fmt.Errorf("remove path: %w", err)
 	}
 
+	log.Printf("zfs create -o mountpoint=%s %s", path, full)
 	cmd := exec.Command("zfs", "create", "-o", "mountpoint="+path, full)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("zfs create: %w\n%s", err, string(out))
@@ -83,6 +87,7 @@ func InitZFS(path, parentDataset string) (string, error) {
 }
 
 func IsSubvolume(path string) bool {
+	log.Printf("btrfs subvolume show %s", path)
 	cmd := exec.Command("btrfs", "subvolume", "show", path)
 	return cmd.Run() == nil
 }

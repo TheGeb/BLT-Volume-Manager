@@ -182,9 +182,11 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	}
 	switch fsType {
 	case "btrfs":
+		log.Printf("btrfs subvolume delete %s", volPath)
 		exec.Command("btrfs", "subvolume", "delete", volPath).Run()
 	case "zfs":
 		if ds, err := snapshot.ParentDataset(volPath); err == nil {
+			log.Printf("zfs destroy -r %s", ds)
 			exec.Command("zfs", "destroy", "-r", ds).Run()
 		}
 	default:
