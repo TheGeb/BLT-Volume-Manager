@@ -254,32 +254,3 @@ func (s *Server) handlePills(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, resp)
 }
-
-func (s *Server) handleVolumes(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var vols []string
-	if s.s3Bucket != "" {
-		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName: s.s3Bucket,
-			S3Endpoint:    s.s3Endpoint,
-			Region:        s.s3Region,
-		})
-		if err == nil {
-			prefixes, err := rw.ListCommonPrefixes("volume-locks/", "/")
-			if err == nil {
-				for _, p := range prefixes {
-					name := strings.TrimSuffix(strings.TrimPrefix(p, "volume-locks/"), "/")
-					if name != "" {
-						vols = append(vols, name)
-					}
-				}
-			}
-		}
-	}
-	sort.Strings(vols)
-	respondJSON(w, vols)
-}

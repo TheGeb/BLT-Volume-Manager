@@ -47,6 +47,28 @@ func (m *Manager) Backup(path, tag string) error {
 	return cmd.Run()
 }
 
+func (m *Manager) BackupAt(path, tag string, t time.Time) error {
+	args := []string{"backup", path}
+	if tag != "" {
+		args = append(args, "--tag", tag)
+	}
+	if !t.IsZero() {
+		args = append(args, "--time", t.Format(time.RFC3339))
+	}
+	compression := os.Getenv("RESTIC_COMPRESSION")
+	if compression == "" {
+		compression = "auto"
+	}
+	args = append(args, "--compression", compression)
+	cmd, err := resticCommand(context.Background(), args...)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

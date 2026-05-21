@@ -124,6 +124,7 @@ class App {
       try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
       await Promise.all([
         this.statsMgr.load().catch(e => App.setBanner(e.message, true)),
+        this.pillsMgr.load().catch(e => App.setBanner(e.message, true)),
         this.snapMgr.load().catch(e => App.setBanner(e.message, true)),
       ]);
       if (this.state.selectedVolume) this.lockMgr.refresh();

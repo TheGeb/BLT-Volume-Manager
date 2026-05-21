@@ -34,7 +34,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner := http.NewServeMux()
 	inner.HandleFunc("/api/repo/init", s.handleRepoInit)
 	inner.HandleFunc("/api/repo/status", s.handleRepoStatus)
-	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/snapshots", s.handleSnapshots)
 	inner.HandleFunc("/api/snapshot/", s.handleSnapshotAction)
 	inner.HandleFunc("/api/volume/", s.handleVolumeAction)
