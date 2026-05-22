@@ -7,6 +7,7 @@ class SnapshotManager {
   private sortBtn: HTMLButtonElement;
   private getState: () => AppState;
   private setState: (patch: Partial<AppState>) => void;
+  private loading = false;
 
   constructor(
     table: HTMLTableSectionElement,
@@ -23,15 +24,37 @@ class SnapshotManager {
   }
 
   showSkeleton(): void {
+    this.loading = true;
     this.table.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
+    const colWidths = [
+      [['120px', '80px'], ['180px', '100px'], ['80px', '60px'], ['140px', '90px'], ['100px']],
+      [['100px', '70px'], ['220px', '140px'], ['100px', '70px'], ['130px', '80px'], ['100px']],
+      [['140px', '90px'], ['160px', '110px'], ['80px', '50px'], ['150px', '100px'], ['100px']],
+      [['110px', '75px'], ['200px', '130px'], ['120px', '80px'], ['135px', '85px'], ['100px']],
+      [['130px', '85px'], ['170px', '120px'], ['80px', '60px'], ['145px', '95px'], ['100px']],
+      [['90px', '65px'], ['240px', '150px'], ['100px', '70px'], ['125px', '75px'], ['100px']],
+      [['150px', '100px'], ['190px', '130px'], ['80px', '55px'], ['155px', '105px'], ['100px']],
+    ];
+    for (const cols of colWidths) {
       const row = document.createElement('tr');
-      const td = document.createElement('td');
-      td.colSpan = 5;
-      td.innerHTML = '<div class="skeleton skeleton-row"></div>';
-      row.appendChild(td);
+      row.className = 'skeleton-row';
+      for (const widths of cols) {
+        const td = document.createElement('td');
+        for (const w of widths) {
+          const bar = document.createElement('div');
+          bar.className = 'skeleton-table-bar';
+          bar.style.width = w;
+          td.appendChild(bar);
+        }
+        row.appendChild(td);
+      }
       this.table.appendChild(row);
     }
+  }
+
+  hideSkeleton(): void {
+    this.loading = false;
+    this.table.innerHTML = '';
   }
 
   async load(): Promise<void> {
@@ -47,17 +70,20 @@ class SnapshotManager {
       this.setState({
         snapshots: raw.map(sn => ({ ...sn, tags: Array.isArray(sn.tags) ? sn.tags : [], paths: Array.isArray(sn.paths) ? sn.paths : [] })),
       });
+      this.hideSkeleton();
       this.render();
       App.showStatus(`Loaded ${this.getState().snapshots.length} snapshots.`);
     } catch (err) {
+      this.hideSkeleton();
       App.showStatus((err as Error).message, true);
       throw err;
     }
   }
 
   render(): void {
+    if (this.loading) return;
     const st = this.getState();
-    const fromSkeleton = !!this.table.querySelector('.skeleton');
+    const fromSkeleton = !!this.table.querySelector('.skeleton-table-row');
     const oldH = fromSkeleton ? this.table.offsetHeight : 0;
 
     fadeIn(this.table, () => {

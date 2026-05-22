@@ -28,6 +28,7 @@ class SnapshotViewer {
   private compHeader: HTMLElement;
   private compSelect: HTMLSelectElement;
   private compBtn: HTMLElement;
+  private compareSkeleton: HTMLElement;
   private currentSnapshot: Snapshot | null = null;
   private allSnapshots: Snapshot[] = [];
 
@@ -41,6 +42,7 @@ class SnapshotViewer {
     this.compHeader = document.getElementById('viewerCompareHeader')!;
     this.compSelect = document.getElementById('viewerCompareSelect')! as HTMLSelectElement;
     this.compBtn = document.getElementById('viewerCompareBtn')!;
+    this.compareSkeleton = document.getElementById('viewerCompareSkeleton')!;
     this.listen();
   }
 
@@ -62,9 +64,11 @@ class SnapshotViewer {
     this.currentSnapshot = snapshot;
     this.snapIdEl.textContent = snapshot.short_id;
     this.panel.style.display = 'block';
-    this.loading.style.display = 'block';
+    this.loading.style.display = 'none';
     this.tree.innerHTML = '';
+    this.renderSkeleton();
     this.detail.innerHTML = '';
+    this.showCompareSkeleton();
     this.compHeader.style.display = 'none';
 
     let nodes: FileNode[];
@@ -76,22 +80,59 @@ class SnapshotViewer {
       }
       nodes = await resp.json();
     } catch (err) {
+      this.tree.innerHTML = '';
+      this.hideCompareSkeleton();
       this.showError((err as Error).message);
       return;
     }
 
     if (!nodes || nodes.length === 0) {
-      this.loading.style.display = 'none';
+      this.tree.innerHTML = '';
+      this.hideCompareSkeleton();
       this.detail.innerHTML = '<span style="color:var(--muted)">Snapshot is empty.</span>';
       return;
     }
 
-    this.loading.style.display = 'none';
     this.renderTree(nodes);
     this.populateCompareSelect(snapshot).catch(() => {});
   }
 
+  private showCompareSkeleton(): void {
+    this.compareSkeleton.style.display = 'flex';
+    this.compHeader.style.display = 'none';
+  }
+
+  private hideCompareSkeleton(): void {
+    this.compareSkeleton.style.display = 'none';
+  }
+
+  private renderSkeleton(): void {
+    const items = [
+      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
+      { depth: 0 }, { depth: 1 }, { depth: 2 }, { depth: 3 }, { depth: 3 },
+      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
+      { depth: 0 }, { depth: 1 }, { depth: 2 }, { depth: 3 }, { depth: 3 },
+      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
+    ];
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'skeleton-tree-item';
+      row.style.paddingLeft = `${item.depth * 18 + 4}px`;
+      const icon = document.createElement('span');
+      icon.className = 'skeleton-icon';
+      icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+      row.appendChild(icon);
+      const bar = document.createElement('span');
+      bar.className = 'skeleton-tree-bar';
+      const widths = [60, 80, 45, 70, 55];
+      bar.style.width = `${widths[item.depth % widths.length]}%`;
+      row.appendChild(bar);
+      this.tree.appendChild(row);
+    }
+  }
+
   private renderTree(nodes: FileNode[]): void {
+    this.tree.innerHTML = '';
     const root: any = { name: '/', type: 'dir', children: {} };
     for (const n of nodes) {
       if (!n.path || n.path === '/') continue;
@@ -139,7 +180,7 @@ class SnapshotViewer {
       summary.style.color = 'var(--text)';
       summary.style.fontSize = '0.9rem';
       const icon = document.createElement('span');
-      icon.textContent = '\u{1F4C1}';
+      icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
       summary.prepend(icon);
       details.appendChild(summary);
       const content = document.createElement('div');
@@ -163,7 +204,7 @@ class SnapshotViewer {
       item.style.alignItems = 'center';
       item.style.gap = '4px';
       const icon = document.createElement('span');
-      icon.textContent = '\u{1F4C4}';
+      icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = node.name;
       if (node.size != null) {
@@ -286,10 +327,16 @@ class SnapshotViewer {
     }
     if (count > 0) {
       this.compHeader.style.display = 'block';
+      this.hideCompareSkeleton();
+    } else {
+      this.hideCompareSkeleton();
     }
   }
 
   private diffOtherId = '';
+  private sideBySide = false;
+  private currentDiffPath = '';
+  private currentDiffData: { t: string; line: string }[] = [];
 
   async doDiff(): Promise<void> {
     if (!this.currentSnapshot) return;
@@ -376,8 +423,9 @@ class SnapshotViewer {
 
       const linesA = textA.split('\n');
       const linesB = textB.split('\n');
-      const diff = this.computeUnifiedDiff(linesA, linesB);
-      this.renderUnifiedDiff(diff, path);
+      this.currentDiffPath = path;
+      this.currentDiffData = this.computeUnifiedDiff(linesA, linesB);
+      this.renderCurrentDiff();
     } catch (err) {
       this.showError((err as Error).message);
     }
@@ -446,8 +494,22 @@ class SnapshotViewer {
     return result;
   }
 
+  private renderCurrentDiff(): void {
+    if (this.sideBySide) {
+      this.renderSideBySideDiff(this.currentDiffData, this.currentDiffPath);
+    } else {
+      this.renderUnifiedDiff(this.currentDiffData, this.currentDiffPath);
+    }
+  }
+
+  private toggleDiffLayout(): void {
+    this.sideBySide = !this.sideBySide;
+    this.renderCurrentDiff();
+  }
+
   private renderUnifiedDiff(diff: { t: string; line: string }[], path: string): void {
-    const html: string[] = [`<div style="margin-bottom:8px;font-weight:700;">Diff: ${this.escapeHtml(path)}</div>`];
+    const toggleLabel = this.sideBySide ? 'Side by side' : 'Inline';
+    const html: string[] = [`<div style="margin-bottom:8px;font-weight:700;display:flex;align-items:center;gap:8px;"><span>Diff: ${this.escapeHtml(path)}</span><button id="diffToggleBtn" style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;">${toggleLabel}</button></div>`];
     let ctxCount = 0;
     const flushCtx = () => {
       if (ctxCount > 3) {
@@ -473,6 +535,65 @@ class SnapshotViewer {
     }
     flushCtx();
     this.detail.innerHTML = html.join('\n');
+    const btn = document.getElementById('diffToggleBtn');
+    if (btn) btn.addEventListener('click', () => this.toggleDiffLayout());
+  }
+
+  private renderSideBySideDiff(diff: { t: string; line: string }[], path: string): void {
+    const toggleLabel = this.sideBySide ? 'Side by side' : 'Inline';
+    const html: string[] = [`<div style="margin-bottom:8px;font-weight:700;display:flex;align-items:center;gap:8px;"><span>Diff: ${this.escapeHtml(path)}</span><button id="diffToggleBtn" style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;">${toggleLabel}</button></div>`];
+    html.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-size:0.85rem;font-family:monospace;">');
+    html.push('<div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">Old</div>');
+    html.push('<div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">New</div>');
+
+    let ctxCount = 0;
+    const pendingDel: string[] = [];
+    const pendingAdd: string[] = [];
+    const flushCtx = () => {
+      if (ctxCount > 3) {
+        html.push(`<div style="grid-column:1/3;color:var(--muted);font-size:0.75rem;padding:1px 4px;">... ${ctxCount - 3} common lines hidden ...</div>`);
+      }
+      ctxCount = 0;
+    };
+    const flushPending = () => {
+      if (pendingDel.length === 0 && pendingAdd.length === 0) return;
+      const maxLen = Math.max(pendingDel.length, pendingAdd.length);
+      for (let i = 0; i < maxLen; i++) {
+        const del = i < pendingDel.length ? this.escapeHtml(pendingDel[i]) : '';
+        const add = i < pendingAdd.length ? this.escapeHtml(pendingAdd[i]) : '';
+        const delBg = del ? 'background:rgba(248,113,113,0.1);' : 'background:rgba(255,255,255,0.02);';
+        const addBg = add ? 'background:rgba(52,211,153,0.1);' : 'background:rgba(255,255,255,0.02);';
+        html.push(`<div style="padding:1px 4px;${delBg}white-space:pre-wrap;">${del}</div>`);
+        html.push(`<div style="padding:1px 4px;${addBg}white-space:pre-wrap;">${add}</div>`);
+      }
+      pendingDel.length = 0;
+      pendingAdd.length = 0;
+    };
+
+    for (const entry of diff) {
+      if (entry.t === 'ctx') {
+        flushPending();
+        ctxCount++;
+        if (ctxCount <= 3) {
+          const line = entry.line.length > 200 ? entry.line.slice(0, 200) + '...' : entry.line;
+          const escaped = this.escapeHtml(line);
+          html.push(`<div style="padding:1px 4px;background:rgba(255,255,255,0.02);white-space:pre-wrap;">${escaped}</div>`);
+          html.push(`<div style="padding:1px 4px;background:rgba(255,255,255,0.02);white-space:pre-wrap;">${escaped}</div>`);
+        }
+      } else if (entry.t === 'del') {
+        flushCtx();
+        pendingDel.push(entry.line.length > 200 ? entry.line.slice(0, 200) + '...' : entry.line);
+      } else if (entry.t === 'add') {
+        flushCtx();
+        pendingAdd.push(entry.line.length > 200 ? entry.line.slice(0, 200) + '...' : entry.line);
+      }
+    }
+    flushPending();
+    flushCtx();
+    html.push('</div>');
+    this.detail.innerHTML = html.join('\n');
+    const btn = document.getElementById('diffToggleBtn');
+    if (btn) btn.addEventListener('click', () => this.toggleDiffLayout());
   }
 
   private escapeHtml(s: string): string {
@@ -487,6 +608,7 @@ class SnapshotViewer {
     this.tree.innerHTML = '';
     this.detail.innerHTML = '';
     this.compHeader.style.display = 'none';
+    this.hideCompareSkeleton();
   }
 }
 

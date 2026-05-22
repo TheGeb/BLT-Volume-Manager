@@ -602,3 +602,18 @@ h1 {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 }
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.skeleton-tree-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+.skeleton-icon { opacity: 0.4; animation: skeletonPulse 1.5s ease-in-out infinite; }
+.skeleton-tree-bar { height: 12px; border-radius: 4px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+
+.skeleton-row { transition: none !important; }
+.skeleton-row td { padding: 12px 18px !important; vertical-align: middle; }
+.skeleton-table-bar { height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+.skeleton-select-bar { height: 32px; width: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+.skeleton-btn-bar { height: 32px; width: 60px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }

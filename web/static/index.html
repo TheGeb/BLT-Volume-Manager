@@ -107,6 +107,7 @@
               </tr>
             </thead>
             <tbody id="snapshotTable"></tbody>
+            <tbody id="snapshotSkeleton" style="display:none;"></tbody>
           </table>
         </div>
         <div id="statusMessage" class="status"></div>
@@ -125,11 +126,15 @@
         <button id="viewerCompareBtn" class="button button-xs" style="margin-left:6px;">Diff</button>
         <button id="diffLayoutBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Side by side</button>
       </div>
+      <div id="viewerCompareSkeleton" style="display:none;margin-bottom:12px;gap:8px;align-items:center;">
+        <span class="skeleton-select-bar" style="width:240px;"></span>
+        <span class="skeleton-btn-bar"></span>
+      </div>
       <div id="viewerContent" style="display:flex;gap:12px;max-height:70vh;min-height:300px;">
         <div id="viewerTree" style="flex:0 0 300px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;"></div>
         <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;"></div>
       </div>
-      <div id="viewerLoading" style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+      <div id="viewerLoading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
     </section>
   </div>
 
