@@ -30,6 +30,11 @@ func main() {
 	}
 	dataDir, _ = filepath.Abs(dataDir)
 
+	resticBase := deriveResticBase()
+	if resticBase == "" {
+		log.Fatalf("RESTIC_REPOSITORY must be set")
+	}
+
 	lockBucket := deriveLockBucket()
 	s3Endpoint := deriveS3Endpoint()
 	s3Region := os.Getenv("S3_REGION")
@@ -38,10 +43,10 @@ func main() {
 		log.Printf("lock bucket=%q endpoint=%q region=%q", lockBucket, s3Endpoint, s3Region)
 	}
 
-	drv := driver.NewDriver(dataDir, lockBucket, s3Endpoint, s3Region)
+	drv := driver.NewDriver(dataDir, resticBase, lockBucket, s3Endpoint, s3Region)
 	if httpAddr != "" {
 		mux := http.NewServeMux()
-		web.NewServer(drv.ResticManager(), lockBucket, s3Endpoint, s3Region).Register(mux)
+		web.NewServer(dataDir, resticBase, lockBucket, s3Endpoint, s3Region, drv).Register(mux)
 		go func() {
 			log.Printf("serving BLT Volume Manager on http://%s", httpAddr)
 			if err := http.ListenAndServe(httpAddr, mux); err != nil {
@@ -62,6 +67,14 @@ func main() {
 	if err := h.ServeUnix(socketPath, 0); err != nil {
 		log.Fatalf("serve unix: %v", err)
 	}
+}
+
+func deriveResticBase() string {
+	repo := strings.TrimSpace(os.Getenv("RESTIC_REPOSITORY"))
+	if repo == "" {
+		return ""
+	}
+	return strings.TrimSuffix(repo, "/")
 }
 
 func deriveLockBucket() string {

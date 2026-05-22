@@ -11,100 +11,24 @@ import (
 )
 
 func (s *Server) refreshStats() {
-	snapshotStats := map[string]interface{}{
-		"total": 0, "hot": 0, "cold": 0, "excluded": 0, "volumes": 0,
-		"newest": "", "oldest": "",
-	}
-	repoStats := map[string]interface{}{}
 	lockStats := map[string]interface{}{
 		"total_volumes": 0, "active": 0, "expired": 0, "unlocked": 0,
 	}
 	pillSet := map[string]bool{}
 
-	rst, err := s.restic.Stats()
-	if err == nil && rst != nil {
-		repoStats = map[string]interface{}{
-			"total_size":              rst.TotalSize,
-			"total_file_count":        rst.TotalFileCount,
-			"total_blob_count":        rst.TotalBlobCount,
-			"total_uncompressed_size": rst.TotalUncompressedSize,
-			"compressed_size":         rst.CompressedSize,
-			"unique_blob_count":       rst.UniqueBlobCount,
-			"unique_blob_size":        rst.UniqueBlobSize,
+	for _, volName := range s.volumeNames() {
+		rm := s.volumeManager(volName)
+		snaps, err := rm.ListSnapshots()
+		if err != nil {
+			continue
 		}
-	}
-
-	snapshots, err := s.restic.ListSnapshots()
-	if err == nil && snapshots != nil {
-		hot, cold, excluded := 0, 0, 0
-		volSet := map[string]bool{}
-		hotVols := map[string]bool{}
-		coldVols := map[string]bool{}
-		excludedVols := map[string]bool{}
-		var newest, oldest time.Time
-		for i, snap := range snapshots {
+		for _, snap := range snaps {
+			pillSet[volName] = true
 			for _, tag := range snap.Tags {
 				switch tag {
-				case "hot":
-					hot++
-				case "cold":
-					cold++
-				case "excluded":
-					excluded++
+				case "hot", "cold", "excluded":
 				}
 			}
-			for _, path := range snap.Paths {
-				if v := volumeNameFromPath(path); v != "" {
-					volSet[v] = true
-					pillSet[v] = true
-					for _, tag := range snap.Tags {
-						switch tag {
-						case "hot":
-							hotVols[v] = true
-						case "cold":
-							coldVols[v] = true
-						case "excluded":
-							excludedVols[v] = true
-						}
-					}
-				}
-			}
-			if i == 0 || snap.Time.After(newest) {
-				newest = snap.Time
-			}
-			if i == 0 || snap.Time.Before(oldest) {
-				oldest = snap.Time
-			}
-		}
-
-		volList := func(m map[string]bool) []string {
-			var out []string
-			for v := range m {
-				out = append(out, v)
-			}
-			sort.Strings(out)
-			return out
-		}
-
-		otherVols := map[string]bool{}
-		for v := range volSet {
-			if !hotVols[v] && !coldVols[v] && !excludedVols[v] {
-				otherVols[v] = true
-			}
-		}
-
-		snapshotStats = map[string]interface{}{
-			"total":            len(snapshots),
-			"hot":              hot,
-			"cold":             cold,
-			"excluded":         excluded,
-			"volumes":          len(volSet),
-			"newest":           newest.Format(time.RFC3339),
-			"oldest":           oldest.Format(time.RFC3339),
-			"hot_volumes":      volList(hotVols),
-			"cold_volumes":     volList(coldVols),
-			"excluded_volumes": volList(excludedVols),
-			"other_volumes":    volList(otherVols),
 		}
 	}
 
@@ -180,8 +104,6 @@ func (s *Server) refreshStats() {
 
 	s.statsMu.Lock()
 	s.statsCache = map[string]interface{}{
-		"snapshots":     snapshotStats,
-		"repo":          repoStats,
 		"locks":         lockStats,
 		"cached_at":     time.Now().UTC().Format(time.RFC3339),
 		"total_volumes": len(pillSet),
@@ -208,16 +130,91 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.statsMu.RLock()
-	cached := s.statsCache
-	s.statsMu.RUnlock()
-	if cached == nil {
-		s.refreshStats()
-		s.statsMu.RLock()
-		cached = s.statsCache
-		s.statsMu.RUnlock()
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
 	}
-	respondJSON(w, cached)
+
+	rm := s.volumeManager(volName)
+	snapshotStats := map[string]interface{}{
+		"total": 0, "hot": 0, "cold": 0, "excluded": 0, "volumes": 0,
+		"newest": "", "oldest": "",
+	}
+	repoStats := map[string]interface{}{}
+
+	rst, err := rm.Stats()
+	if err == nil && rst != nil {
+		repoStats = map[string]interface{}{
+			"total_size":              rst.TotalSize,
+			"total_file_count":        rst.TotalFileCount,
+			"total_blob_count":        rst.TotalBlobCount,
+			"total_uncompressed_size": rst.TotalUncompressedSize,
+			"compressed_size":         rst.CompressedSize,
+			"unique_blob_count":       rst.UniqueBlobCount,
+			"unique_blob_size":        rst.UniqueBlobSize,
+		}
+	}
+
+	snaps, err := rm.ListSnapshots()
+	if err == nil && snaps != nil {
+		hot, cold, excluded := 0, 0, 0
+		var newest, oldest time.Time
+		for i, snap := range snaps {
+			for _, tag := range snap.Tags {
+				switch tag {
+				case "hot":
+					hot++
+				case "cold":
+					cold++
+				case "excluded":
+					excluded++
+				}
+			}
+			if i == 0 || snap.Time.After(newest) {
+				newest = snap.Time
+			}
+			if i == 0 || snap.Time.Before(oldest) {
+				oldest = snap.Time
+			}
+		}
+		newestStr := ""
+		oldestStr := ""
+		if !newest.IsZero() {
+			newestStr = newest.Format(time.RFC3339)
+		}
+		if !oldest.IsZero() {
+			oldestStr = oldest.Format(time.RFC3339)
+		}
+		snapshotStats = map[string]interface{}{
+			"total":    len(snaps),
+			"hot":      hot,
+			"cold":     cold,
+			"excluded": excluded,
+			"volumes":  1,
+			"newest":   newestStr,
+			"oldest":   oldestStr,
+			"hot_volumes":      func() []string { if hot > 0 { return []string{volName} }; return nil }(),
+			"cold_volumes":     func() []string { if cold > 0 { return []string{volName} }; return nil }(),
+			"excluded_volumes": func() []string { if excluded > 0 { return []string{volName} }; return nil }(),
+			"other_volumes":    func() []string { o := len(snaps) - hot - cold - excluded; if o > 0 { return []string{volName} }; return nil }(),
+		}
+	}
+
+	resp := map[string]interface{}{
+		"snapshots": snapshotStats,
+		"repo":      repoStats,
+		"volume":    volName,
+	}
+
+	s.statsMu.RLock()
+	if s.statsCache != nil {
+		resp["locks"] = s.statsCache["locks"]
+		resp["cached_at"] = s.statsCache["cached_at"]
+	}
+	s.statsMu.RUnlock()
+
+	respondJSON(w, resp)
 }
 
 func (s *Server) handleStatsRefresh(w http.ResponseWriter, r *http.Request) {

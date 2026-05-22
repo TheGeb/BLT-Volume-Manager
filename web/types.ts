@@ -4,6 +4,7 @@ interface Snapshot {
   time: string;
   tags: string[];
   paths: string[];
+  volume: string;
 }
 
 interface LockStatus {

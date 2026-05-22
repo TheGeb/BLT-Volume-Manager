@@ -57,10 +57,10 @@ class SnapshotManager {
     this.table.innerHTML = '';
   }
 
-  async load(): Promise<void> {
+  async load(vol: string): Promise<void> {
     this.showSkeleton();
     try {
-      const resp = await fetch('/api/snapshots');
+      const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(vol)}`);
       if (!resp.ok) {
         let msg = 'Unable to load snapshots';
         try { const b = await resp.json(); if (b.error) msg = b.error; } catch {}
@@ -172,7 +172,7 @@ class SnapshotManager {
       cb.type = 'checkbox';
       cb.checked = isExcluded;
       cb.addEventListener('change', () => {
-        (cb.checked ? this.addTag(sn.id, 'excluded') : this.removeTag(sn.id, 'excluded'));
+        (cb.checked ? this.addTag(sn.id, 'excluded', sn.volume) : this.removeTag(sn.id, 'excluded', sn.volume));
       });
       label.appendChild(cb);
       label.appendChild(document.createTextNode(' excluded'));
@@ -206,7 +206,7 @@ class SnapshotManager {
         restoreBtn.disabled = true;
         restoreBtn.textContent = 'Restoring...';
         try {
-          const resp = await fetch(`/api/snapshot/${encodeURIComponent(sn.id)}/restore?path=${encodeURIComponent(target)}`, { method: 'POST' });
+          const resp = await fetch(`/api/snapshot/${encodeURIComponent(sn.id)}/restore?path=${encodeURIComponent(target)}&volume=${encodeURIComponent(sn.volume)}`, { method: 'POST' });
           if (!resp.ok) {
             const b = await resp.json();
             throw new Error(b.error || 'restore failed');
@@ -233,7 +233,7 @@ class SnapshotManager {
         e.stopPropagation();
         rpBtn.disabled = true;
         try {
-          await this.addTag(sn.id, 'restore-point');
+          await this.addTag(sn.id, 'restore-point', sn.volume);
           App.showStatus(`Snapshot ${sn.short_id} set as restore point.`);
         } catch (err) {
           App.showStatus((err as Error).message, true);
@@ -263,23 +263,23 @@ class SnapshotManager {
     });
   }
 
-  private async addTag(snapshotID: string, tag: string): Promise<void> {
+  private async addTag(snapshotID: string, tag: string, volume: string): Promise<void> {
     App.showStatus(`Adding tag "${tag}"...`);
     try {
-      const resp = await fetch(`/api/snapshot/${encodeURIComponent(snapshotID)}/tag?tag=${encodeURIComponent(tag)}`, { method: 'POST' });
+      const resp = await fetch(`/api/snapshot/${encodeURIComponent(snapshotID)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`, { method: 'POST' });
       if (!resp.ok) throw new Error('Failed to add tag');
-      await this.load();
+      await this.load(volume);
     } catch (err) {
       App.showStatus((err as Error).message, true);
     }
   }
 
-  private async removeTag(snapshotID: string, tag: string): Promise<void> {
+  private async removeTag(snapshotID: string, tag: string, volume: string): Promise<void> {
     App.showStatus(`Removing tag "${tag}"...`);
     try {
-      const resp = await fetch(`/api/snapshot/${encodeURIComponent(snapshotID)}/tag?tag=${encodeURIComponent(tag)}`, { method: 'DELETE' });
+      const resp = await fetch(`/api/snapshot/${encodeURIComponent(snapshotID)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`, { method: 'DELETE' });
       if (!resp.ok) throw new Error('Failed to remove tag');
-      await this.load();
+      await this.load(volume);
     } catch (err) {
       App.showStatus((err as Error).message, true);
     }

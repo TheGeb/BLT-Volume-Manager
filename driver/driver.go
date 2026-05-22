@@ -32,15 +32,15 @@ type VolumeInfo struct {
 }
 
 type Driver struct {
-	root            string
-	locker          locker.Locker
-	restic          *restic.Manager
-	vols            map[string]*VolumeInfo
-	mu              sync.Mutex
-	zfsParent       string
+	root       string
+	resticBase string
+	locker     locker.Locker
+	vols       map[string]*VolumeInfo
+	mu         sync.Mutex
+	zfsParent  string
 }
 
-func NewDriver(root string, lockBucket string, s3Endpoint string, s3Region string) *Driver {
+func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint string, s3Region string) *Driver {
 	var l locker.Locker
 	if lockBucket != "" {
 		if sl, err := locker.NewS3Locker(lockBucket, s3Endpoint, s3Region); err == nil {
@@ -58,20 +58,19 @@ func NewDriver(root string, lockBucket string, s3Endpoint string, s3Region strin
 		zfsParent = p
 	}
 
-	r := restic.NewManager()
 	drv := &Driver{
-		root:      root,
-		locker:    l,
-		restic:    r,
-		vols:      make(map[string]*VolumeInfo),
-		zfsParent: zfsParent,
+		root:       root,
+		resticBase: resticBase,
+		locker:     l,
+		vols:       make(map[string]*VolumeInfo),
+		zfsParent:  zfsParent,
 	}
 	go drv.monitorOrphanedSnapshots(context.Background())
 	return drv
 }
 
-func (d *Driver) ResticManager() *restic.Manager {
-	return d.restic
+func (d *Driver) ResticManager(volName string) *restic.Manager {
+	return restic.NewManager(d.resticBase + "/restic/" + volName)
 }
 
 func (d *Driver) Create(r *volume.CreateRequest) error {
@@ -101,7 +100,8 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		if restoreMode == "" {
 			restoreMode = "latest"
 		}
-		if err := d.restic.RestoreIfExists(volPath, restoreMode); err != nil {
+		rm := d.ResticManager(name)
+		if err := rm.RestoreIfExists(volPath, restoreMode); err != nil {
 			log.Printf("restore failed: %v", err)
 		}
 		lock.Release()
@@ -177,7 +177,8 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 		fsType = cfg.FsType
 	}
 
-	if err := d.coldBackup(name, volPath, fsType); err != nil {
+	rm := d.ResticManager(name)
+	if err := d.coldBackup(name, volPath, fsType, rm); err != nil {
 		log.Printf("final backup before remove failed: %v", err)
 	}
 	switch fsType {
@@ -217,6 +218,8 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	vi.attached++
 	d.mu.Unlock()
 
+	rm := d.ResticManager(name)
+
 	ctx := context.Background()
 	lock, err := d.locker.Acquire(ctx, name)
 	if err != nil {
@@ -224,13 +227,11 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	} else {
 		vi.Lock = lock
 
-		// If the volume is cold (has an fsType), check for restore-point.
 		if vi.FsType != "" {
-			snapID, err := d.restic.FindRestorePoint(volPath)
+			snapID, err := rm.FindRestorePoint(volPath)
 			if err != nil {
 				log.Printf("check restore-point: %v", err)
 			} else if snapID != "" {
-				// Guard the destructive restore-point flow with lock validity.
 				valid, verr := vi.Lock.IsValid()
 				if verr != nil {
 					log.Printf("restore-point: lock check failed: %v", verr)
@@ -239,9 +240,8 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 				} else {
 					log.Printf("restore-point found for %s (%s)", name, snapID)
 
-					// Backup current state to restic with "rollback" tag before restoring.
 					log.Printf("backing up current state (rollback) for %s", name)
-					if err := d.restic.Backup(volPath, "rollback"); err != nil {
+					if err := rm.Backup(volPath, "rollback"); err != nil {
 						log.Printf("rollback backup failed: %v", err)
 					}
 
@@ -250,11 +250,11 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 					if snapErr != nil {
 						log.Printf("pre-restore snapshot: %v", snapErr)
 					}
-					if err := d.restic.RestoreSnapshot(snapID, volPath); err != nil {
+					if err := rm.RestoreSnapshot(snapID, volPath); err != nil {
 						log.Printf("restore-point restore failed: %v", err)
 					} else {
 						log.Printf("restore-point restored, removing tag")
-						if err := d.restic.UntagSnapshot(snapID, "restore-point"); err != nil {
+						if err := rm.UntagSnapshot(snapID, "restore-point"); err != nil {
 							log.Printf("remove restore-point tag: %v", err)
 						}
 					}
@@ -282,7 +282,8 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) error {
 	if ok {
 		vi.attached--
 		if vi.attached <= 0 {
-			if err := d.coldBackup(name, vi.Path, vi.FsType); err != nil {
+			rm := d.ResticManager(name)
+			if err := d.coldBackup(name, vi.Path, vi.FsType, rm); err != nil {
 				log.Printf("unmount cold backup failed: %v", err)
 			}
 			if vi.cancel != nil {
@@ -352,6 +353,18 @@ func (d *Driver) SnapVolumes() map[string]string {
 	return out
 }
 
+func (d *Driver) VolumeNames() []string {
+	root := filepath.Join(d.root, "volumes")
+	entries, _ := os.ReadDir(root)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names
+}
+
 func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 	data, err := json.Marshal(cfg)
 	if err != nil {
@@ -373,6 +386,7 @@ func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {
 }
 
 func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
+	rm := d.ResticManager(name)
 	hotTicker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for {
@@ -382,7 +396,7 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 				return
 			case <-hotTicker.C:
 				log.Printf("hot backup for %s", name)
-				if err := d.restic.Backup(volPath, "hot"); err != nil {
+				if err := rm.Backup(volPath, "hot"); err != nil {
 					log.Printf("hot backup error: %v", err)
 				}
 			}
@@ -390,16 +404,16 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 	}()
 }
 
-func (d *Driver) coldBackup(name, volPath, fsType string) error {
+func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) error {
 	if fsType == "" {
-		return d.restic.Backup(volPath, "cold")
+		return rm.Backup(volPath, "cold")
 	}
 
 	snapDir := filepath.Join(d.root, "snapshots")
 	info, err := snapshot.Create(volPath, snapDir, name)
 	if err != nil {
 		log.Printf("cold backup: snapshot create failed (%v), falling back to direct backup", err)
-		return d.restic.Backup(volPath, "cold")
+		return rm.Backup(volPath, "cold")
 	}
 
 	snapTime := time.Now()
@@ -407,7 +421,7 @@ func (d *Driver) coldBackup(name, volPath, fsType string) error {
 		snapTime = fi.ModTime()
 	}
 
-	if err := d.restic.BackupAt(info.AccessPath, "cold", snapTime); err != nil {
+	if err := rm.BackupAt(info.AccessPath, "cold", snapTime); err != nil {
 		return fmt.Errorf("cold backup: %w", err)
 	}
 	if err := snapshot.Remove(info); err != nil {
@@ -449,7 +463,8 @@ func (d *Driver) retryOrphanedSnapshots() {
 			continue
 		}
 		log.Printf("retrying orphaned cold backup for %s (%s)", info.VolName, info.AccessPath)
-		if err := d.restic.BackupAt(info.AccessPath, "cold", fi.ModTime()); err != nil {
+		rm := d.ResticManager(info.VolName)
+		if err := rm.BackupAt(info.AccessPath, "cold", fi.ModTime()); err != nil {
 			log.Printf("orphaned cold backup for %s failed: %v", info.VolName, err)
 			continue
 		}

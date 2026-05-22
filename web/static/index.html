@@ -54,17 +54,13 @@
       </div>
     </section>
 
-    <section id="statsPanel" class="panel stats-panel">
-      <h2 class="stats-heading">Overview</h2>
-      <div id="statsGrid" class="stats-grid"></div>
-    </section>
-
-    <section id="troubleshootPanel" class="panel troubleshoot-panel">
-      <h2 class="stats-heading">Troubleshooting</h2>
-      <div class="troubleshoot-actions">
-        <button id="checkButton" class="button button-secondary" title="Check repository integrity">Check</button>
-        <button id="repairButton" class="button button-secondary" title="Unlock and rebuild repository index">Repair</button>
+    <section id="testPanel" class="panel" style="display:none;">
+      <h2 class="stats-heading">Test Volume</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="testVolumeInput" class="input" type="text" placeholder="Volume name" style="width:200px;" />
+        <button id="testCreateBtn" class="button button-secondary">Create test volume</button>
       </div>
+      <div id="testStatus" class="status" style="margin-top:12px;"></div>
     </section>
 
     <div id="volumeView" class="split" style="display:none;">
@@ -112,6 +108,21 @@
         </div>
         <div id="statusMessage" class="status"></div>
       </section>
+
+      <div style="grid-column:1/-1;">
+        <section id="volumeTroubleshootPanel" class="panel troubleshoot-panel" style="display:none;">
+          <h2 class="stats-heading">Troubleshooting</h2>
+          <div class="troubleshoot-actions">
+            <button id="volumeCheckButton" class="button button-secondary" title="Check repository integrity">Check</button>
+            <button id="volumeRepairButton" class="button button-secondary" title="Unlock and rebuild repository index">Repair</button>
+          </div>
+        </section>
+
+        <section id="volumeStatsPanel" class="panel stats-panel" style="display:none;">
+          <h2 class="stats-heading">Overview</h2>
+          <div id="volumeStatsGrid" class="stats-grid"></div>
+        </section>
+      </div>
     </div>
 
     <section id="snapshotViewer" class="panel" style="display:none;">

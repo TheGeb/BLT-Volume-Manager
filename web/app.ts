@@ -21,9 +21,13 @@ class App {
   private refreshBtn: HTMLButtonElement;
   private checkBtn: HTMLButtonElement;
   private repairBtn: HTMLButtonElement;
-  private statsPanel: HTMLElement;
-  private troubleshootPanel: HTMLElement;
+  private volumeStatsPanel: HTMLElement;
+  private volumeTroubleshootPanel: HTMLElement;
   private volumeView: HTMLElement;
+  private testPanel: HTMLElement;
+  private testVolumeInput: HTMLInputElement;
+  private testCreateBtn: HTMLButtonElement;
+  private testStatus: HTMLDivElement;
   private themeToggle: HTMLButtonElement;
   private themeIcon: HTMLElement;
   private moonSvg: string;
@@ -47,20 +51,24 @@ class App {
     const lockStatusText = document.getElementById('lockStatusText') as HTMLDivElement;
     const lockOwner = document.getElementById('lockOwner') as HTMLDivElement;
     const lockExpiry = document.getElementById('lockExpiry') as HTMLDivElement;
-    const statsGrid = document.getElementById('statsGrid') as HTMLDivElement;
+    const statsGrid = document.getElementById('volumeStatsGrid') as HTMLDivElement;
     const volumeView = document.getElementById('volumeView') as HTMLElement;
     const lockPanelContent = document.getElementById('lockPanelContent') as HTMLElement;
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
     this.themeIcon = document.getElementById('themeIcon') as HTMLElement;
     this.refreshBtn = document.getElementById('refreshButton') as HTMLButtonElement;
-    this.checkBtn = document.getElementById('checkButton') as HTMLButtonElement;
-    this.repairBtn = document.getElementById('repairButton') as HTMLButtonElement;
+    this.checkBtn = document.getElementById('volumeCheckButton') as HTMLButtonElement;
+    this.repairBtn = document.getElementById('volumeRepairButton') as HTMLButtonElement;
     this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
     this.initRepoBtn = document.getElementById('initRepoButton') as HTMLButtonElement;
     this.initBanner = document.getElementById('repoInitBanner') as HTMLDivElement;
-    this.statsPanel = document.getElementById('statsPanel') as HTMLElement;
-    this.troubleshootPanel = document.getElementById('troubleshootPanel') as HTMLElement;
+    this.volumeStatsPanel = document.getElementById('volumeStatsPanel') as HTMLElement;
+    this.volumeTroubleshootPanel = document.getElementById('volumeTroubleshootPanel') as HTMLElement;
     this.volumeView = volumeView;
+    this.testPanel = document.getElementById('testPanel') as HTMLElement;
+    this.testVolumeInput = document.getElementById('testVolumeInput') as HTMLInputElement;
+    this.testCreateBtn = document.getElementById('testCreateBtn') as HTMLButtonElement;
+    this.testStatus = document.getElementById('testStatus') as HTMLDivElement;
 
     App._statusEl = statusMessage;
     App._banner = document.getElementById('errorBanner') as HTMLDivElement;
@@ -78,7 +86,10 @@ class App {
     this.snapMgr = new SnapshotManager(snapshotTable, searchInput, sortButton,
       () => this.state, (p) => Object.assign(this.state, p));
 
+    this.testCreateBtn.addEventListener('click', () => this.createTestVolume());
+
     this.bindEvents();
+    this.onVolumeChange('');
   }
 
   static showStatus(msg: string, isError = false): void {
@@ -121,13 +132,16 @@ class App {
 
     this.refreshBtn.addEventListener('click', async () => {
       App.setBanner('');
+      const vol = this.state.selectedVolume;
       try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
-      await Promise.all([
-        this.statsMgr.load().catch(e => App.setBanner(e.message, true)),
-        this.pillsMgr.load().catch(e => App.setBanner(e.message, true)),
-        this.snapMgr.load().catch(e => App.setBanner(e.message, true)),
-      ]);
-      if (this.state.selectedVolume) this.lockMgr.refresh();
+      if (vol) {
+        await Promise.all([
+          this.statsMgr.load(vol).catch(e => App.setBanner(e.message, true)),
+          this.snapMgr.load(vol).catch(e => App.setBanner(e.message, true)),
+        ]);
+      }
+      await this.pillsMgr.load().catch(e => App.setBanner(e.message, true));
+      if (vol) this.lockMgr.refresh();
     });
 
     const sortButton = document.getElementById('sortButton') as HTMLButtonElement;
@@ -138,23 +152,23 @@ class App {
     });
 
     this.checkBtn.addEventListener('click', async () => {
+      const vol = this.state.selectedVolume;
+      if (!vol) return;
       this.checkBtn.disabled = true;
       this.checkBtn.textContent = 'Checking...';
       App.setBanner('');
       App.showStatus('Checking repository integrity...');
       try {
-        const resp = await fetch('/api/repo/check', { method: 'POST' });
+        const resp = await fetch(`/api/repo/check?volume=${encodeURIComponent(vol)}`, { method: 'POST' });
         if (resp.ok) {
           const d = await resp.json();
           App.showStatus(d.status);
-          App.setBanner(d.status);
         } else {
           const b = await resp.json();
           throw new Error(b.error || 'check failed');
         }
       } catch (err) {
         App.showStatus((err as Error).message, true);
-        App.setBanner((err as Error).message, true);
       } finally {
         this.checkBtn.disabled = false;
         this.checkBtn.textContent = 'Check';
@@ -162,30 +176,28 @@ class App {
     });
 
     this.repairBtn.addEventListener('click', async () => {
+      const vol = this.state.selectedVolume;
+      if (!vol) return;
       this.repairBtn.disabled = true;
       this.repairBtn.textContent = 'Repairing...';
       App.setBanner('');
       App.showStatus('Running repair (unlock + rebuild index)...');
       try {
-        const resp = await fetch('/api/repo/repair', { method: 'POST' });
+        const resp = await fetch(`/api/repo/repair?volume=${encodeURIComponent(vol)}`, { method: 'POST' });
         if (resp.ok) {
           const d = await resp.json();
           App.showStatus(d.status);
-          App.setBanner(d.status);
         } else {
           const b = await resp.json();
           throw new Error(b.error || 'repair failed');
         }
       } catch (err) {
         App.showStatus((err as Error).message, true);
-        App.setBanner((err as Error).message, true);
       } finally {
         this.repairBtn.disabled = false;
         this.repairBtn.textContent = 'Repair';
       }
     });
-
-    this.initRepoBtn.addEventListener('click', () => this.initRepo());
 
     this.themeToggle.addEventListener('click', () => {
       const isLight = document.body.classList.toggle('light');
@@ -198,39 +210,74 @@ class App {
     await Promise.all([
       this.checkRepoStatus(),
       this.pillsMgr.load(),
-      this.snapMgr.load().catch(e => App.setBanner(e.message, true)),
-      this.statsMgr.load().catch(e => App.setBanner(e.message, true)),
     ]);
   }
 
+  private async createTestVolume(): Promise<void> {
+    const name = this.testVolumeInput.value.trim();
+    if (!name) {
+      this.testStatus.textContent = 'Enter a volume name';
+      this.testStatus.style.color = 'var(--red)';
+      return;
+    }
+    this.testCreateBtn.disabled = true;
+    this.testCreateBtn.textContent = 'Creating...';
+    this.testStatus.textContent = '';
+    try {
+      const resp = await fetch('/api/test/create-volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const d = await resp.json();
+      if (!resp.ok) {
+        throw new Error(d.error || `HTTP ${resp.status}`);
+      }
+      this.testStatus.textContent = d.message;
+      this.testStatus.style.color = '';
+      this.testVolumeInput.value = '';
+      await this.pillsMgr.load();
+      this.onVolumeChange(name);
+    } catch (err) {
+      this.testStatus.textContent = (err as Error).message;
+      this.testStatus.style.color = 'var(--red)';
+    } finally {
+      this.testCreateBtn.disabled = false;
+      this.testCreateBtn.textContent = 'Create test volume';
+    }
+  }
+
   private onVolumeChange(vol: string): void {
+    this.testPanel.style.display = vol ? 'none' : '';
     if (vol) {
-      this.statsPanel.style.display = 'none';
-      this.troubleshootPanel.style.display = 'none';
       this.volumeView.style.display = 'grid';
+      this.volumeStatsPanel.style.display = '';
+      this.volumeTroubleshootPanel.style.display = '';
+      this.snapMgr.load(vol).catch(() => {});
+      this.statsMgr.load(vol).catch(() => {});
       this.lockMgr.refresh();
     } else {
-      this.statsPanel.style.display = '';
-      this.troubleshootPanel.style.display = '';
       this.volumeView.style.display = 'none';
+      this.volumeStatsPanel.style.display = 'none';
+      this.volumeTroubleshootPanel.style.display = 'none';
     }
-    this.snapMgr.render();
   }
 
   private async checkRepoStatus(): Promise<void> {
     try {
-      const resp = await fetch('/api/repo/status');
+      const resp = await fetch('/api/pills');
       if (!resp.ok) {
-        let msg = 'Failed to check repository status';
-        try { const b = await resp.json(); if (b.error) msg = b.error; } catch {}
+        const msg = 'Failed to check repository status';
         App.showStatus(msg, true);
         App.setBanner(msg, true);
         return;
       }
-      const data = await resp.json() as RepoStatus;
-      this.initBanner.style.display = data.initialized ? 'none' : 'flex';
-      if (data.hostname) this.state.hostname = data.hostname;
-      if (data.initialized !== false) App.setBanner('');
+      const data = await resp.json() as { volumes: string[] };
+      if (data.volumes && data.volumes.length > 0) {
+        App.setBanner('');
+      } else {
+        App.setBanner('No volumes found. Create one with: docker volume create --driver s3vol --name <name>');
+      }
     } catch {
       const msg = 'Cannot reach server';
       App.showStatus(msg, true);
@@ -238,24 +285,7 @@ class App {
     }
   }
 
-  private async initRepo(): Promise<void> {
-    this.initRepoBtn.disabled = true;
-    this.initRepoBtn.textContent = 'Initializing...';
-    try {
-      const resp = await fetch('/api/repo/init', { method: 'POST' });
-      if (!resp.ok) {
-        const body = await resp.json();
-        throw new Error(body.error || 'Failed to initialize repository');
-      }
-      this.initBanner.style.display = 'none';
-      await Promise.all([this.snapMgr.load(), this.statsMgr.load()]);
-    } catch (err) {
-      App.showStatus((err as Error).message, true);
-    } finally {
-      this.initRepoBtn.disabled = false;
-      this.initRepoBtn.textContent = 'Initialize Repository';
-    }
-  }
+
 }
 
 window.addEventListener('load', () => {

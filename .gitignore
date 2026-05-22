@@ -30,6 +30,10 @@ go.work.sum
 # Generated JS (compiled from .ts)
 *.js
 
+# Built binaries
+blt-volume-manager
+.node-bin
+
 # Editor/IDE
 # .idea/
 # .vscode/

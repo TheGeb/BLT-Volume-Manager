@@ -7,7 +7,13 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := s.restic.Check(true)
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
+	err := rm.Check(true)
 	if err != nil {
 		logInfo("check_failed")
 		respondError(w, err, http.StatusInternalServerError)
@@ -22,7 +28,13 @@ func (s *Server) handleRepair(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := s.restic.Repair()
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
+	err := rm.Repair()
 	if err != nil {
 		logInfo("repair_failed")
 		respondError(w, err, http.StatusInternalServerError)

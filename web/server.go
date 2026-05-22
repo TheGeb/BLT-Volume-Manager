@@ -13,11 +13,18 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
+type Driver interface {
+	ResticManager(volName string) *restic.Manager
+	VolumeNames() []string
+}
+
 type Server struct {
-	restic       *restic.Manager
+	dataDir      string
+	resticBase   string
 	s3Bucket     string
 	s3Endpoint   string
 	s3Region     string
+	driver       Driver
 	statsMu      sync.RWMutex
 	statsCache   map[string]interface{}
 	statsCacheAt time.Time
@@ -26,8 +33,16 @@ type Server struct {
 	pillsCacheAt time.Time
 }
 
-func NewServer(r *restic.Manager, s3Bucket string, s3Endpoint string, s3Region string) *Server {
-	return &Server{restic: r, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
+func NewServer(dataDir string, resticBase string, s3Bucket string, s3Endpoint string, s3Region string, drv Driver) *Server {
+	return &Server{dataDir: dataDir, resticBase: resticBase, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region, driver: drv}
+}
+
+func (s *Server) volumeManager(volName string) *restic.Manager {
+	return s.driver.ResticManager(volName)
+}
+
+func (s *Server) volumeNames() []string {
+	return s.driver.VolumeNames()
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
@@ -43,6 +58,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/pills", s.handlePills)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
+	inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
 
 	uiFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

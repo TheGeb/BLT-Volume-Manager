@@ -73,7 +73,7 @@ class SnapshotViewer {
 
     let nodes: FileNode[];
     try {
-      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(snapshot.id)}/ls`);
+      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(snapshot.id)}/ls?volume=${encodeURIComponent(snapshot.volume)}`);
       if (!resp.ok) {
         const body = await resp.text();
         throw new Error(body || 'Failed to list snapshot');
@@ -94,7 +94,7 @@ class SnapshotViewer {
     }
 
     this.renderTree(nodes);
-    this.populateCompareSelect(snapshot).catch(() => {});
+    this.populateCompareSelect(snapshot).catch(err => console.warn('populateCompareSelect failed', err));
   }
 
   private showCompareSkeleton(): void {
@@ -231,7 +231,7 @@ class SnapshotViewer {
     }
     this.detail.innerHTML = '<span style="color:var(--muted)">Loading file...</span>';
     try {
-      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/dump?path=${encodeURIComponent(path)}`);
+      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/dump?path=${encodeURIComponent(path)}&volume=${encodeURIComponent(this.currentSnapshot.volume)}`);
       if (!resp.ok) {
         const body = await resp.text();
         this.showError(body || 'dump failed');
@@ -256,7 +256,7 @@ class SnapshotViewer {
     }
     this.detail.innerHTML = '<span style="color:var(--muted)">Loading file...</span>';
     try {
-      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?path=${encodeURIComponent(path)}`);
+      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?path=${encodeURIComponent(path)}&volume=${encodeURIComponent(this.currentSnapshot!.volume)}`);
       if (!resp.ok) {
         const body = await resp.text();
         this.showError(body || 'dump failed');
@@ -307,18 +307,28 @@ class SnapshotViewer {
   }
 
   async populateCompareSelect(snapshot: Snapshot): Promise<void> {
-    const vol = this.extractVol((snapshot.paths || [])[0] || '');
-    if (!vol) return;
+    const vol = snapshot.volume;
+    if (!vol) {
+      console.warn('populateCompareSelect: snapshot has no volume', snapshot);
+      this.compHeader.style.display = 'none';
+      this.hideCompareSkeleton();
+      return;
+    }
 
-    const resp = await fetch('/api/snapshots');
-    if (!resp.ok) return;
+    const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(vol)}`);
+    if (!resp.ok) {
+      console.warn('populateCompareSelect: snapshots API returned', resp.status, await resp.text().catch(() => ''));
+      this.compHeader.style.display = 'none';
+      this.hideCompareSkeleton();
+      return;
+    }
     this.allSnapshots = await resp.json() as Snapshot[];
 
     this.compSelect.innerHTML = '';
     let count = 0;
     for (const sn of this.allSnapshots) {
       if (sn.id === snapshot.id || sn.short_id === snapshot.short_id) continue;
-      if (!sn.paths || !sn.paths.some(p => this.matchVolume(p, vol))) continue;
+      if (sn.volume !== vol) continue;
       const opt = document.createElement('option');
       opt.value = sn.id;
       opt.textContent = `${sn.short_id} (${new Date(sn.time).toLocaleString()})`;
@@ -337,6 +347,7 @@ class SnapshotViewer {
   private sideBySide = false;
   private currentDiffPath = '';
   private currentDiffData: { t: string; line: string }[] = [];
+  private savedTreeHTML = '';
 
   async doDiff(): Promise<void> {
     if (!this.currentSnapshot) return;
@@ -348,7 +359,7 @@ class SnapshotViewer {
     this.diffOtherId = otherId;
     this.detail.innerHTML = '<span style="color:var(--muted)">Loading diff...</span>';
     try {
-      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/diff/${encodeURIComponent(otherId)}`);
+      const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/diff/${encodeURIComponent(otherId)}?volume=${encodeURIComponent(this.currentSnapshot.volume)}`);
       if (!resp.ok) throw new Error('Diff failed');
       const result = await resp.json() as DiffResult;
       this.renderDiff(result, otherId);
@@ -357,8 +368,21 @@ class SnapshotViewer {
     }
   }
 
+  private restoreTree(): void {
+    this.tree.innerHTML = this.savedTreeHTML;
+    this.savedTreeHTML = '';
+    this.detail.innerHTML = '';
+  }
+
   private renderDiff(result: DiffResult, otherId: string): void {
+    // Save current tree so we can restore it
+    if (!this.savedTreeHTML) {
+      this.savedTreeHTML = this.tree.innerHTML;
+    }
+    this.detail.innerHTML = '';
+
     const html: string[] = [];
+    html.push('<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;"><button id="diffBackBtn" style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;">← Back to files</button><span style="font-weight:700;font-size:0.9rem;">Changes</span></div>');
     for (const cs of (result.change_sets || [])) {
       const color = cs.type === 'added' ? 'var(--green)' : cs.type === 'removed' ? 'var(--red)' : 'var(--yellow)';
       const label = cs.type.toUpperCase();
@@ -378,11 +402,15 @@ class SnapshotViewer {
         html.push(`<div style="padding:1px 0 1px 16px;font-size:0.85rem;color:var(--muted);">... and ${cs.paths.length - 50} more</div>`);
       }
     }
-    if (html.length === 0) {
+    if (html.length === 1) {
       html.push('<div style="color:var(--muted);padding:20px;text-align:center;">Snapshots are identical.</div>');
     }
-    this.detail.innerHTML = html.join('\n');
-    this.detail.querySelectorAll('.file-diff-link').forEach(el => {
+    this.tree.innerHTML = html.join('\n');
+
+    const backBtn = document.getElementById('diffBackBtn');
+    if (backBtn) backBtn.addEventListener('click', () => this.restoreTree());
+
+    this.tree.querySelectorAll('.file-diff-link').forEach(el => {
       el.addEventListener('click', (e: Event) => {
         e.preventDefault();
         const path = el.getAttribute('data-path');
@@ -390,7 +418,7 @@ class SnapshotViewer {
         if (path && other) this.showFileDiff(path, other);
       });
     });
-    this.detail.querySelectorAll('.file-view-link').forEach(el => {
+    this.tree.querySelectorAll('.file-view-link').forEach(el => {
       el.addEventListener('click', (e: Event) => {
         e.preventDefault();
         const path = el.getAttribute('data-path');
@@ -404,9 +432,10 @@ class SnapshotViewer {
     if (!this.currentSnapshot) return;
     this.detail.innerHTML = `<span style="color:var(--muted)">Loading diff for ${this.escapeHtml(path)}...</span>`;
     try {
+      const vol = this.currentSnapshot.volume;
       const [respA, respB] = await Promise.all([
-        fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/dump?path=${encodeURIComponent(path)}`),
-        fetch(`/api/snapshot-view/${encodeURIComponent(otherId)}/dump?path=${encodeURIComponent(path)}`),
+        fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/dump?path=${encodeURIComponent(path)}&volume=${encodeURIComponent(vol)}`),
+        fetch(`/api/snapshot-view/${encodeURIComponent(otherId)}/dump?path=${encodeURIComponent(path)}&volume=${encodeURIComponent(vol)}`),
       ]);
       if (!respA.ok || !respB.ok) {
         const errA = respA.ok ? '' : ' ' + (await respA.text());

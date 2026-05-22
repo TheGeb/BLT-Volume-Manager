@@ -7,6 +7,11 @@ import (
 	"github.com/example/blt-volume-manager/restic"
 )
 
+type SnapshotWithVolume struct {
+	restic.Snapshot
+	Volume string `json:"volume"`
+}
+
 func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -14,24 +19,24 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	}
 
 	volumeFilter := r.URL.Query().Get("volume")
+	if volumeFilter == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
 
-	snapshots, err := s.restic.ListSnapshots()
+	rm := s.volumeManager(volumeFilter)
+	snapshots, err := rm.ListSnapshots()
 	if err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	if volumeFilter != "" {
-		filtered := make([]restic.Snapshot, 0, len(snapshots))
-		for _, snap := range snapshots {
-			if snapshotMatchesVolume(snap, volumeFilter) {
-				filtered = append(filtered, snap)
-			}
-		}
-		snapshots = filtered
+	var result []SnapshotWithVolume
+	for _, snap := range snapshots {
+		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volumeFilter})
 	}
 
-	respondJSON(w, snapshots)
+	respondJSON(w, result)
 }
 
 func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +52,12 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	snapshotID := parts[0]
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
 
 	if parts[1] == "restore" {
 		if r.Method != http.MethodPost {
@@ -59,7 +70,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		go func() {
-			if err := s.restic.RestoreSnapshot(snapshotID, target); err != nil {
+			if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
 				logInfo("restore_failed: " + err.Error())
 			} else {
 				logInfo("restore_ok")
@@ -78,19 +89,19 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		if tag == "restore-point" {
-			if err := s.restic.SetRestorePoint(snapshotID); err != nil {
+			if err := rm.SetRestorePoint(snapshotID); err != nil {
 				respondError(w, err, http.StatusInternalServerError)
 				return
 			}
 		} else {
-			if err := s.restic.TagSnapshot(snapshotID, tag); err != nil {
+			if err := rm.TagSnapshot(snapshotID, tag); err != nil {
 				respondError(w, err, http.StatusInternalServerError)
 				return
 			}
 		}
 		respondJSON(w, map[string]string{"status": "tag added"})
 	case http.MethodDelete:
-		if err := s.restic.UntagSnapshot(snapshotID, tag); err != nil {
+		if err := rm.UntagSnapshot(snapshotID, tag); err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -115,6 +126,12 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 
 	snapshotID := parts[0]
 	action := parts[1]
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
 
 	switch action {
 	case "ls":
@@ -123,7 +140,7 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		path := r.URL.Query().Get("path")
-		nodes, err := s.restic.ListSnapshotFiles(snapshotID, path)
+		nodes, err := rm.ListSnapshotFiles(snapshotID, path)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -140,7 +157,7 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing path", http.StatusBadRequest)
 			return
 		}
-		data, err := s.restic.DumpFile(snapshotID, path)
+		data, err := rm.DumpFile(snapshotID, path)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -157,7 +174,7 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing second snapshot id", http.StatusBadRequest)
 			return
 		}
-		result, err := s.restic.DiffSnapshots(snapshotID, parts[2])
+		result, err := rm.DiffSnapshots(snapshotID, parts[2])
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return

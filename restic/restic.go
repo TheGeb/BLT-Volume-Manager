@@ -14,10 +14,10 @@ import (
 	"time"
 )
 
-// Manager wraps restic operations. It expects restic in PATH and environment
-// configured (RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS envs for S3).
-
-type Manager struct{}
+// Manager wraps restic operations for a single repository.
+type Manager struct {
+	repo string
+}
 
 type Snapshot struct {
 	ID      string    `json:"id"`
@@ -27,7 +27,11 @@ type Snapshot struct {
 	Paths   []string  `json:"paths"`
 }
 
-func NewManager() *Manager { return &Manager{} }
+// NewManager creates a Manager for the given restic repository URL/path.
+func NewManager(repo string) *Manager { return &Manager{repo: repo} }
+
+// Repo returns the repository path/URL.
+func (m *Manager) Repo() string { return m.repo }
 
 func (m *Manager) Backup(path, tag string) error {
 	args := []string{"backup", path}
@@ -39,7 +43,7 @@ func (m *Manager) Backup(path, tag string) error {
 		compression = "auto"
 	}
 	args = append(args, "--compression", compression)
-	cmd, err := resticCommand(context.Background(), args...)
+	cmd, err := m.resticCommand(context.Background(), args...)
 	if err != nil {
 		return err
 	}
@@ -61,7 +65,7 @@ func (m *Manager) BackupAt(path, tag string, t time.Time) error {
 		compression = "auto"
 	}
 	args = append(args, "--compression", compression)
-	cmd, err := resticCommand(context.Background(), args...)
+	cmd, err := m.resticCommand(context.Background(), args...)
 	if err != nil {
 		return err
 	}
@@ -74,7 +78,7 @@ func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "snapshots", "--no-lock", "--json")
+	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json")
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +105,7 @@ func (m *Manager) TagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	cmd, err := resticCommand(context.Background(), "tag", "--add", tag, snapshotID)
+	cmd, err := m.resticCommand(context.Background(), "tag", "--add", tag, snapshotID)
 	if err != nil {
 		return err
 	}
@@ -114,7 +118,7 @@ func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	cmd, err := resticCommand(context.Background(), "tag", "--remove", tag, snapshotID)
+	cmd, err := m.resticCommand(context.Background(), "tag", "--remove", tag, snapshotID)
 	if err != nil {
 		return err
 	}
@@ -124,38 +128,29 @@ func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 }
 
 func (m *Manager) RestoreIfExists(path, preferred string) error {
-	// preferred: "hot","cold","latest"
-	// We look for snapshots and restore the most appropriate one.
-	// Simplified: always restore latest snapshot. Users can control tags via options.
-	// run: restic snapshots --json | parse -> restic restore <id> --target <path>
-	// For simplicity, try `restic snapshots --last 1` and restore it.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Build snapshots command depending on preference
 	args := []string{"snapshots", "--no-lock", "--last", "1", "--json"}
 	if preferred == "hot" || preferred == "cold" {
 		args = []string{"snapshots", "--no-lock", "--tag", preferred, "--last", "1", "--json"}
 	}
-	cmd, err := resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
 	out, err := cmd.Output()
 	if err != nil || len(out) == 0 {
-		// no snapshots found for this preference
 		return nil
 	}
 
-	// Try to parse the snapshot id from JSON to restore that specific snapshot.
 	var snaps []map[string]interface{}
 	if err := json.Unmarshal(out, &snaps); err != nil || len(snaps) == 0 {
-		// fallback: attempt to restore latest with tag if provided
 		rargs := []string{"restore", "latest", "--target", path}
 		if preferred == "hot" || preferred == "cold" {
 			rargs = append(rargs, "--tag", preferred)
 		}
-		r, err := resticCommand(ctx, rargs...)
+		r, err := m.resticCommand(ctx, rargs...)
 		if err != nil {
 			return err
 		}
@@ -163,7 +158,6 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		r.Stderr = os.Stderr
 		return r.Run()
 	}
-	// get snapshot ID key - try "short_id" or "id"
 	id := ""
 	if v, ok := snaps[0]["short_id"]; ok {
 		if s, ok := v.(string); ok {
@@ -178,8 +172,7 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		}
 	}
 	if id == "" {
-		// couldn't find id; fallback to restore latest
-		r, err := resticCommand(ctx, "restore", "latest", "--target", path)
+		r, err := m.resticCommand(ctx, "restore", "latest", "--target", path)
 		if err != nil {
 			return err
 		}
@@ -188,7 +181,7 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		return r.Run()
 	}
 
-	r, err := resticCommand(ctx, "restore", id, "--target", path)
+	r, err := m.resticCommand(ctx, "restore", id, "--target", path)
 	if err != nil {
 		return err
 	}
@@ -198,7 +191,6 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 }
 
 func (m *Manager) StartSchedule(ctx context.Context, name, path string, hotInterval, coldInterval time.Duration) {
-	// Start two tickers: hot and cold. Hot tags snapshots as "hot"; cold as "cold".
 	hotTicker := time.NewTicker(hotInterval)
 	coldTicker := time.NewTicker(coldInterval)
 	go func() {
@@ -232,20 +224,20 @@ func (m *Manager) Init() error {
 }
 
 type RepoStats struct {
-	TotalSize           int64 `json:"total_size"`
-	TotalFileCount      int64 `json:"total_file_count"`
-	TotalBlobCount      int64 `json:"total_blob_count"`
+	TotalSize             int64 `json:"total_size"`
+	TotalFileCount        int64 `json:"total_file_count"`
+	TotalBlobCount        int64 `json:"total_blob_count"`
 	TotalUncompressedSize int64 `json:"total_uncompressed_size"`
-	CompressedSize      int64 `json:"compressed_size"`
-	UniqueBlobCount     int64 `json:"unique_blob_count"`
-	UniqueBlobSize      int64 `json:"unique_blob_size"`
+	CompressedSize        int64 `json:"compressed_size"`
+	UniqueBlobCount       int64 `json:"unique_blob_count"`
+	UniqueBlobSize        int64 `json:"unique_blob_size"`
 }
 
 func (m *Manager) Stats() (*RepoStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "stats", "--no-lock", "--json", "--mode", "raw-data")
+	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", "--json", "--mode", "raw-data")
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +256,7 @@ func (m *Manager) Stats() (*RepoStats, error) {
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	cmd, err := resticCommand(ctx, "restore", snapshotID, "--target", target)
+	cmd, err := m.resticCommand(ctx, "restore", snapshotID, "--target", target)
 	if err != nil {
 		return err
 	}
@@ -274,7 +266,6 @@ func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
 }
 
 // volumeNameFromPath extracts the volume name from a path.
-// Handles /volumes/<name> paths and snapshot paths like <name>-cold-snap.
 func volumeNameFromPath(path string) string {
 	marker := "/volumes/"
 	if idx := strings.Index(path, marker); idx >= 0 {
@@ -283,7 +274,6 @@ func volumeNameFromPath(path string) string {
 			return parts[0]
 		}
 	}
-	// Snapshot paths: .../<name>-cold-snap or .../<name>-pre-restore
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	last := parts[len(parts)-1]
 	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
@@ -295,15 +285,12 @@ func volumeNameFromPath(path string) string {
 }
 
 // SetRestorePoint tags a snapshot as the restore-point for its volume.
-// It ensures exclusivity by removing the tag from any other snapshot
-// that belongs to the same volume.
 func (m *Manager) SetRestorePoint(snapshotID string) error {
 	snapshots, err := m.ListSnapshots()
 	if err != nil {
 		return fmt.Errorf("list snapshots: %w", err)
 	}
 
-	// Find the target snapshot and determine its volume name.
 	targetVolume := ""
 	for _, snap := range snapshots {
 		if snap.ShortID == snapshotID || snap.ID == snapshotID {
@@ -320,7 +307,6 @@ func (m *Manager) SetRestorePoint(snapshotID string) error {
 		return fmt.Errorf("snapshot %s not found or could not determine volume", snapshotID)
 	}
 
-	// Untag any other snapshot for the same volume that has "restore-point".
 	for _, snap := range snapshots {
 		if snap.ShortID == snapshotID || snap.ID == snapshotID {
 			continue
@@ -338,7 +324,6 @@ func (m *Manager) SetRestorePoint(snapshotID string) error {
 		if snapVolume != targetVolume {
 			continue
 		}
-		// Remove from the conflicting snapshot.
 		id := snap.ShortID
 		if id == "" {
 			id = snap.ID
@@ -348,7 +333,6 @@ func (m *Manager) SetRestorePoint(snapshotID string) error {
 		}
 	}
 
-	// Tag the target.
 	return m.TagSnapshot(snapshotID, "restore-point")
 }
 
@@ -381,7 +365,6 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", nil
 	}
 
-	// Return the most recent one.
 	id := candidates[0].ShortID
 	if id == "" {
 		id = candidates[0].ID
@@ -429,8 +412,6 @@ type DiffChange struct {
 }
 
 // ListSnapshotFiles lists files in a snapshot at the given path.
-// Parses the text output of `restic ls` (lines of paths).
-// Returns paths relative to the common backup root.
 func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -439,7 +420,7 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 	if path != "" && path != "/" {
 		args = append(args, path)
 	}
-	cmd, err := resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +442,6 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 		return nil, nil
 	}
 
-	// Determine directories: a path is a dir if another path starts with it + "/".
 	dirSet := map[string]bool{}
 	for _, p := range rawPaths {
 		prefix := p + "/"
@@ -473,12 +453,14 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 		}
 	}
 
-	// Find the common root prefix (first two path components shared by all paths).
+	// Strip the common root prefix so display paths are relative
 	common := commonPathPrefix(rawPaths)
-	common = filepath.Dir(common) // include the backup root dir
 
 	var nodes []FileNode
 	for _, p := range rawPaths {
+		if p == common {
+			continue
+		}
 		rel := strings.TrimPrefix(p, common)
 		rel = strings.TrimPrefix(rel, "/")
 		if rel == "" || rel == "." {
@@ -491,10 +473,31 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 			FullPath: p,
 		})
 	}
+
+	// If stripping the common root left us with nothing (e.g. a single path),
+	// strip one more level so the root folder itself still shows
+	if len(nodes) == 0 {
+		common = filepath.Dir(common)
+		for _, p := range rawPaths {
+			if p == common {
+				continue
+			}
+			rel := strings.TrimPrefix(p, common)
+			rel = strings.TrimPrefix(rel, "/")
+			if rel == "" || rel == "." {
+				continue
+			}
+			nodes = append(nodes, FileNode{
+				Name:     filepath.Base(rel),
+				Type:     map[bool]string{true: "dir", false: "file"}[dirSet[p]],
+				Path:     "/" + rel,
+				FullPath: p,
+			})
+		}
+	}
 	return nodes, nil
 }
 
-// commonPathPrefix returns the longest common path prefix for a set of paths.
 func commonPathPrefix(paths []string) string {
 	if len(paths) == 0 {
 		return ""
@@ -516,7 +519,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "dump", snapshotID, path)
+	cmd, err := m.resticCommand(ctx, "dump", snapshotID, path)
 	if err != nil {
 		return nil, err
 	}
@@ -528,12 +531,11 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 }
 
 // DiffSnapshots returns the diff between two snapshots.
-// Parses the text output of `restic diff` (lines prefixed with +, -, M, U, T).
 func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "diff", snapID1, snapID2)
+	cmd, err := m.resticCommand(ctx, "diff", snapID1, snapID2)
 	if err != nil {
 		return nil, err
 	}
@@ -583,22 +585,11 @@ func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	return &DiffResult{ChangeSets: changes}, nil
 }
 
-func resticRepository() (string, error) {
-	repo := strings.TrimSpace(os.Getenv("RESTIC_REPOSITORY"))
-	if repo == "" {
-		return "", errors.New("RESTIC_REPOSITORY must be set for restic operations")
-	}
-
-	repo = strings.TrimSuffix(repo, "/")
-	repo += "/restic"
-	return repo, nil
-}
-
 func (m *Manager) repositoryExists() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := resticCommand(ctx, "snapshots", "--no-lock", "--json")
+	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json")
 	if err != nil {
 		return false, err
 	}
@@ -618,7 +609,7 @@ func isRepositoryMissing(output string) bool {
 }
 
 func (m *Manager) initRepository() error {
-	cmd, err := resticCommand(context.Background(), "init")
+	cmd, err := m.resticCommand(context.Background(), "init")
 	if err != nil {
 		return err
 	}
@@ -634,7 +625,7 @@ func (m *Manager) Check(noLock bool) error {
 	if noLock {
 		args = append(args, "--no-lock")
 	}
-	cmd, err := resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -644,13 +635,12 @@ func (m *Manager) Check(noLock bool) error {
 }
 
 func (m *Manager) Repair() error {
-	// Unlock first, then rebuild index.
 	if err := m.Unlock(); err != nil {
 		log.Printf("repair: unlock failed (continuing): %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	cmd, err := resticCommand(ctx, "repair", "index", "--no-lock")
+	cmd, err := m.resticCommand(ctx, "repair", "index", "--no-lock")
 	if err != nil {
 		return err
 	}
@@ -662,7 +652,7 @@ func (m *Manager) Repair() error {
 func (m *Manager) Unlock() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd, err := resticCommand(ctx, "unlock")
+	cmd, err := m.resticCommand(ctx, "unlock")
 	if err != nil {
 		return err
 	}
@@ -671,13 +661,8 @@ func (m *Manager) Unlock() error {
 	return cmd.Run()
 }
 
-func resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
-	repo, err := resticRepository()
-	if err != nil {
-		return nil, err
-	}
-
-	global := []string{"-r", repo}
+func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
+	global := []string{"-r", m.repo}
 	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
 	case "trace":
 		global = append(global, "--verbose=2")

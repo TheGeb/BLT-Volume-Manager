@@ -7,7 +7,13 @@ func (s *Server) handleRepoStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	exists, err := s.restic.RepoExists()
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
+	exists, err := rm.RepoExists()
 	if err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
@@ -20,7 +26,13 @@ func (s *Server) handleRepoInit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := s.restic.Init(); err != nil {
+	volName := r.URL.Query().Get("volume")
+	if volName == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return
+	}
+	rm := s.volumeManager(volName)
+	if err := rm.Init(); err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
