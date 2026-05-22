@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -403,6 +404,183 @@ func hasTag(tags []string, target string) bool {
 		}
 	}
 	return false
+}
+
+// FileNode represents a single file/directory entry from restic ls.
+type FileNode struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Path        string `json:"path"`
+	FullPath    string `json:"full_path,omitempty"`
+	Size        int64  `json:"size,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+	Permissions string `json:"permissions,omitempty"`
+	ModTime     string `json:"mtime,omitempty"`
+}
+
+// DiffResult represents a diff between two snapshots.
+type DiffResult struct {
+	ChangeSets []DiffChange `json:"change_sets"`
+}
+
+type DiffChange struct {
+	Type  string   `json:"type"`
+	Paths []string `json:"paths"`
+}
+
+// ListSnapshotFiles lists files in a snapshot at the given path.
+// Parses the text output of `restic ls` (lines of paths).
+// Returns paths relative to the common backup root.
+func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	args := []string{"ls", snapshotID}
+	if path != "" && path != "/" {
+		args = append(args, path)
+	}
+	cmd, err := resticCommand(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("restic ls: %w", err)
+	}
+
+	var rawPaths []string
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "snapshot ") || strings.HasPrefix(line, "restic ") {
+			continue
+		}
+		rawPaths = append(rawPaths, line)
+	}
+	if len(rawPaths) == 0 {
+		return nil, nil
+	}
+
+	// Determine directories: a path is a dir if another path starts with it + "/".
+	dirSet := map[string]bool{}
+	for _, p := range rawPaths {
+		prefix := p + "/"
+		for _, q := range rawPaths {
+			if strings.HasPrefix(q, prefix) && q != p {
+				dirSet[p] = true
+				break
+			}
+		}
+	}
+
+	// Find the common root prefix (first two path components shared by all paths).
+	common := commonPathPrefix(rawPaths)
+	common = filepath.Dir(common) // include the backup root dir
+
+	var nodes []FileNode
+	for _, p := range rawPaths {
+		rel := strings.TrimPrefix(p, common)
+		rel = strings.TrimPrefix(rel, "/")
+		if rel == "" || rel == "." {
+			continue
+		}
+		nodes = append(nodes, FileNode{
+			Name:     filepath.Base(rel),
+			Type:     map[bool]string{true: "dir", false: "file"}[dirSet[p]],
+			Path:     "/" + rel,
+			FullPath: p,
+		})
+	}
+	return nodes, nil
+}
+
+// commonPathPrefix returns the longest common path prefix for a set of paths.
+func commonPathPrefix(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	prefix := paths[0]
+	for _, p := range paths[1:] {
+		for !strings.HasPrefix(p, prefix) {
+			prefix = filepath.Dir(prefix)
+			if prefix == "/" || prefix == "." {
+				return ""
+			}
+		}
+	}
+	return prefix
+}
+
+// DumpFile returns the contents of a file within a snapshot.
+func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd, err := resticCommand(ctx, "dump", snapshotID, path)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("restic dump: %w", err)
+	}
+	return out, nil
+}
+
+// DiffSnapshots returns the diff between two snapshots.
+// Parses the text output of `restic diff` (lines prefixed with +, -, M, U, T).
+func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd, err := resticCommand(ctx, "diff", snapID1, snapID2)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("restic diff: %w\n%s", err, string(out))
+	}
+
+	var changes []DiffChange
+	groups := map[string][]string{}
+	order := []string{}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if len(line) < 2 || line[1] != ' ' {
+			continue
+		}
+		prefix := string(line[0])
+		path := strings.TrimSpace(line[2:])
+		if path == "" {
+			continue
+		}
+		var typ string
+		switch prefix {
+		case "+":
+			typ = "added"
+		case "-":
+			typ = "removed"
+		case "M":
+			typ = "modified"
+		case "U":
+			typ = "metadata"
+		case "T":
+			typ = "type-changed"
+		default:
+			continue
+		}
+		if _, ok := groups[typ]; !ok {
+			order = append(order, typ)
+		}
+		groups[typ] = append(groups[typ], path)
+	}
+
+	for _, typ := range order {
+		changes = append(changes, DiffChange{Type: typ, Paths: groups[typ]})
+	}
+
+	return &DiffResult{ChangeSets: changes}, nil
 }
 
 func resticRepository() (string, error) {

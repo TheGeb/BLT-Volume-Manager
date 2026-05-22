@@ -159,6 +159,17 @@ class SnapshotManager {
       row.appendChild(timeCell);
 
       const actionCell = document.createElement('td');
+
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'button button-secondary button-xs';
+      viewBtn.textContent = 'View';
+      viewBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ev = new CustomEvent('open-snapshot-viewer', { detail: { snapshot: sn } });
+        document.dispatchEvent(ev);
+      });
+      actionCell.appendChild(viewBtn);
+
       const restoreBtn = document.createElement('button');
       restoreBtn.className = 'button button-secondary button-xs';
       restoreBtn.textContent = 'Restore';
