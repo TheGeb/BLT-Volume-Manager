@@ -104,6 +104,7 @@ function renderStatBar(parts: { value: number; color: string; label: string; nam
     legend.appendChild(item);
   });
   const wrapper = document.createElement('div');
+  wrapper.className = 'bar-wrapper';
   wrapper.appendChild(bar);
   wrapper.appendChild(legend);
   return wrapper;

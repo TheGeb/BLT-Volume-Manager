@@ -66,18 +66,6 @@ class StatsManager {
       this.grid.appendChild(errCard);
     }
 
-    if (data.locks.total_volumes > 0) {
-      const card = document.createElement('div');
-      card.className = 'stat-card-graph';
-      card.innerHTML = '<div class="chart-title">Lock status</div>';
-      card.appendChild(renderStatBar([
-        { value: data.locks.active, color: 'var(--green)', label: 'Active', names: data.locks.active_volumes },
-        { value: data.locks.expired, color: 'var(--yellow)', label: 'Expired', names: data.locks.expired_volumes },
-        { value: data.locks.unlocked, color: 'var(--muted)', label: 'Unlocked' },
-      ]));
-      this.grid.appendChild(card);
-    }
-
     if (data.repo.compressed_size != null && data.repo.total_uncompressed_size != null) {
       const card = document.createElement('div');
       card.className = 'stat-card-graph';
@@ -86,12 +74,12 @@ class StatsManager {
       const uncompressed = data.repo.total_uncompressed_size;
       const saved = uncompressed - compressed;
       card.appendChild(renderStatBar([
-        { value: compressed, color: 'var(--accent)', label: `Compressed (${formatBytes(compressed)})`, display: formatBytes(compressed) },
+        { value: compressed, color: 'var(--accent)', label: `On Disk (${formatBytes(compressed)})`, display: formatBytes(compressed) },
         { value: Math.max(saved, 0), color: 'var(--green)', label: `Saved (${formatBytes(Math.max(saved, 0))})`, display: formatBytes(Math.max(saved, 0)) },
       ]));
       const ratio = uncompressed > 0 ? (compressed / uncompressed * 100).toFixed(1) : '-';
       const sub = document.createElement('div');
-      sub.style.cssText = 'font-size:0.8rem;color:var(--muted);margin-top:8px;text-align:center;';
+      sub.style.cssText = 'font-size:0.8rem;color:var(--muted);text-align:center;';
       if (compressed === 0 && uncompressed === 0) {
         sub.textContent = 'No data';
       } else {
@@ -101,21 +89,6 @@ class StatsManager {
       this.grid.appendChild(card);
     }
 
-    const parent = this.grid.parentElement!;
-    parent.querySelectorAll('.stat-sub').forEach(el => el.remove());
-    const parts: string[] = [];
-    if (data.snapshots.newest || data.snapshots.oldest) {
-      parts.push(`Newest: ${data.snapshots.newest ? new Date(data.snapshots.newest).toLocaleString() : '-'}  ·  Oldest: ${data.snapshots.oldest ? new Date(data.snapshots.oldest).toLocaleString() : '-'}`);
-    }
-    if (data.cached_at) {
-      parts.push(`Cached: ${new Date(data.cached_at).toLocaleString()}`);
-    }
-    if (parts.length > 0) {
-      const sub = document.createElement('div');
-      sub.className = 'stat-sub';
-      sub.textContent = parts.join('  ·  ');
-      parent.appendChild(sub);
-    }
     });
   }
 }

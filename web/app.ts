@@ -27,7 +27,6 @@ class App {
   private testCreateBtn: HTMLButtonElement;
   private testStatus: HTMLDivElement;
   private statsGrid: HTMLDivElement;
-  private deleteVolumePanel: HTMLElement;
   private deleteVolumeBtn: HTMLButtonElement;
   private deleteModal: HTMLElement;
   private deleteModalVolumeName: HTMLElement;
@@ -69,7 +68,6 @@ class App {
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
     this.themeIcon = document.getElementById('themeIcon') as HTMLElement;
     this.refreshBtn = document.getElementById('refreshButton') as HTMLButtonElement;
-    this.deleteVolumePanel = document.getElementById('deleteVolumePanel') as HTMLElement;
     this.deleteVolumeBtn = document.getElementById('deleteVolumeBtn') as HTMLButtonElement;
     this.deleteModal = document.getElementById('deleteModal') as HTMLElement;
     this.deleteModalVolumeName = document.getElementById('deleteModalVolumeName') as HTMLElement;

@@ -190,26 +190,21 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .repo-layout {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 16px;
-  align-items: start;
-}
-
-.repo-actions-stack {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 16px;
+  align-items: stretch;
 }
 
 @media (max-width: 900px) {
-  .split {
-    grid-template-columns: 1fr;
-  }
-
   .repo-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
+}
+
+.repo-layout > * {
+  flex: 1;
+  min-width: 280px;
 }
 
 .tab-bar {
@@ -310,7 +305,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .troubleshoot-panel {
-  padding: 16px 24px;
+  padding: 24px;
 }
 
 .troubleshoot-actions {
@@ -476,7 +471,7 @@ select option { background: var(--surface); color: var(--text); }
   font-style: normal;
   top: 50%;
   transform: translateY(-50%);
-  right: 4px;
+  right: 6px;
 }
 
 .init-banner {
@@ -514,9 +509,10 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  flex: 1;
   transition: opacity 0.15s ease;
 }
 
@@ -532,15 +528,17 @@ select option { background: var(--surface); color: var(--text); }
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 20px;
-  grid-column: span 2;
+  padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-@media (max-width: 600px) {
-  .stat-card-graph {
-    grid-column: span 1;
-  }
+.stat-card-graph > :last-child {
+  margin-top: auto;
 }
+
 
 .stat-value {
   font-size: 2rem;
@@ -568,9 +566,17 @@ select option { background: var(--surface); color: var(--text); }
   margin-top: 14px;
 }
 
+.bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .bar-stacked {
   display: flex;
-  height: 32px;
+  flex: 1;
+  max-height: 50%;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -602,7 +608,6 @@ select option { background: var(--surface); color: var(--text); }
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 10px;
   font-size: 0.8rem;
 }
 
@@ -621,10 +626,12 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .chart-title {
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text);
+  margin-bottom: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .chart-value-row {
