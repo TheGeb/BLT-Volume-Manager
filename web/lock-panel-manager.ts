@@ -115,21 +115,18 @@ class LockPanelManager {
     if (!vol) return;
     const ownerName = prompt('Lock owner name:', this.getState().hostname);
     if (!ownerName) return;
-    App.showStatus(`Creating lock for volume ${vol}...`);
+    App.setBanner(`Creating lock for volume ${vol}...`);
     try {
-      const resp = await fetch(`/api/volume/${encodeURIComponent(vol)}/locks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ owner: ownerName }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json();
-        throw new Error(body.error || 'Failed to create lock');
+      const resp = await fetch(`/api/volume/${encodeURIComponent(vol)}/locks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ owner: ownerName }) });
+      const d = await resp.json();
+      if (resp.ok) {
+        App.setBanner(`Lock created for volume ${vol}.`);
+        await this.refresh();
+      } else {
+        App.setBanner((d as any).error || (d as any).message || 'Failed', true);
       }
-      App.showStatus(`Lock created for volume ${vol}.`);
-      await this.refresh();
     } catch (err) {
-      App.showStatus((err as Error).message, true);
+      App.setBanner((err as Error).message, true);
     }
   }
 
@@ -137,17 +134,17 @@ class LockPanelManager {
     const vol = this.getState().selectedVolume;
     if (!vol) return;
     if (!confirm(`Delete all locks for volume ${vol}?`)) return;
-    App.showStatus(`Deleting locks for volume ${vol}...`);
+    App.setBanner(`Deleting locks for volume ${vol}...`);
     try {
       const resp = await fetch(`/api/volume/${encodeURIComponent(vol)}/locks`, { method: 'DELETE' });
       if (!resp.ok) {
         const body = await resp.json();
         throw new Error(body.error || 'Failed to delete locks');
       }
-      App.showStatus(`Deleted locks for volume ${vol}.`);
+      App.setBanner(`Deleted locks for volume ${vol}.`);
       await this.refresh();
     } catch (err) {
-      App.showStatus((err as Error).message, true);
+      App.setBanner((err as Error).message, true);
     }
   }
 }

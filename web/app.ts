@@ -109,9 +109,11 @@ class App {
       App._bannerText.textContent = msg;
       App._banner.style.color = isError ? 'var(--red)' : 'var(--text)';
       App._banner.style.borderColor = isError ? 'var(--red)' : 'var(--border)';
+      App._banner.style.background = isError ? 'rgba(239,68,68,0.08)' : 'transparent';
       App._banner.classList.add('visible');
     } else {
       App._banner.classList.remove('visible');
+      App._banner.style.background = '';
     }
   }
 
@@ -166,18 +168,18 @@ class App {
       this.checkBtn.disabled = true;
       this.checkBtn.textContent = 'Checking...';
       App.setBanner('');
-      App.showStatus('Checking repository integrity...');
+      App.setBanner('Checking repository integrity...');
       try {
         const resp = await fetch(`/api/repo/check?volume=${encodeURIComponent(vol)}`, { method: 'POST' });
         if (resp.ok) {
           const d = await resp.json();
-          App.showStatus(d.status);
+          App.setBanner(d.status);
         } else {
           const b = await resp.json();
           throw new Error(b.error || 'check failed');
         }
       } catch (err) {
-        App.showStatus((err as Error).message, true);
+        App.setBanner((err as Error).message, true);
       } finally {
         this.checkBtn.disabled = false;
         this.checkBtn.textContent = 'Check';
@@ -190,18 +192,18 @@ class App {
       this.repairBtn.disabled = true;
       this.repairBtn.textContent = 'Repairing...';
       App.setBanner('');
-      App.showStatus('Running repair (unlock + rebuild index)...');
+      App.setBanner('Running repair (unlock + rebuild index)...');
       try {
         const resp = await fetch(`/api/repo/repair?volume=${encodeURIComponent(vol)}`, { method: 'POST' });
         if (resp.ok) {
           const d = await resp.json();
-          App.showStatus(d.status);
+          App.setBanner(d.status);
         } else {
           const b = await resp.json();
           throw new Error(b.error || 'repair failed');
         }
       } catch (err) {
-        App.showStatus((err as Error).message, true);
+        App.setBanner((err as Error).message, true);
       } finally {
         this.repairBtn.disabled = false;
         this.repairBtn.textContent = 'Repair';
@@ -293,9 +295,7 @@ class App {
     try {
       const resp = await fetch('/api/pills');
       if (!resp.ok) {
-        const msg = 'Failed to check repository status';
-        App.showStatus(msg, true);
-        App.setBanner(msg, true);
+        App.setBanner('Failed to check repository status', true);
         return;
       }
       const data = await resp.json() as { volumes: string[] };
@@ -305,12 +305,9 @@ class App {
         App.setBanner('No volumes found. Create one with: docker volume create --driver s3vol --name <name>');
       }
     } catch {
-      const msg = 'Cannot reach server';
-      App.showStatus(msg, true);
-      App.setBanner(msg, true);
+      App.setBanner('Cannot reach server', true);
     }
   }
-
 
 }
 
