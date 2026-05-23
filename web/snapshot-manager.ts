@@ -167,43 +167,17 @@ class SnapshotManager {
 
       filtered.forEach(sn => {
       const row = document.createElement('tr');
-      const idCell = document.createElement('td');
-      idCell.className = 'copy-id';
-      idCell.title = 'Click to copy full snapshot ID';
-      idCell.textContent = sn.short_id;
-      idCell.addEventListener('click', () => {
-        navigator.clipboard.writeText(sn.id);
-        App.setBanner('Snapshot ID copied to clipboard');
-        idCell.classList.add('copied');
-        setTimeout(() => idCell.classList.remove('copied'), 1500);
-      });
-      row.appendChild(idCell);
 
-      const hostCell = document.createElement('td');
-      hostCell.textContent = sn.hostname || '-';
-      hostCell.style.color = 'var(--muted)';
-      hostCell.style.fontSize = '0.9rem';
-      row.appendChild(hostCell);
-
-      const tagsCell = document.createElement('td');
-      tagsCell.style.color = 'var(--muted)';
-      tagsCell.style.fontSize = '0.9rem';
-      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold');
-      tagsCell.textContent = visibleTags.length ? visibleTags.join(', ') : '—';
-      row.appendChild(tagsCell);
-
+      // 1. Restore Point
       const rpCell = document.createElement('td');
       rpCell.style.textAlign = 'center';
-      const rpIndicator = document.createElement('span');
       const isRP = sn.tags.includes('restore-point');
       const svgNs = 'http://www.w3.org/2000/svg';
       const rpSvg = document.createElementNS(svgNs, 'svg');
       rpSvg.setAttribute('width', '20');
       rpSvg.setAttribute('height', '20');
       rpSvg.setAttribute('viewBox', '0 0 20 20');
-      rpSvg.style.display = 'block';
-      rpSvg.style.margin = '0 auto';
-      rpSvg.style.cursor = 'pointer';
+      rpSvg.style.cssText = 'cursor:pointer;vertical-align:middle;';
       const circle = document.createElementNS(svgNs, 'circle');
       circle.setAttribute('cx', '10');
       circle.setAttribute('cy', '10');
@@ -231,6 +205,28 @@ class SnapshotManager {
       rpCell.appendChild(rpSvg);
       row.appendChild(rpCell);
 
+      // 2. Snapshot ID
+      const idCell = document.createElement('td');
+      idCell.className = 'copy-id';
+      idCell.title = 'Click to copy full snapshot ID';
+      idCell.textContent = sn.short_id.slice(0, 8) + '…';
+      idCell.addEventListener('click', () => {
+        navigator.clipboard.writeText(sn.id);
+        App.setBanner('Snapshot ID copied to clipboard');
+        idCell.classList.add('copied');
+        setTimeout(() => idCell.classList.remove('copied'), 1500);
+      });
+      row.appendChild(idCell);
+
+      // 3. Type
+      const tagsCell = document.createElement('td');
+      tagsCell.style.color = 'var(--muted)';
+      tagsCell.style.fontSize = '0.9rem';
+      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold');
+      tagsCell.textContent = visibleTags.length ? visibleTags.join(', ') : '—';
+      row.appendChild(tagsCell);
+
+      // 4. Size
       const sizeCell = document.createElement('td');
       sizeCell.style.textAlign = 'center';
       sizeCell.style.fontVariantNumeric = 'tabular-nums';
@@ -272,17 +268,26 @@ class SnapshotManager {
       }
       row.appendChild(sizeCell);
 
+      // 5. Host
+      const hostCell = document.createElement('td');
+      hostCell.textContent = sn.hostname || '-';
+      hostCell.style.color = 'var(--muted)';
+      hostCell.style.fontSize = '0.9rem';
+      row.appendChild(hostCell);
+
+      // 6. Date
       const timeCell = document.createElement('td');
       const d = new Date(sn.time);
       timeCell.innerHTML = `${d.toLocaleDateString()}<br><span style="font-size:0.85rem;color:var(--muted);">${d.toLocaleTimeString()}</span>`;
       row.appendChild(timeCell);
 
+      // 7. Actions
       const actionCell = document.createElement('td');
       actionCell.style.whiteSpace = 'nowrap';
 
       const viewBtn = document.createElement('button');
       viewBtn.className = 'button button-secondary button-xs';
-      viewBtn.textContent = 'View';
+      viewBtn.textContent = 'View/Diff';
       viewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const ev = new CustomEvent('open-snapshot-viewer', { detail: { snapshot: sn, snapshots: this.getState().snapshots } });

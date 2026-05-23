@@ -21,17 +21,12 @@ class App {
   private refreshBtn: HTMLButtonElement;
   private checkBtn: HTMLButtonElement;
   private repairBtn: HTMLButtonElement;
-  private volumeStatsPanel: HTMLElement;
-  private volumeTroubleshootPanel: HTMLElement;
   private volumeView: HTMLElement;
   private landingPanel: HTMLElement;
   private testVolumeInput: HTMLInputElement;
   private testCreateBtn: HTMLButtonElement;
   private testStatus: HTMLDivElement;
-  private statsToggleIcon: HTMLElement;
-  private statsHeader: HTMLElement;
   private statsGrid: HTMLDivElement;
-  private statsLoaded = false;
   private deleteVolumePanel: HTMLElement;
   private deleteVolumeBtn: HTMLButtonElement;
   private deleteModal: HTMLElement;
@@ -43,6 +38,10 @@ class App {
   private themeIcon: HTMLElement;
   private moonSvg: string;
   private sunSvg: string;
+  private tabSnapshots: HTMLButtonElement;
+  private tabRepo: HTMLButtonElement;
+  private snapshotsTab: HTMLElement;
+  private repoTab: HTMLElement;
 
   constructor() {
     this.state = {
@@ -65,8 +64,6 @@ class App {
     const lockExpiry = document.getElementById('lockExpiry') as HTMLDivElement;
     const statsGrid = document.getElementById('volumeStatsGrid') as HTMLDivElement;
     this.statsGrid = statsGrid;
-    this.statsHeader = document.getElementById('statsHeader') as HTMLElement;
-    this.statsToggleIcon = document.getElementById('statsToggleIcon') as HTMLElement;
     const volumeView = document.getElementById('volumeView') as HTMLElement;
     const lockPanelContent = document.getElementById('lockPanelContent') as HTMLElement;
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
@@ -82,10 +79,12 @@ class App {
     this.checkBtn = document.getElementById('volumeCheckButton') as HTMLButtonElement;
     this.repairBtn = document.getElementById('volumeRepairButton') as HTMLButtonElement;
     this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
+    this.tabSnapshots = document.getElementById('tabSnapshots') as HTMLButtonElement;
+    this.tabRepo = document.getElementById('tabRepo') as HTMLButtonElement;
+    this.snapshotsTab = document.getElementById('snapshotsTab') as HTMLElement;
+    this.repoTab = document.getElementById('repoTab') as HTMLElement;
     this.initRepoBtn = document.getElementById('initRepoButton') as HTMLButtonElement;
     this.initBanner = document.getElementById('repoInitBanner') as HTMLDivElement;
-    this.volumeStatsPanel = document.getElementById('volumeStatsPanel') as HTMLElement;
-    this.volumeTroubleshootPanel = document.getElementById('volumeTroubleshootPanel') as HTMLElement;
     this.volumeView = volumeView;
     this.landingPanel = document.getElementById('landingPanel') as HTMLElement;
     this.testVolumeInput = document.getElementById('testVolumeInput') as HTMLInputElement;
@@ -160,11 +159,7 @@ class App {
       try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
       if (vol) {
         await this.snapMgr.load(vol).catch(e => App.setBanner(e.message, true));
-        if (this.statsGrid.style.display !== 'none') {
-          this.statsMgr.load(vol).catch(e => App.setBanner(e.message, true));
-        } else {
-          this.statsLoaded = false;
-        }
+        this.statsMgr.load(vol).catch(e => App.setBanner(e.message, true));
       }
       await this.pillsMgr.load().catch(e => App.setBanner(e.message, true));
       if (vol) this.lockMgr.refresh();
@@ -231,20 +226,6 @@ class App {
       }
     });
 
-    this.statsHeader.addEventListener('click', () => {
-      const grid = this.statsGrid;
-      const expanded = grid.style.display !== 'none';
-      grid.style.display = expanded ? 'none' : '';
-      this.statsToggleIcon.style.transform = expanded ? 'rotate(0deg)' : 'rotate(90deg)';
-      if (!expanded && !this.statsLoaded) {
-        const vol = this.state.selectedVolume;
-        if (vol) {
-          this.statsLoaded = true;
-          this.statsMgr.load(vol).catch(() => {});
-        }
-      }
-    });
-
     this.deleteVolumeBtn.addEventListener('click', () => {
       const vol = this.state.selectedVolume;
       if (!vol) return;
@@ -301,6 +282,44 @@ class App {
       const isLight = document.body.classList.toggle('light');
       this.themeIcon.innerHTML = isLight ? this.moonSvg : this.sunSvg;
     });
+
+    // Restore point info tooltip (appended to body to avoid overflow clipping)
+    const rpInfo = document.querySelector('.restore-point-info') as HTMLElement;
+    if (rpInfo) {
+      let tooltipEl: HTMLDivElement | null = null;
+      const tipText = rpInfo.getAttribute('data-tip') || '';
+      rpInfo.addEventListener('mouseenter', () => {
+        if (!tipText) return;
+        tooltipEl = document.createElement('div');
+        tooltipEl.textContent = tipText;
+        tooltipEl.style.cssText = 'position:fixed;z-index:1000;background:var(--surface);color:var(--text);font-size:0.8rem;padding:10px 14px;border-radius:10px;border:1px solid var(--border);box-shadow:var(--shadow);white-space:normal;width:280px;text-align:left;line-height:1.4;pointer-events:none;';
+        const rect = rpInfo.getBoundingClientRect();
+        tooltipEl.style.left = Math.max(4, rect.left + rect.width / 2 - 140) + 'px';
+        tooltipEl.style.top = (rect.bottom + 8) + 'px';
+        document.body.appendChild(tooltipEl);
+      });
+      rpInfo.addEventListener('mouseleave', () => {
+        if (tooltipEl) {
+          tooltipEl.remove();
+          tooltipEl = null;
+        }
+      });
+    }
+
+    const switchTab = (tab: 'snapshots' | 'repo') => {
+      const isSnap = tab === 'snapshots';
+      this.tabSnapshots.classList.toggle('tab-active', isSnap);
+      this.tabRepo.classList.toggle('tab-active', !isSnap);
+      this.snapshotsTab.style.display = isSnap ? '' : 'none';
+      this.repoTab.style.display = isSnap ? 'none' : '';
+      if (tab === 'repo') {
+        const vol = this.state.selectedVolume;
+        if (vol) this.statsMgr.load(vol).catch(() => {});
+      }
+    };
+
+    this.tabSnapshots.addEventListener('click', () => switchTab('snapshots'));
+    this.tabRepo.addEventListener('click', () => switchTab('repo'));
   }
 
   async start(): Promise<void> {
@@ -354,21 +373,19 @@ class App {
     this.deleteModal.style.display = 'none';
     this.landingPanel.style.display = vol ? 'none' : '';
     if (vol) {
-      this.volumeView.style.display = 'grid';
-      this.volumeStatsPanel.style.display = '';
-      this.volumeTroubleshootPanel.style.display = '';
-      this.deleteVolumePanel.style.display = '';
+      this.volumeView.style.display = 'block';
+      this.snapshotsTab.style.display = '';
+      this.repoTab.style.display = 'none';
+      this.tabSnapshots.classList.add('tab-active');
+      this.tabRepo.classList.remove('tab-active');
       this.snapMgr.load(vol).catch(() => {});
       this.lockMgr.refresh();
-      this.statsLoaded = false;
-      this.statsGrid.style.display = 'none';
       this.statsGrid.innerHTML = '';
-      this.statsToggleIcon.style.transform = 'rotate(0deg)';
+      this.statsMgr.load(vol).catch(() => {});
     } else {
       this.volumeView.style.display = 'none';
-      this.volumeStatsPanel.style.display = 'none';
-      this.volumeTroubleshootPanel.style.display = 'none';
-      this.deleteVolumePanel.style.display = 'none';
+      this.snapshotsTab.style.display = 'none';
+      this.repoTab.style.display = 'none';
     }
   }
 

@@ -189,10 +189,66 @@ select option { background: var(--surface); color: var(--text); }
   align-items: start;
 }
 
+.repo-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.repo-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 @media (max-width: 900px) {
   .split {
     grid-template-columns: 1fr;
   }
+
+  .repo-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 12px 28px;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.tab-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tab-panel {
+  display: block;
 }
 
 .lock-panel {
@@ -403,6 +459,26 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--muted);
 }
 
+/* Restore point info icon */
+.restore-point-info {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  font-style: normal;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 4px;
+}
+
 .init-banner {
   display: flex;
   align-items: center;
@@ -426,51 +502,6 @@ select option { background: var(--surface); color: var(--text); }
 
 .init-banner.init-banner-error.visible {
   visibility: visible;
-  opacity: 1;
-}
-
-.restore-point-info {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1.5px solid var(--muted);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: help;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-
-.restore-point-info::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8rem;
-  font-weight: 400;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  white-space: normal;
-  width: 280px;
-  text-align: left;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  line-height: 1.4;
-  z-index: 100;
-}
-
-.restore-point-info:hover::after {
   opacity: 1;
 }
 

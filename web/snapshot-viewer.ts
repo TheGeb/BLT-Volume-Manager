@@ -487,7 +487,7 @@ class SnapshotViewer {
       if (sn.volume !== vol) continue;
       const opt = document.createElement('option');
       opt.value = sn.id;
-      opt.textContent = `${sn.short_id} — ${sn.hostname || '?'} (${new Date(sn.time).toLocaleString()})`;
+      opt.textContent = `${sn.hostname || '?'} — ${new Date(sn.time).toLocaleString()} (${sn.short_id})`;
       this.compSelect.appendChild(opt);
       count++;
     }
