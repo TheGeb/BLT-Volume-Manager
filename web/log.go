@@ -74,6 +74,8 @@ func logError(event string, err error) {
 	logJSON(e)
 }
 
+//FIXME: Rename or move to more intuitive package
+
 func logS3Call(op, bucket, key string, dur time.Duration, err error) {
 	e := logEntry{Level: "debug", Event: "s3_call", Op: op, Bucket: bucket, Key: key, DurationMs: dur.Milliseconds()}
 	if err != nil {

@@ -92,7 +92,9 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 
 	ctx := context.Background()
 	lock, err := d.locker.Acquire(ctx, name)
-	if err == nil {
+	if err == nil { 
+		//FIXME: Need to adjust this restore logic to check snapshot tags for restore point
+		// Also should it take latest even if it's a hot backup? Maybe send an alert
 		restoreMode := "latest"
 		if r.Options != nil {
 			restoreMode = r.Options["restore"]
@@ -104,7 +106,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		if err := rm.RestoreIfExists(volPath, restoreMode); err != nil {
 			log.Printf("restore failed: %v", err)
 		}
-		lock.Release()
+		lock.Release() // FIXME: This doesn't seem right - should retain lock on success?
 	} else {
 		log.Printf("create: couldn't acquire lock for %s: %v", name, err)
 	}
@@ -178,7 +180,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	}
 
 	rm := d.ResticManager(name)
-	if err := d.coldBackup(name, volPath, fsType, rm); err != nil {
+	if err := d.coldBackup(name, volPath, fsType, rm); err != nil { //FIXME: Snapshot first and backup snapshot
 		log.Printf("final backup before remove failed: %v", err)
 	}
 	switch fsType {
@@ -221,7 +223,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	rm := d.ResticManager(name)
 
 	ctx := context.Background()
-	lock, err := d.locker.Acquire(ctx, name)
+	lock, err := d.locker.Acquire(ctx, name) //FIXME: this should be more of a "check lock"
 	if err != nil {
 		log.Printf("Mount: failed to acquire lock: %v", err)
 	} else {
@@ -241,7 +243,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 					log.Printf("restore-point found for %s (%s)", name, snapID)
 
 					log.Printf("backing up current state (rollback) for %s", name)
-					if err := rm.Backup(volPath, "rollback"); err != nil {
+					if err := rm.Backup(volPath, "rollback"); err != nil { //TODO: If no mounted containers, filesystem snapshot first then cold backup
 						log.Printf("rollback backup failed: %v", err)
 					}
 
@@ -283,7 +285,7 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) error {
 		vi.attached--
 		if vi.attached <= 0 {
 			rm := d.ResticManager(name)
-			if err := d.coldBackup(name, vi.Path, vi.FsType, rm); err != nil {
+			if err := d.coldBackup(name, vi.Path, vi.FsType, rm); err != nil { //TODO: hot backup if other containers still have mount, else no cold backup?
 				log.Printf("unmount cold backup failed: %v", err)
 			}
 			if vi.cancel != nil {
@@ -386,6 +388,7 @@ func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {
 }
 
 func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
+	//TODO: should hot backups create filesystem snapshots too?
 	rm := d.ResticManager(name)
 	hotTicker := time.NewTicker(5 * time.Minute)
 	go func() {
@@ -464,7 +467,7 @@ func (d *Driver) retryOrphanedSnapshots() {
 		}
 		log.Printf("retrying orphaned cold backup for %s (%s)", info.VolName, info.AccessPath)
 		rm := d.ResticManager(info.VolName)
-		if err := rm.BackupAt(info.AccessPath, "cold", fi.ModTime()); err != nil {
+		if err := rm.BackupAt(info.AccessPath, "cold", fi.ModTime()); err != nil { //FIXME: Can we assume it's a cold snapshot?
 			log.Printf("orphaned cold backup for %s failed: %v", info.VolName, err)
 			continue
 		}

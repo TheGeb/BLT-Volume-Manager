@@ -279,7 +279,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "stats", snapshotID, "--json")
+	cmd, err := m.resticCommand(ctx, "stats", snapshotID, "--json")  //TODO: No-lock?
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +462,7 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 	if path != "" && path != "/" {
 		args = append(args, path)
 	}
-	cmd, err := m.resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, args...)  //TODO: No-lock?
 	if err != nil {
 		return nil, err
 	}
@@ -561,7 +561,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "dump", snapshotID, path)
+	cmd, err := m.resticCommand(ctx, "dump", snapshotID, path)  //TODO: No-lock?
 	if err != nil {
 		return nil, err
 	}
@@ -577,7 +577,7 @@ func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "diff", snapID1, snapID2)
+	cmd, err := m.resticCommand(ctx, "diff", snapID1, snapID2) //TODO: No-lock?
 	if err != nil {
 		return nil, err
 	}
@@ -682,7 +682,7 @@ func (m *Manager) Repair() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	cmd, err := m.resticCommand(ctx, "repair", "index", "--no-lock")
+	cmd, err := m.resticCommand(ctx, "repair", "index")
 	if err != nil {
 		return err
 	}

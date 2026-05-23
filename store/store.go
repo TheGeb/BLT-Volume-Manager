@@ -61,7 +61,7 @@ func NewS3Store(opts S3StoreOpts) (*S3rw, error) {
 		}
 		scheme := u.Scheme
 		if scheme == "" {
-			scheme = "http"
+			scheme = "http" //FIXME default https, ensure that http still works if specified though
 		}
 		base := scheme + "://" + u.Host
 		clientOpts = append(clientOpts, func(o *s3.Options) {
