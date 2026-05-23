@@ -27,13 +27,13 @@ class SnapshotManager {
     this.loading = true;
     this.table.innerHTML = '';
     const colWidths = [
-      [['120px', '80px'], ['180px', '100px'], ['80px', '60px'], ['140px', '90px'], ['100px']],
-      [['100px', '70px'], ['220px', '140px'], ['100px', '70px'], ['130px', '80px'], ['100px']],
-      [['140px', '90px'], ['160px', '110px'], ['80px', '50px'], ['150px', '100px'], ['100px']],
-      [['110px', '75px'], ['200px', '130px'], ['120px', '80px'], ['135px', '85px'], ['100px']],
-      [['130px', '85px'], ['170px', '120px'], ['80px', '60px'], ['145px', '95px'], ['100px']],
-      [['90px', '65px'], ['240px', '150px'], ['100px', '70px'], ['125px', '75px'], ['100px']],
-      [['150px', '100px'], ['190px', '130px'], ['80px', '55px'], ['155px', '105px'], ['100px']],
+      [['120px', '80px'], ['80px'], ['180px', '100px'], ['80px', '60px'], ['140px', '90px'], ['100px']],
+      [['100px', '70px'], ['80px'], ['220px', '140px'], ['100px', '70px'], ['130px', '80px'], ['100px']],
+      [['140px', '90px'], ['80px'], ['160px', '110px'], ['80px', '50px'], ['150px', '100px'], ['100px']],
+      [['110px', '75px'], ['80px'], ['200px', '130px'], ['120px', '80px'], ['135px', '85px'], ['100px']],
+      [['130px', '85px'], ['80px'], ['170px', '120px'], ['80px', '60px'], ['145px', '95px'], ['100px']],
+      [['90px', '65px'], ['80px'], ['240px', '150px'], ['100px', '70px'], ['125px', '75px'], ['100px']],
+      [['150px', '100px'], ['80px'], ['190px', '130px'], ['80px', '55px'], ['155px', '105px'], ['100px']],
     ];
     for (const cols of colWidths) {
       const row = document.createElement('tr');
@@ -92,7 +92,7 @@ class SnapshotManager {
     const filtered = st.snapshots
       .filter(sn => {
         if (!st.query) return true;
-        const text = [sn.id, sn.short_id, sn.paths.join(' '), sn.tags.join(' ')].join(' ').toLowerCase();
+        const text = [sn.id, sn.short_id, sn.hostname, sn.paths.join(' '), sn.tags.join(' ')].join(' ').toLowerCase();
         return text.includes(st.query);
       })
       .sort((a, b) => {
@@ -102,7 +102,7 @@ class SnapshotManager {
       });
 
     if (filtered.length === 0) {
-      this.table.innerHTML = '<tr><td colspan="5">No backups match the current filter.</td></tr>';
+      this.table.innerHTML = '<tr><td colspan="6">No backups match the current filter.</td></tr>';
       return;
     }
 
@@ -124,7 +124,7 @@ class SnapshotManager {
           const wr = document.createElement('tr');
           wr.className = 'warning-row';
           const wc = document.createElement('td');
-          wc.colSpan = 5;
+          wc.colSpan = 6;
           wc.innerHTML = `<span style="color:var(--yellow)">\u26a0</span> Volume <strong>${vol}</strong> has <strong>${ids.length}</strong> restore-point snapshots: ${ids.join(', ')}. Only one should exist.`;
           wr.appendChild(wc);
           this.table.appendChild(wr);
@@ -144,6 +144,12 @@ class SnapshotManager {
         setTimeout(() => idCell.classList.remove('copied'), 1500);
       });
       row.appendChild(idCell);
+
+      const hostCell = document.createElement('td');
+      hostCell.textContent = sn.hostname || '-';
+      hostCell.style.color = 'var(--muted)';
+      hostCell.style.fontSize = '0.9rem';
+      row.appendChild(hostCell);
 
       const pathsCell = document.createElement('td');
       pathsCell.textContent = sn.paths.join(', ');

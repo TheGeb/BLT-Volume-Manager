@@ -82,7 +82,7 @@ class SnapshotViewer {
 
   async open(snapshot: Snapshot): Promise<void> {
     this.currentSnapshot = snapshot;
-    this.snapIdEl.textContent = snapshot.short_id;
+    this.snapIdEl.textContent = `${snapshot.short_id} (${snapshot.hostname || '?'})`;
     this.panel.style.display = 'block';
     this.loading.style.display = 'none';
     this.tree.innerHTML = '';
@@ -441,7 +441,7 @@ class SnapshotViewer {
       if (sn.volume !== vol) continue;
       const opt = document.createElement('option');
       opt.value = sn.id;
-      opt.textContent = `${sn.short_id} (${new Date(sn.time).toLocaleString()})`;
+      opt.textContent = `${sn.short_id} — ${sn.hostname || '?'} (${new Date(sn.time).toLocaleString()})`;
       this.compSelect.appendChild(opt);
       count++;
     }
@@ -461,12 +461,13 @@ class SnapshotViewer {
   async doDiff(): Promise<void> {
     if (!this.currentSnapshot) return;
     const otherId = this.compSelect.value;
+    const otherLabel = this.compSelect.selectedOptions[0]?.textContent || otherId;
     if (!otherId) {
       this.detail.innerHTML = '<span style="color:var(--muted)">Select a snapshot to compare.</span>';
       return;
     }
     this.diffOtherId = otherId;
-    this.detail.innerHTML = '';
+    this.detail.innerHTML = `<span style="color:var(--muted);font-size:0.85rem;">Comparing with ${otherLabel}</span>`;
     this.tree.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">Loading diff...</div>';
     try {
       const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/diff/${encodeURIComponent(otherId)}?volume=${encodeURIComponent(this.currentSnapshot.volume)}`);

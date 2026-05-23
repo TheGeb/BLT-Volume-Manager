@@ -20,11 +20,12 @@ type Manager struct {
 }
 
 type Snapshot struct {
-	ID      string    `json:"id"`
-	ShortID string    `json:"short_id"`
-	Time    time.Time `json:"time"`
-	Tags    []string  `json:"tags"`
-	Paths   []string  `json:"paths"`
+	ID       string    `json:"id"`
+	ShortID  string    `json:"short_id"`
+	Time     time.Time `json:"time"`
+	Tags     []string  `json:"tags"`
+	Paths    []string  `json:"paths"`
+	Hostname string    `json:"hostname"`
 }
 
 // NewManager creates a Manager for the given restic repository URL/path.
