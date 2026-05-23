@@ -102,12 +102,14 @@ func deriveS3Endpoint() string {
 	ep := os.Getenv("S3_ENDPOINT")
 	if ep == "" {
 		ep = strings.TrimPrefix(os.Getenv("RESTIC_REPOSITORY"), "s3:")
+		ep = strings.TrimPrefix(ep, "https://")
+		ep = strings.TrimPrefix(ep, "http://")
 	}
 	if ep == "" {
 		return ""
 	}
 	if !strings.Contains(ep, "://") {
-		ep = "https://" + ep
+		ep = "http://" + ep
 	}
 	return ep
 }

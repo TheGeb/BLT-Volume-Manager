@@ -61,7 +61,7 @@ func NewS3Store(opts S3StoreOpts) (*S3rw, error) {
 		}
 		scheme := u.Scheme
 		if scheme == "" {
-			scheme = "https"
+			scheme = "http"
 		}
 		base := scheme + "://" + u.Host
 		clientOpts = append(clientOpts, func(o *s3.Options) {

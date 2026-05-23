@@ -48,20 +48,24 @@ class LockPanelManager {
     try {
       const resp = await fetch(`/api/volume/${encodeURIComponent(vol)}/locks`);
       if (!resp.ok) {
-        this.statusText.textContent = 'Error';
-        this.ownerEl.textContent = '';
-        this.expiryEl.textContent = '';
-        this.deleteBtn.disabled = false;
+        this.showError((await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }))).error || 'Error');
         return;
       }
       const data = await resp.json() as LockStatus;
       this.render(data);
     } catch {
-      this.statusText.textContent = 'Error';
-      this.ownerEl.textContent = '';
-      this.expiryEl.textContent = '';
-      this.deleteBtn.disabled = false;
+      this.showError('Failed to load lock status');
     }
+  }
+
+  private showError(msg: string): void {
+    this.skeleton.style.display = 'none';
+    this.content.style.display = '';
+    this.statusText.textContent = msg;
+    this.statusText.style.color = 'var(--red)';
+    this.ownerEl.textContent = '';
+    this.expiryEl.textContent = '';
+    this.deleteBtn.disabled = false;
   }
 
   render(data: LockStatus): void {
