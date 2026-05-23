@@ -161,6 +161,10 @@
         <div class="row gap" style="margin-bottom:16px;">
           <input id="searchInput" class="input" type="search" placeholder="Filter by name, path, or tag" />
           <button id="sortButton" class="button button-secondary">Sort by newest</button>
+          <label class="toggle-label" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;white-space:nowrap;">
+            <input id="showHotToggle" type="checkbox" checked />
+            Show hot backups
+          </label>
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
@@ -169,7 +173,8 @@
                 <th>Snapshot ID</th>
                 <th>Host</th>
                 <th>Paths</th>
-                <th>Tags</th>
+                <th>Hot / Cold</th>
+                <th>Restore Point</th>
                 <th>Date</th>
                 <th>Actions</th>
               </tr>

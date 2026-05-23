@@ -48,6 +48,7 @@ class App {
     this.state = {
       snapshots: [], volumes: [], selectedVolume: '', volumeFilter: '',
       query: '', sortNewestFirst: true, hostname: 'webadmin', prevStats: null,
+      showHot: true,
     };
 
     const snapshotTable = document.getElementById('snapshotTable') as HTMLTableSectionElement;
@@ -173,6 +174,12 @@ class App {
     sortButton.addEventListener('click', () => {
       this.state.sortNewestFirst = !this.state.sortNewestFirst;
       sortButton.textContent = this.state.sortNewestFirst ? 'Sort by newest' : 'Sort by oldest';
+      this.snapMgr.render();
+    });
+
+    const showHotToggle = document.getElementById('showHotToggle') as HTMLInputElement;
+    showHotToggle.addEventListener('change', () => {
+      this.state.showHot = showHotToggle.checked;
       this.snapMgr.render();
     });
 

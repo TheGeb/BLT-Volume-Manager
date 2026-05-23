@@ -65,4 +65,5 @@ interface AppState {
   hostname: string;
   prevStats: StatsResponse | null;
   pillsCachedAt?: string;
+  showHot: boolean;
 }

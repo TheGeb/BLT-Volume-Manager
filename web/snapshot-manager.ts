@@ -122,6 +122,7 @@ class SnapshotManager {
 
     const filtered = st.snapshots
       .filter(sn => {
+        if (st.showHot === false && sn.tags.includes('hot')) return false;
         if (!st.query) return true;
         const text = [sn.id, sn.short_id, sn.hostname, sn.paths.join(' '), sn.tags.join(' ')].join(' ').toLowerCase();
         return text.includes(st.query);
@@ -133,7 +134,7 @@ class SnapshotManager {
       });
 
     if (filtered.length === 0) {
-      this.table.innerHTML = '<tr><td colspan="6">No backups match the current filter.</td></tr>';
+      this.table.innerHTML = '<tr><td colspan="7">No backups match the current filter.</td></tr>';
       return;
     }
 
@@ -155,7 +156,7 @@ class SnapshotManager {
           const wr = document.createElement('tr');
           wr.className = 'warning-row';
           const wc = document.createElement('td');
-          wc.colSpan = 6;
+          wc.colSpan = 7;
           wc.innerHTML = `<span style="color:var(--yellow)">\u26a0</span> Volume <strong>${vol}</strong> has <strong>${ids.length}</strong> restore-point snapshots: ${ids.join(', ')}. Only one should exist.`;
           wr.appendChild(wc);
           this.table.appendChild(wr);
@@ -189,8 +190,7 @@ class SnapshotManager {
       const tagsCell = document.createElement('td');
       const tagList = document.createElement('div');
       tagList.className = 'tag-list';
-      const isRestorePoint = sn.tags.includes('restore-point');
-      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold' || t === 'restore-point');
+      const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold');
       if (visibleTags.length === 0) {
         tagList.textContent = 'No tags';
       } else {
@@ -204,11 +204,53 @@ class SnapshotManager {
       tagsCell.appendChild(tagList);
       row.appendChild(tagsCell);
 
+      const rpCell = document.createElement('td');
+      rpCell.style.textAlign = 'center';
+      const rpIndicator = document.createElement('span');
+      const isRP = sn.tags.includes('restore-point');
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const rpSvg = document.createElementNS(svgNs, 'svg');
+      rpSvg.setAttribute('width', '20');
+      rpSvg.setAttribute('height', '20');
+      rpSvg.setAttribute('viewBox', '0 0 20 20');
+      rpSvg.style.display = 'block';
+      rpSvg.style.margin = '0 auto';
+      rpSvg.style.cursor = 'pointer';
+      const circle = document.createElementNS(svgNs, 'circle');
+      circle.setAttribute('cx', '10');
+      circle.setAttribute('cy', '10');
+      circle.setAttribute('r', '8');
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke-width', '2');
+      circle.setAttribute('stroke', isRP ? 'var(--accent)' : 'var(--border)');
+      rpSvg.appendChild(circle);
+      if (isRP) {
+        const path = document.createElementNS(svgNs, 'path');
+        path.setAttribute('d', 'M6 10 l3 3 l5 -5');
+        path.setAttribute('stroke', 'var(--accent)');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        rpSvg.appendChild(path);
+      }
+      rpSvg.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isRP) {
+          this.removeTag(sn.id, 'restore-point', sn.volume);
+        } else {
+          this.addTag(sn.id, 'restore-point', sn.volume);
+        }
+      });
+      rpCell.appendChild(rpSvg);
+      row.appendChild(rpCell);
+
       const timeCell = document.createElement('td');
       timeCell.textContent = new Date(sn.time).toLocaleString();
       row.appendChild(timeCell);
 
       const actionCell = document.createElement('td');
+      actionCell.style.display = 'flex';
+      actionCell.style.gap = '6px';
+      actionCell.style.flexWrap = 'wrap';
 
       const viewBtn = document.createElement('button');
       viewBtn.className = 'button button-secondary button-xs';
@@ -220,32 +262,9 @@ class SnapshotManager {
       });
       actionCell.appendChild(viewBtn);
 
-      const rpBtn = document.createElement('button');
-      rpBtn.className = 'button button-secondary button-xs';
-      rpBtn.textContent = isRestorePoint ? '\u229b Restore Point' : '\u2295 Set Restore Point';
-      rpBtn.style.marginLeft = '6px';
-      if (isRestorePoint) {
-        rpBtn.style.borderColor = 'var(--accent)';
-        rpBtn.style.color = 'var(--accent)';
-      }
-      rpBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        rpBtn.disabled = true;
-        try {
-          await this.addTag(sn.id, 'restore-point', sn.volume);
-          App.setBanner(`Snapshot ${sn.short_id} set as restore point.`);
-        } catch (err) {
-          App.setBanner((err as Error).message, true);
-        } finally {
-          rpBtn.disabled = false;
-        }
-      });
-      actionCell.appendChild(rpBtn);
-
       const delBtn = document.createElement('button');
       delBtn.className = 'button button-secondary button-xs';
       delBtn.textContent = 'Delete';
-      delBtn.style.marginLeft = '6px';
       delBtn.style.color = 'var(--red)';
       delBtn.style.borderColor = 'var(--red)';
       delBtn.addEventListener('click', async (e) => {
