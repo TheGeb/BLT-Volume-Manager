@@ -380,39 +380,6 @@ class SnapshotViewer {
       this.showError((err as Error).message);
     }
   }
-  private matchVolume(path: string, vol: string): boolean {
-    const marker = '/volumes/';
-    const idx = path.indexOf(marker);
-    if (idx >= 0) {
-      const subpath = path.slice(idx + marker.length).replace(/^\//, '');
-      return subpath.split('/')[0] === vol;
-    }
-    const parts = path.split('/').filter(Boolean);
-    const last = parts[parts.length - 1] || '';
-    for (const suffix of ['-cold-snap', '-pre-restore']) {
-      if (last.endsWith(suffix)) {
-        return last.slice(0, -suffix.length) === vol;
-      }
-    }
-    return last === vol;
-  }
-
-  private extractVol(path: string): string {
-    const marker = '/volumes/';
-    const idx = path.indexOf(marker);
-    if (idx >= 0) {
-      return path.slice(idx + marker.length).replace(/^\//, '').split('/')[0] || '';
-    }
-    const parts = path.split('/').filter(Boolean);
-    const last = parts[parts.length - 1] || '';
-    for (const suffix of ['-cold-snap', '-pre-restore']) {
-      if (last.endsWith(suffix)) {
-        return last.slice(0, -suffix.length);
-      }
-    }
-    return last;
-  }
-
   async populateCompareSelect(snapshot: Snapshot): Promise<void> {
     const vol = snapshot.volume;
     if (!vol) {

@@ -31,7 +31,7 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result []SnapshotWithVolume
+	result := make([]SnapshotWithVolume, 0, len(snapshots))
 	for _, snap := range snapshots {
 		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volumeFilter})
 	}
@@ -46,7 +46,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/snapshot/"), "/")
-	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore") {
+	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore" && parts[1] != "delete") {
 		http.NotFound(w, r)
 		return
 	}
@@ -58,6 +58,19 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.volumeManager(volName)
+
+	if parts[1] == "delete" {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := rm.ForgetSnapshot(snapshotID); err != nil {
+			respondError(w, err, http.StatusInternalServerError)
+			return
+		}
+		respondJSON(w, map[string]string{"status": "snapshot deleted"})
+		return
+	}
 
 	if parts[1] == "restore" {
 		if r.Method != http.MethodPost {

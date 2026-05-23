@@ -24,7 +24,7 @@ class App {
   private volumeStatsPanel: HTMLElement;
   private volumeTroubleshootPanel: HTMLElement;
   private volumeView: HTMLElement;
-  private testPanel: HTMLElement;
+  private landingPanel: HTMLElement;
   private testVolumeInput: HTMLInputElement;
   private testCreateBtn: HTMLButtonElement;
   private testStatus: HTMLDivElement;
@@ -32,6 +32,13 @@ class App {
   private statsHeader: HTMLElement;
   private statsGrid: HTMLDivElement;
   private statsLoaded = false;
+  private deleteVolumePanel: HTMLElement;
+  private deleteVolumeBtn: HTMLButtonElement;
+  private deleteModal: HTMLElement;
+  private deleteModalVolumeName: HTMLElement;
+  private deleteConfirmInput: HTMLInputElement;
+  private deleteModalConfirm: HTMLButtonElement;
+  private deleteModalCancel: HTMLButtonElement;
   private themeToggle: HTMLButtonElement;
   private themeIcon: HTMLElement;
   private moonSvg: string;
@@ -64,6 +71,13 @@ class App {
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
     this.themeIcon = document.getElementById('themeIcon') as HTMLElement;
     this.refreshBtn = document.getElementById('refreshButton') as HTMLButtonElement;
+    this.deleteVolumePanel = document.getElementById('deleteVolumePanel') as HTMLElement;
+    this.deleteVolumeBtn = document.getElementById('deleteVolumeBtn') as HTMLButtonElement;
+    this.deleteModal = document.getElementById('deleteModal') as HTMLElement;
+    this.deleteModalVolumeName = document.getElementById('deleteModalVolumeName') as HTMLElement;
+    this.deleteConfirmInput = document.getElementById('deleteConfirmInput') as HTMLInputElement;
+    this.deleteModalConfirm = document.getElementById('deleteModalConfirm') as HTMLButtonElement;
+    this.deleteModalCancel = document.getElementById('deleteModalCancel') as HTMLButtonElement;
     this.checkBtn = document.getElementById('volumeCheckButton') as HTMLButtonElement;
     this.repairBtn = document.getElementById('volumeRepairButton') as HTMLButtonElement;
     this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
@@ -72,7 +86,7 @@ class App {
     this.volumeStatsPanel = document.getElementById('volumeStatsPanel') as HTMLElement;
     this.volumeTroubleshootPanel = document.getElementById('volumeTroubleshootPanel') as HTMLElement;
     this.volumeView = volumeView;
-    this.testPanel = document.getElementById('testPanel') as HTMLElement;
+    this.landingPanel = document.getElementById('landingPanel') as HTMLElement;
     this.testVolumeInput = document.getElementById('testVolumeInput') as HTMLInputElement;
     this.testCreateBtn = document.getElementById('testCreateBtn') as HTMLButtonElement;
     this.testStatus = document.getElementById('testStatus') as HTMLDivElement;
@@ -224,6 +238,58 @@ class App {
       }
     });
 
+    this.deleteVolumeBtn.addEventListener('click', () => {
+      const vol = this.state.selectedVolume;
+      if (!vol) return;
+      this.deleteModalVolumeName.textContent = vol;
+      this.deleteConfirmInput.value = '';
+      this.deleteConfirmInput.placeholder = `Type "${vol}" to confirm`;
+      this.deleteModalConfirm.disabled = true;
+      this.deleteModal.style.display = '';
+    });
+
+    this.deleteModalCancel.addEventListener('click', () => {
+      this.deleteModal.style.display = 'none';
+    });
+
+    this.deleteModal.addEventListener('click', (e) => {
+      if (e.target === this.deleteModal) this.deleteModal.style.display = 'none';
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.deleteModal.style.display = 'none';
+    });
+
+    this.deleteConfirmInput.addEventListener('input', () => {
+      const vol = this.state.selectedVolume;
+      this.deleteModalConfirm.disabled = this.deleteConfirmInput.value !== vol;
+    });
+
+    this.deleteModalConfirm.addEventListener('click', async () => {
+      const vol = this.state.selectedVolume;
+      if (!vol || this.deleteConfirmInput.value !== vol) return;
+      this.deleteModalConfirm.disabled = true;
+      this.deleteModalConfirm.textContent = 'Deleting...';
+      try {
+        const resp = await fetch(`/api/volume/${encodeURIComponent(vol)}`, { method: 'DELETE' });
+        if (!resp.ok) {
+          const d = await resp.json();
+          throw new Error(d.error || 'delete failed');
+        }
+        this.deleteModal.style.display = 'none';
+        App.setBanner(`Volume ${vol} deleted — updating...`);
+        this.state.selectedVolume = '';
+        this.pillsMgr.showSkeleton();
+        this.onVolumeChange('');
+        try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
+        await this.pillsMgr.load();
+      } catch (err) {
+        App.setBanner((err as Error).message, true);
+      } finally {
+        this.deleteModalConfirm.disabled = false;
+        this.deleteModalConfirm.textContent = 'Delete';
+      }
+    });
+
     this.themeToggle.addEventListener('click', () => {
       const isLight = document.body.classList.toggle('light');
       this.themeIcon.innerHTML = isLight ? this.moonSvg : this.sunSvg;
@@ -258,27 +324,33 @@ class App {
       if (!resp.ok) {
         throw new Error(d.error || `HTTP ${resp.status}`);
       }
-      this.testStatus.textContent = d.message;
+      this.testStatus.textContent = 'Updating volume list...';
       this.testStatus.style.color = '';
       this.testVolumeInput.value = '';
+      this.pillsMgr.showSkeleton();
+      try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
       await this.pillsMgr.load();
+      this.state.selectedVolume = name;
+      this.pillsMgr.render();
       this.onVolumeChange(name);
     } catch (err) {
       this.testStatus.textContent = (err as Error).message;
       this.testStatus.style.color = 'var(--red)';
     } finally {
       this.testCreateBtn.disabled = false;
-      this.testCreateBtn.textContent = 'Create test volume';
+      this.testCreateBtn.textContent = 'Create & back up';
     }
   }
 
   private onVolumeChange(vol: string): void {
     document.dispatchEvent(new CustomEvent('close-snapshot-viewer'));
-    this.testPanel.style.display = vol ? 'none' : '';
+    this.deleteModal.style.display = 'none';
+    this.landingPanel.style.display = vol ? 'none' : '';
     if (vol) {
       this.volumeView.style.display = 'grid';
       this.volumeStatsPanel.style.display = '';
       this.volumeTroubleshootPanel.style.display = '';
+      this.deleteVolumePanel.style.display = '';
       this.snapMgr.load(vol).catch(() => {});
       this.lockMgr.refresh();
       this.statsLoaded = false;
@@ -289,6 +361,7 @@ class App {
       this.volumeView.style.display = 'none';
       this.volumeStatsPanel.style.display = 'none';
       this.volumeTroubleshootPanel.style.display = 'none';
+      this.deleteVolumePanel.style.display = 'none';
     }
   }
 

@@ -102,6 +102,20 @@ func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 	return snapshots, nil
 }
 
+func (m *Manager) ForgetSnapshot(snapshotID string) error {
+	if snapshotID == "" {
+		return errors.New("snapshot ID is required")
+	}
+	// restic forget deletes the snapshot and removes the associated data
+	cmd, err := m.resticCommand(context.Background(), "forget", snapshotID)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func (m *Manager) TagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")

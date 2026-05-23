@@ -66,6 +66,14 @@ func logInfo(event string) {
 	logJSON(logEntry{Level: "info", Event: event})
 }
 
+func logError(event string, err error) {
+	e := logEntry{Level: "error", Event: event}
+	if err != nil {
+		e.Error = err.Error()
+	}
+	logJSON(e)
+}
+
 func logS3Call(op, bucket, key string, dur time.Duration, err error) {
 	e := logEntry{Level: "debug", Event: "s3_call", Op: op, Bucket: bucket, Key: key, DurationMs: dur.Milliseconds()}
 	if err != nil {

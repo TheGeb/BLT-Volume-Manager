@@ -50,6 +50,7 @@ func respondError(w http.ResponseWriter, err error, status int) {
 	msg := "unknown error"
 	if err != nil {
 		msg = err.Error()
+		logError("request_error", err)
 	}
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

@@ -183,10 +183,10 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	return prefixes, nil
 }
 
-func (s *S3rw) DeleteLockObjects() error {
-	objects, err := s.ListObjects(s.opts.AwsLockFolder)
+func (s *S3rw) DeleteObjectsWithPrefix(prefix string) error {
+	objects, err := s.ListObjects(prefix)
 	if err != nil {
-		return fmt.Errorf("listing lock objects (prefix=%s): %w", s.opts.AwsLockFolder, err)
+		return fmt.Errorf("listing objects (prefix=%s): %w", prefix, err)
 	}
 	if len(objects) == 0 {
 		return nil
@@ -202,7 +202,11 @@ func (s *S3rw) DeleteLockObjects() error {
 		Delete: &types.Delete{Objects: idents},
 	})
 	if err != nil {
-		return fmt.Errorf("batch deleting lock objects (bucket=%s): %w", s.opts.AwsBucketName, err)
+		return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.AwsBucketName, prefix, err)
 	}
 	return nil
+}
+
+func (s *S3rw) DeleteLockObjects() error {
+	return s.DeleteObjectsWithPrefix(s.opts.AwsLockFolder)
 }

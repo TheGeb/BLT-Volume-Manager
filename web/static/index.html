@@ -54,13 +54,30 @@
       </div>
     </section>
 
-    <section id="testPanel" class="panel" style="display:none;">
-      <h2 class="stats-heading">Test Volume</h2>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input id="testVolumeInput" class="input" type="text" placeholder="Volume name" style="width:200px;" />
-        <button id="testCreateBtn" class="button button-secondary">Create test volume</button>
+    <section id="landingPanel" class="panel" style="display:none;">
+      <div style="text-align:center;padding:20px 0;">
+        <h2 style="margin:0 0 8px;font-size:1.6rem;">BLT Volume Manager</h2>
+        <p style="margin:0;color:var(--muted);font-size:0.95rem;">
+          Select a volume from the pills above to view its snapshots, locks, and stats.
+        </p>
       </div>
-      <div id="testStatus" class="status" style="margin-top:12px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:20px;">
+          <h3 class="stats-heading" style="margin:0 0 12px;">Quick start</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:0.85rem;font-family:monospace;">
+            <code style="padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;color:var(--accent);">docker volume create --driver s3vol --name my-volume</code>
+            <code style="padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;color:var(--accent);">docker run -v my-volume:/data alpine echo hello</code>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:20px;">
+          <h3 class="stats-heading" style="margin:0 0 12px;">Test Volume</h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="testVolumeInput" class="input" type="text" placeholder="Volume name" style="width:160px;" />
+            <button id="testCreateBtn" class="button button-secondary">Create &amp; back up</button>
+          </div>
+          <div id="testStatus" class="status" style="margin-top:12px;"></div>
+        </div>
+      </div>
     </section>
 
     <div id="volumeView" class="split" style="display:none;">
@@ -93,6 +110,51 @@
             <button id="volumeRepairButton" class="button button-secondary button-block" title="Unlock and rebuild repository index">Repair</button>
           </div>
         </section>
+        <section id="deleteVolumePanel" class="panel" style="display:none;">
+          <h2 class="stats-heading" style="color:var(--red);">Danger Zone</h2>
+          <button id="deleteVolumeBtn" class="button button-block" style="background:var(--red);color:#fff;">Delete volume</button>
+        </section>
+      </div>
+
+      <!-- Delete volume confirmation modal -->
+      <div id="deleteModal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+          <h3 style="margin:0 0 12px;color:var(--red);">Delete volume</h3>
+          <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
+            This will permanently delete the volume, all its snapshots, backups, and locks from S3.
+          </p>
+          <p style="margin:0 0 16px;color:var(--yellow);font-size:0.9rem;">
+            Make sure no other hosts are still using this volume before proceeding.
+          </p>
+          <p style="margin:0 0 8px;font-size:0.85rem;">
+            Type <strong id="deleteModalVolumeName"></strong> to confirm:
+          </p>
+          <input id="deleteConfirmInput" class="input" type="text" placeholder="" style="width:100%;box-sizing:border-box;margin-bottom:16px;" />
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="deleteModalCancel" class="button button-secondary">Cancel</button>
+            <button id="deleteModalConfirm" class="button" style="background:var(--red);color:#fff;" disabled>Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete snapshot confirmation modal -->
+      <div id="snapshotDeleteModal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+          <h3 style="margin:0 0 12px;color:var(--red);">Delete snapshot</h3>
+          <div style="margin-bottom:16px;font-size:0.85rem;">
+            <div><strong>Hostname:</strong> <span id="snapshotDeleteHostname"></span></div>
+            <div><strong>Date:</strong> <span id="snapshotDeleteDate"></span></div>
+            <div><strong>Tags:</strong> <span id="snapshotDeleteTags"></span></div>
+          </div>
+          <p style="margin:0 0 8px;font-size:0.85rem;">
+            Type <strong>delete</strong> to confirm:
+          </p>
+          <input id="snapshotDeleteInput" class="input" type="text" placeholder='Type "delete" to confirm' style="width:100%;box-sizing:border-box;margin-bottom:16px;" />
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="snapshotDeleteCancel" class="button button-secondary">Cancel</button>
+            <button id="snapshotDeleteConfirm" class="button" style="background:var(--red);color:#fff;" disabled>Delete</button>
+          </div>
+        </div>
       </div>
 
       <section class="panel table-panel">

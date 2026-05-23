@@ -8,6 +8,7 @@ class SnapshotManager {
   private getState: () => AppState;
   private setState: (patch: Partial<AppState>) => void;
   private loading = false;
+  private pendingDelete: (() => void) | null = null;
 
   constructor(
     table: HTMLTableSectionElement,
@@ -21,6 +22,32 @@ class SnapshotManager {
     this.sortBtn = sortBtn;
     this.getState = getState;
     this.setState = setState;
+    this.initDeleteModal();
+  }
+
+  private initDeleteModal(): void {
+    const modal = document.getElementById('snapshotDeleteModal') as HTMLElement;
+    const input = document.getElementById('snapshotDeleteInput') as HTMLInputElement;
+    const confirmBtn = document.getElementById('snapshotDeleteConfirm') as HTMLButtonElement;
+    const cancelBtn = document.getElementById('snapshotDeleteCancel') as HTMLButtonElement;
+
+    const close = () => { modal.style.display = 'none'; this.pendingDelete = null; };
+
+    input.addEventListener('input', () => {
+      confirmBtn.disabled = input.value !== 'delete';
+    });
+
+    cancelBtn.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+    confirmBtn.addEventListener('click', () => {
+      if (input.value !== 'delete') return;
+      close();
+      const fn = this.pendingDelete;
+      this.pendingDelete = null;
+      if (fn) fn();
+    });
   }
 
   showSkeleton(): void {
@@ -50,6 +77,10 @@ class SnapshotManager {
       }
       this.table.appendChild(row);
     }
+    const parent = this.table.parentElement;
+    if (parent && parent.offsetHeight > 0) {
+      this.table.style.minHeight = `${parent.offsetHeight}px`;
+    }
   }
 
   hideSkeleton(): void {
@@ -66,7 +97,7 @@ class SnapshotManager {
         try { const b = await resp.json(); if (b.error) msg = b.error; } catch {}
         throw new Error(msg);
       }
-      const raw = await resp.json() as Snapshot[];
+      const raw = (await resp.json() || []) as Snapshot[];
       this.setState({
         snapshots: raw.map(sn => ({ ...sn, tags: Array.isArray(sn.tags) ? sn.tags : [], paths: Array.isArray(sn.paths) ? sn.paths : [] })),
       });
@@ -160,7 +191,6 @@ class SnapshotManager {
       tagList.className = 'tag-list';
       const isRestorePoint = sn.tags.includes('restore-point');
       const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold' || t === 'restore-point');
-      const isExcluded = sn.tags.includes('excluded');
       if (visibleTags.length === 0) {
         tagList.textContent = 'No tags';
       } else {
@@ -171,17 +201,6 @@ class SnapshotManager {
           tagList.appendChild(tagItem);
         });
       }
-      const label = document.createElement('label');
-      label.className = 'tag-checkbox';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = isExcluded;
-      cb.addEventListener('change', () => {
-        (cb.checked ? this.addTag(sn.id, 'excluded', sn.volume) : this.removeTag(sn.id, 'excluded', sn.volume));
-      });
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' excluded'));
-      tagList.appendChild(label);
       tagsCell.appendChild(tagList);
       row.appendChild(tagsCell);
 
@@ -200,31 +219,6 @@ class SnapshotManager {
         document.dispatchEvent(ev);
       });
       actionCell.appendChild(viewBtn);
-
-      const restoreBtn = document.createElement('button');
-      restoreBtn.className = 'button button-secondary button-xs';
-      restoreBtn.textContent = 'Restore';
-      restoreBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const target = prompt('Target path for restore:', '/tmp/restore/' + sn.short_id);
-        if (!target) return;
-        restoreBtn.disabled = true;
-        restoreBtn.textContent = 'Restoring...';
-        try {
-          const resp = await fetch(`/api/snapshot/${encodeURIComponent(sn.id)}/restore?path=${encodeURIComponent(target)}&volume=${encodeURIComponent(sn.volume)}`, { method: 'POST' });
-          if (!resp.ok) {
-            const b = await resp.json();
-            throw new Error(b.error || 'restore failed');
-          }
-          App.setBanner(`Restore of ${sn.short_id} started – see server logs for results.`);
-        } catch (err) {
-          App.setBanner((err as Error).message, true);
-        } finally {
-          restoreBtn.disabled = false;
-          restoreBtn.textContent = 'Restore';
-        }
-      });
-      actionCell.appendChild(restoreBtn);
 
       const rpBtn = document.createElement('button');
       rpBtn.className = 'button button-secondary button-xs';
@@ -247,24 +241,71 @@ class SnapshotManager {
         }
       });
       actionCell.appendChild(rpBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'button button-secondary button-xs';
+      delBtn.textContent = 'Delete';
+      delBtn.style.marginLeft = '6px';
+      delBtn.style.color = 'var(--red)';
+      delBtn.style.borderColor = 'var(--red)';
+      delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const hostnameEl = document.getElementById('snapshotDeleteHostname') as HTMLSpanElement;
+        const dateEl = document.getElementById('snapshotDeleteDate') as HTMLSpanElement;
+        const tagsEl = document.getElementById('snapshotDeleteTags') as HTMLSpanElement;
+        const input = document.getElementById('snapshotDeleteInput') as HTMLInputElement;
+        const confirmBtn = document.getElementById('snapshotDeleteConfirm') as HTMLButtonElement;
+        hostnameEl.textContent = sn.hostname || '-';
+        dateEl.textContent = new Date(sn.time).toLocaleString();
+        tagsEl.textContent = sn.tags.length ? sn.tags.join(', ') : 'none';
+        input.value = '';
+        confirmBtn.disabled = true;
+        const modal = document.getElementById('snapshotDeleteModal') as HTMLElement;
+        modal.style.display = '';
+        this.pendingDelete = async () => {
+          delBtn.disabled = true;
+          delBtn.textContent = 'Deleting...';
+          try {
+            const resp = await fetch(`/api/snapshot/${encodeURIComponent(sn.id)}/delete?volume=${encodeURIComponent(sn.volume)}`, { method: 'DELETE' });
+            if (!resp.ok) {
+              const b = await resp.json();
+              throw new Error(b.error || 'delete failed');
+            }
+            App.setBanner(`Snapshot ${sn.short_id} deleted`);
+            await this.load(sn.volume);
+          } catch (err) {
+            App.setBanner((err as Error).message, true);
+            delBtn.disabled = false;
+            delBtn.textContent = 'Delete';
+          }
+        };
+      });
+      actionCell.appendChild(delBtn);
+
       row.appendChild(actionCell);
       this.table.appendChild(row);
-    });
+      });
 
-    if (fromSkeleton && oldH > 0) {
-      const newH = this.table.offsetHeight;
-      if (newH !== oldH) {
-        this.table.style.height = `${oldH}px`;
-        requestAnimationFrame(() => {
-          this.table.style.transition = 'height 0.25s ease';
-          this.table.style.height = `${newH}px`;
-        });
-        setTimeout(() => {
-          this.table.style.height = '';
-          this.table.style.transition = '';
-        }, 260);
+      if (fromSkeleton && oldH > 0) {
+        const newH = this.table.offsetHeight;
+        if (newH !== oldH) {
+          this.table.style.minHeight = `${oldH}px`;
+          this.table.style.height = `${oldH}px`;
+          requestAnimationFrame(() => {
+            this.table.style.transition = 'height 0.25s ease';
+            this.table.style.height = `${newH}px`;
+          });
+          setTimeout(() => {
+            this.table.style.height = '';
+            this.table.style.minHeight = '';
+            this.table.style.transition = '';
+          }, 260);
+        } else {
+          this.table.style.minHeight = '';
+        }
+      } else {
+        this.table.style.minHeight = '';
       }
-    }
     });
   }
 

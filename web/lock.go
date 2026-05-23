@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -20,12 +21,18 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/volume/"), "/")
+	volumeName := parts[0]
+
+	// DELETE /api/volume/<name> — delete the entire volume
+	if len(parts) == 1 && r.Method == http.MethodDelete {
+		s.handleDeleteVolume(w, r, volumeName)
+		return
+	}
+
 	if len(parts) != 2 || parts[1] != "locks" {
 		http.NotFound(w, r)
 		return
 	}
-
-	volumeName := parts[0]
 
 	switch r.Method {
 	case http.MethodGet:
@@ -57,6 +64,54 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
+	// 1. Delete S3 locks
+	if s.s3Bucket != "" {
+		if err := s.deleteVolumeLocks(volumeName); err != nil {
+			respondError(w, fmt.Errorf("delete locks: %w", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 2. Delete S3 restic repo data (if repo is S3-based)
+	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
+		rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName: s.s3Bucket,
+			S3Endpoint:    s.s3Endpoint,
+			Region:        s.s3Region,
+		})
+		if err == nil {
+			prefix := "restic/" + volumeName + "/"
+			rw.DeleteObjectsWithPrefix(prefix)
+		}
+	}
+
+	// 3. Delete file-based lock
+	lockPath := filepath.Join(s.dataDir, "locks", volumeName+".lock")
+	os.Remove(lockPath)
+
+	// 4. Delete local restic repo directory (if resticBase is a local path)
+	if !strings.HasPrefix(s.resticBase, "s3:") {
+		repoPath := filepath.Join(s.resticBase, "restic", volumeName)
+		if err := os.RemoveAll(repoPath); err != nil {
+			respondError(w, fmt.Errorf("delete restic repo: %w", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 5. Delete volume data directory
+	volPath := filepath.Join(s.dataDir, "volumes", volumeName)
+	if err := os.RemoveAll(volPath); err != nil {
+		respondError(w, fmt.Errorf("delete volume data: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 6. Refresh caches
+	s.refreshStats()
+
+	respondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
 func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error) {
