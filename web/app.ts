@@ -273,6 +273,7 @@ class App {
   }
 
   private onVolumeChange(vol: string): void {
+    document.dispatchEvent(new CustomEvent('close-snapshot-viewer'));
     this.testPanel.style.display = vol ? 'none' : '';
     if (vol) {
       this.volumeView.style.display = 'grid';

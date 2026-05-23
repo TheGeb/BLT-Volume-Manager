@@ -30,6 +30,8 @@ class SnapshotViewer {
   private compBtn: HTMLElement;
   private clearDiffBtn: HTMLElement;
   private compareSkeleton: HTMLElement;
+  private expandAllBtn: HTMLElement;
+  private collapseAllBtn: HTMLElement;
   private currentSnapshot: Snapshot | null = null;
   private allSnapshots: Snapshot[] = [];
   private lastNodes: FileNode[] = [];
@@ -47,17 +49,30 @@ class SnapshotViewer {
     this.compBtn = document.getElementById('viewerCompareBtn')!;
     this.clearDiffBtn = document.getElementById('viewerClearDiffBtn')!;
     this.compareSkeleton = document.getElementById('viewerCompareSkeleton')!;
+    this.expandAllBtn = document.getElementById('viewerExpandAll')!;
+    this.collapseAllBtn = document.getElementById('viewerCollapseAll')!;
     this.listen();
   }
 
   private listen(): void {
     document.addEventListener('open-snapshot-viewer', (e: Event) => {
       const ev = e as CustomEvent;
+      this.allSnapshots = ev.detail.snapshots || [];
       this.open(ev.detail.snapshot).catch(err => this.showError(err.message));
     });
     this.closeBtn.addEventListener('click', () => this.close());
     this.compBtn.addEventListener('click', () => this.doDiff());
     this.clearDiffBtn.addEventListener('click', () => this.clearDiff());
+    this.expandAllBtn.addEventListener('click', () => this.toggleAll(true));
+    this.collapseAllBtn.addEventListener('click', () => this.toggleAll(false));
+    document.addEventListener('close-snapshot-viewer', () => this.close());
+  }
+
+  private toggleAll(open: boolean): void {
+    const details = this.tree.querySelectorAll('details');
+    for (const d of details) {
+      d.open = open;
+    }
   }
 
   private showError(msg: string): void {
@@ -407,14 +422,17 @@ class SnapshotViewer {
       return;
     }
 
-    const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(vol)}`);
-    if (!resp.ok) {
-      console.warn('populateCompareSelect: snapshots API returned', resp.status, await resp.text().catch(() => ''));
-      this.compHeader.style.display = 'none';
-      this.hideCompareSkeleton();
-      return;
+    // If allSnapshots is empty, fetch; otherwise use the cached list
+    if (this.allSnapshots.length === 0) {
+      const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(vol)}`);
+      if (!resp.ok) {
+        console.warn('populateCompareSelect: snapshots API returned', resp.status, await resp.text().catch(() => ''));
+        this.compHeader.style.display = 'none';
+        this.hideCompareSkeleton();
+        return;
+      }
+      this.allSnapshots = await resp.json() as Snapshot[];
     }
-    this.allSnapshots = await resp.json() as Snapshot[];
 
     this.compSelect.innerHTML = '';
     let count = 0;

@@ -190,7 +190,7 @@ class SnapshotManager {
       viewBtn.textContent = 'View';
       viewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const ev = new CustomEvent('open-snapshot-viewer', { detail: { snapshot: sn } });
+        const ev = new CustomEvent('open-snapshot-viewer', { detail: { snapshot: sn, snapshots: this.getState().snapshots } });
         document.dispatchEvent(ev);
       });
       actionCell.appendChild(viewBtn);
