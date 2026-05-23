@@ -337,6 +337,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--muted);
   font-size: 0.95rem;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 #snapshotTable {
@@ -428,8 +429,49 @@ select option { background: var(--surface); color: var(--text); }
   opacity: 1;
 }
 
-.stats-panel {
-  margin-bottom: 20px;
+.restore-point-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.restore-point-info::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 400;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  white-space: normal;
+  width: 280px;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  line-height: 1.4;
+  z-index: 100;
+}
+
+.restore-point-info:hover::after {
+  opacity: 1;
 }
 
 .stats-heading {

@@ -14,12 +14,7 @@ class StatsManager {
 
   showSkeleton(): void {
     this.grid.innerHTML = '';
-    for (let i = 0; i < 6; i++) {
-      const card = document.createElement('div');
-      card.className = 'stat-card skeleton skeleton-card';
-      this.grid.appendChild(card);
-    }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const card = document.createElement('div');
       card.className = 'stat-card skeleton skeleton-card-graph';
       this.grid.appendChild(card);
@@ -63,44 +58,12 @@ class StatsManager {
     const prev = this.getPrev();
     this.setPrev(data);
 
-    const smallCards: { value: string | number; label: string; oldValue?: number }[] = [
-      { value: data.snapshots.total ?? '-', label: 'Snapshots', oldValue: prev?.snapshots.total },
-      { value: data.total_volumes ?? '-', label: 'Volumes', oldValue: prev?.total_volumes },
-    ];
-    if (data.repo.total_file_count != null) {
-      smallCards.push({ value: data.repo.total_file_count, label: 'Files', oldValue: prev?.repo.total_file_count });
-    }
-    if (data.repo.unique_blob_count != null) {
-      smallCards.push({ value: data.repo.unique_blob_count, label: 'Unique blobs', oldValue: prev?.repo.unique_blob_count });
-    }
-    if (data.repo.compressed_size != null) {
-      smallCards.push({ value: formatBytes(data.repo.compressed_size), label: 'Repo size' });
-    }
-
-    smallCards.forEach(c => {
-      const card = document.createElement('div');
-      card.className = 'stat-card';
-      card.innerHTML = `<div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div>`;
-      this.grid.appendChild(card);
-      const sv = card.querySelector('.stat-value') as HTMLElement;
-      if (c.oldValue != null && typeof c.value === 'number' && c.oldValue !== c.value) {
-        animateStatValue(sv, c.oldValue, c.value);
-      }
-    });
-
-    const total = data.snapshots.hot + data.snapshots.cold + data.snapshots.excluded;
-    const other = data.snapshots.total - total;
-    if (data.snapshots.total > 0) {
-      const card = document.createElement('div');
-      card.className = 'stat-card-graph';
-      card.innerHTML = '<div class="chart-title">Snapshot tags</div>';
-      card.appendChild(renderStatBar([
-        { value: data.snapshots.hot, color: 'var(--orange)', label: 'Hot', names: data.snapshots.hot_volumes },
-        { value: data.snapshots.cold, color: 'var(--blue)', label: 'Cold', names: data.snapshots.cold_volumes },
-        { value: data.snapshots.excluded, color: 'var(--red)', label: 'Excluded', names: data.snapshots.excluded_volumes },
-        { value: Math.max(other, 0), color: 'var(--muted)', label: 'Other', names: data.snapshots.other_volumes },
-      ]));
-      this.grid.appendChild(card);
+    if (data.repo.error) {
+      const errCard = document.createElement('div');
+      errCard.className = 'stat-card';
+      errCard.style.cssText = 'grid-column:1/-1;color:var(--red);font-size:0.85rem;text-align:center;padding:12px;';
+      errCard.textContent = `Stats unavailable: ${data.repo.error}`;
+      this.grid.appendChild(errCard);
     }
 
     if (data.locks.total_volumes > 0) {

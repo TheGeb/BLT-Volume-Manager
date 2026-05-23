@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -45,7 +46,14 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/snapshot/"), "/")
+	// Batch sizes endpoint
+	trimmed := strings.TrimPrefix(r.URL.Path, "/api/snapshot/")
+	if trimmed == "sizes" {
+		s.handleSnapshotSizes(w, r)
+		return
+	}
+
+	parts := strings.Split(trimmed, "/")
 	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore" && parts[1] != "delete") {
 		http.NotFound(w, r)
 		return
@@ -197,4 +205,34 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) handleSnapshotSizes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Volume string   `json:"volume"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Volume == "" || len(req.IDs) == 0 {
+		http.Error(w, "missing volume or ids", http.StatusBadRequest)
+		return
+	}
+
+	rm := s.volumeManager(req.Volume)
+	result := map[string]int64{}
+	for _, id := range req.IDs {
+		stats, err := rm.SnapshotStats(id)
+		if err != nil {
+			continue
+		}
+		result[id] = stats.TotalSize
+	}
+	respondJSON(w, result)
 }

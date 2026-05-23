@@ -42,6 +42,7 @@ interface StatsResponse {
     compressed_size?: number;
     unique_blob_count?: number;
     unique_blob_size?: number;
+    error?: string;
   };
   locks: {
     total_volumes: number;

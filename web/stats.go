@@ -144,15 +144,17 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	repoStats := map[string]interface{}{}
 
 	rst, err := rm.Stats()
-	if err == nil && rst != nil {
+	if err != nil {
+		logError("stats_failed", err)
+		repoStats["error"] = err.Error()
+	} else if rst != nil {
 		repoStats = map[string]interface{}{
 			"total_size":              rst.TotalSize,
 			"total_file_count":        rst.TotalFileCount,
 			"total_blob_count":        rst.TotalBlobCount,
 			"total_uncompressed_size": rst.TotalUncompressedSize,
-			"compressed_size":         rst.CompressedSize,
-			"unique_blob_count":       rst.UniqueBlobCount,
-			"unique_blob_size":        rst.UniqueBlobSize,
+			"compressed_size":         rst.TotalSize,
+			"unique_blob_count":       rst.TotalBlobCount,
 		}
 	}
 
@@ -211,6 +213,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	if s.statsCache != nil {
 		resp["locks"] = s.statsCache["locks"]
 		resp["cached_at"] = s.statsCache["cached_at"]
+		resp["total_volumes"] = s.statsCache["total_volumes"]
 	}
 	s.statsMu.RUnlock()
 

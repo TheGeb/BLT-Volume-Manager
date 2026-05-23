@@ -9,6 +9,8 @@ class SnapshotManager {
   private setState: (patch: Partial<AppState>) => void;
   private loading = false;
   private pendingDelete: (() => void) | null = null;
+  private sizes: Record<string, string> = {};
+  private currentVolume = '';
 
   constructor(
     table: HTMLTableSectionElement,
@@ -54,25 +56,21 @@ class SnapshotManager {
     this.loading = true;
     this.table.innerHTML = '';
     const colWidths = [
-      [['120px', '80px'], ['80px'], ['180px', '100px'], ['80px', '60px'], ['140px', '90px'], ['100px']],
-      [['100px', '70px'], ['80px'], ['220px', '140px'], ['100px', '70px'], ['130px', '80px'], ['100px']],
-      [['140px', '90px'], ['80px'], ['160px', '110px'], ['80px', '50px'], ['150px', '100px'], ['100px']],
-      [['110px', '75px'], ['80px'], ['200px', '130px'], ['120px', '80px'], ['135px', '85px'], ['100px']],
-      [['130px', '85px'], ['80px'], ['170px', '120px'], ['80px', '60px'], ['145px', '95px'], ['100px']],
-      [['90px', '65px'], ['80px'], ['240px', '150px'], ['100px', '70px'], ['125px', '75px'], ['100px']],
-      [['150px', '100px'], ['80px'], ['190px', '130px'], ['80px', '55px'], ['155px', '105px'], ['100px']],
+      ['110px', '70px', '60px', '28px', '28px', '90px', '100px'],
+      ['90px', '70px', '60px', '28px', '28px', '90px', '100px'],
+      ['130px', '70px', '60px', '28px', '28px', '90px', '100px'],
+      ['100px', '70px', '60px', '28px', '28px', '90px', '100px'],
+      ['120px', '70px', '60px', '28px', '28px', '90px', '100px'],
     ];
     for (const cols of colWidths) {
       const row = document.createElement('tr');
       row.className = 'skeleton-row';
-      for (const widths of cols) {
+      for (const w of cols) {
         const td = document.createElement('td');
-        for (const w of widths) {
-          const bar = document.createElement('div');
-          bar.className = 'skeleton-table-bar';
-          bar.style.width = w;
-          td.appendChild(bar);
-        }
+        const bar = document.createElement('div');
+        bar.className = 'skeleton-table-bar';
+        bar.style.width = w;
+        td.appendChild(bar);
         row.appendChild(td);
       }
       this.table.appendChild(row);
@@ -89,6 +87,10 @@ class SnapshotManager {
   }
 
   async load(vol: string): Promise<void> {
+    if (vol !== this.currentVolume) {
+      this.sizes = {};
+      this.currentVolume = vol;
+    }
     this.showSkeleton();
     try {
       const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(vol)}`);
@@ -114,7 +116,7 @@ class SnapshotManager {
   render(): void {
     if (this.loading) return;
     const st = this.getState();
-    const fromSkeleton = !!this.table.querySelector('.skeleton-table-row');
+    const fromSkeleton = !!this.table.querySelector('.skeleton-row');
     const oldH = fromSkeleton ? this.table.offsetHeight : 0;
 
     fadeIn(this.table, () => {
@@ -124,7 +126,7 @@ class SnapshotManager {
       .filter(sn => {
         if (st.showHot === false && sn.tags.includes('hot')) return false;
         if (!st.query) return true;
-        const text = [sn.id, sn.short_id, sn.hostname, sn.paths.join(' '), sn.tags.join(' ')].join(' ').toLowerCase();
+        const text = [sn.id, sn.short_id, sn.hostname, sn.tags.join(' ')].join(' ').toLowerCase();
         return text.includes(st.query);
       })
       .sort((a, b) => {
@@ -183,25 +185,11 @@ class SnapshotManager {
       hostCell.style.fontSize = '0.9rem';
       row.appendChild(hostCell);
 
-      const pathsCell = document.createElement('td');
-      pathsCell.textContent = sn.paths.join(', ');
-      row.appendChild(pathsCell);
-
       const tagsCell = document.createElement('td');
-      const tagList = document.createElement('div');
-      tagList.className = 'tag-list';
+      tagsCell.style.color = 'var(--muted)';
+      tagsCell.style.fontSize = '0.9rem';
       const visibleTags = sn.tags.filter(t => t === 'hot' || t === 'cold');
-      if (visibleTags.length === 0) {
-        tagList.textContent = 'No tags';
-      } else {
-        visibleTags.forEach(tag => {
-          const tagItem = document.createElement('span');
-          tagItem.className = 'tag tag-readonly';
-          tagItem.textContent = tag;
-          tagList.appendChild(tagItem);
-        });
-      }
-      tagsCell.appendChild(tagList);
+      tagsCell.textContent = visibleTags.length ? visibleTags.join(', ') : '—';
       row.appendChild(tagsCell);
 
       const rpCell = document.createElement('td');
@@ -243,14 +231,54 @@ class SnapshotManager {
       rpCell.appendChild(rpSvg);
       row.appendChild(rpCell);
 
+      const sizeCell = document.createElement('td');
+      sizeCell.style.textAlign = 'center';
+      sizeCell.style.fontVariantNumeric = 'tabular-nums';
+      sizeCell.style.whiteSpace = 'nowrap';
+      if (this.sizes[sn.id]) {
+        sizeCell.textContent = this.sizes[sn.id];
+      } else {
+        const sizeBtn = document.createElement('span');
+        sizeBtn.title = 'Compute size';
+        sizeBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;cursor:pointer;opacity:0.5;';
+        sizeBtn.style.color = 'var(--muted)';
+        sizeBtn.addEventListener('mouseenter', () => sizeBtn.style.opacity = '1');
+        sizeBtn.addEventListener('mouseleave', () => sizeBtn.style.opacity = '0.5');
+        sizeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+        sizeBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          sizeBtn.innerHTML = '<span style="font-size:12px;">…</span>';
+          sizeBtn.style.opacity = '0.6';
+          try {
+            const st = this.getState();
+            const resp = await fetch('/api/snapshot/sizes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ volume: st.selectedVolume, ids: [sn.id] }),
+            });
+            if (!resp.ok) throw new Error('Failed');
+            const data = await resp.json() as Record<string, number>;
+            if (data[sn.id] != null) {
+              this.sizes[sn.id] = formatBytes(data[sn.id]);
+            } else {
+              this.sizes[sn.id] = 'err';
+            }
+            this.render();
+          } catch {
+            sizeBtn.style.opacity = '0.5';
+          }
+        });
+        sizeCell.appendChild(sizeBtn);
+      }
+      row.appendChild(sizeCell);
+
       const timeCell = document.createElement('td');
-      timeCell.textContent = new Date(sn.time).toLocaleString();
+      const d = new Date(sn.time);
+      timeCell.innerHTML = `${d.toLocaleDateString()}<br><span style="font-size:0.85rem;color:var(--muted);">${d.toLocaleTimeString()}</span>`;
       row.appendChild(timeCell);
 
       const actionCell = document.createElement('td');
-      actionCell.style.display = 'flex';
-      actionCell.style.gap = '6px';
-      actionCell.style.flexWrap = 'wrap';
+      actionCell.style.whiteSpace = 'nowrap';
 
       const viewBtn = document.createElement('button');
       viewBtn.className = 'button button-secondary button-xs';
@@ -265,6 +293,7 @@ class SnapshotManager {
       const delBtn = document.createElement('button');
       delBtn.className = 'button button-secondary button-xs';
       delBtn.textContent = 'Delete';
+      delBtn.style.marginLeft = '6px';
       delBtn.style.color = 'var(--red)';
       delBtn.style.borderColor = 'var(--red)';
       delBtn.addEventListener('click', async (e) => {

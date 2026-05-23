@@ -21,6 +21,7 @@ interface DiffResult {
 class SnapshotViewer {
   private panel: HTMLElement;
   private tree: HTMLElement;
+  private treePanel: HTMLElement;
   private detail: HTMLElement;
   private loading: HTMLElement;
   private snapIdEl: HTMLElement;
@@ -39,6 +40,7 @@ class SnapshotViewer {
 
   constructor() {
     this.panel = document.getElementById('snapshotViewer')!;
+    this.treePanel = document.getElementById('viewerTreePanel')!;
     this.tree = document.getElementById('viewerTree')!;
     this.detail = document.getElementById('viewerDetail')!;
     this.loading = document.getElementById('viewerLoading')!;
@@ -52,6 +54,7 @@ class SnapshotViewer {
     this.expandAllBtn = document.getElementById('viewerExpandAll')!;
     this.collapseAllBtn = document.getElementById('viewerCollapseAll')!;
     this.listen();
+    this.initDrag();
   }
 
   private listen(): void {
@@ -131,12 +134,32 @@ class SnapshotViewer {
   }
 
   private renderSkeleton(): void {
+    this.detail.innerHTML = '';
+    const lines = [
+      '80%', '60%', '90%', '55%', '70%',
+      '85%',
+    ];
+    for (const w of lines) {
+      const bar = document.createElement('div');
+      bar.className = 'skeleton-table-bar';
+      bar.style.cssText = `width:${w};height:14px;border-radius:6px;margin-bottom:10px;`;
+      this.detail.appendChild(bar);
+    }
+
+    this.tree.innerHTML = '';
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+    for (let i = 0; i < 2; i++) {
+      const btn = document.createElement('div');
+      btn.className = 'skeleton';
+      btn.style.cssText = 'flex:1;height:28px;border-radius:8px;';
+      btnRow.appendChild(btn);
+    }
+    this.tree.appendChild(btnRow);
+
     const items = [
-      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
-      { depth: 0 }, { depth: 1 }, { depth: 2 }, { depth: 3 }, { depth: 3 },
-      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
-      { depth: 0 }, { depth: 1 }, { depth: 2 }, { depth: 3 }, { depth: 3 },
-      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 }, { depth: 2 },
+      { depth: 0 }, { depth: 1 }, { depth: 1 }, { depth: 2 },
+      { depth: 0 }, { depth: 1 },
     ];
     for (const item of items) {
       const row = document.createElement('div');
@@ -153,6 +176,62 @@ class SnapshotViewer {
       row.appendChild(bar);
       this.tree.appendChild(row);
     }
+  }
+
+  private initDrag(): void {
+    const colHandle = document.getElementById('viewerDragHandle')!;
+    const rowHandle = document.getElementById('viewerHeightHandle')!;
+    const content = document.getElementById('viewerContent')!;
+    let colDragging = false;
+    let rowDragging = false;
+
+    colHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      colDragging = true;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    rowHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      rowDragging = true;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (colDragging) {
+        const rect = (colHandle.parentElement as HTMLElement).getBoundingClientRect();
+        const minW = 120;
+        const maxW = rect.width - 120;
+        let w = e.clientX - rect.left;
+        if (w < minW) w = minW;
+        if (w > maxW) w = maxW;
+        this.treePanel.style.flex = `0 0 ${w}px`;
+      }
+      if (rowDragging) {
+        const contentRect = content.getBoundingClientRect();
+        const minH = 200;
+        const maxH = window.innerHeight - contentRect.top - 40;
+        let h = e.clientY - contentRect.top;
+        if (h < minH) h = minH;
+        if (h > maxH) h = maxH;
+        content.style.height = h + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (colDragging) {
+        colDragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+      if (rowDragging) {
+        rowDragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
   }
 
   private renderTree(nodes: FileNode[], diff: DiffResult | null): void {

@@ -258,14 +258,41 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
+		log.Printf("restic stats stderr: %s", string(out))
 		return nil, fmt.Errorf("restic stats: %w", err)
 	}
 
 	var stats RepoStats
 	if err := json.Unmarshal(out, &stats); err != nil {
+		log.Printf("restic stats raw output: %s", string(out))
 		return nil, fmt.Errorf("parse restic stats: %w", err)
 	}
 	return &stats, nil
+}
+
+type SnapshotSizeResult struct {
+	TotalSize      int64 `json:"total_size"`
+	TotalFileCount int64 `json:"total_file_count"`
+}
+
+func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd, err := m.resticCommand(ctx, "stats", snapshotID, "--json")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("restic snapshot stats: %w", err)
+	}
+
+	var result SnapshotSizeResult
+	if err := json.Unmarshal(out, &result); err != nil {
+		return nil, fmt.Errorf("parse restic snapshot stats: %w", err)
+	}
+	return &result, nil
 }
 
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {

@@ -80,7 +80,44 @@
       </div>
     </section>
 
-    <div id="volumeView" class="split" style="display:none;">
+    <div id="volumeView" style="display:none;">
+      <section id="snapshotViewer" class="panel" style="display:none;margin-bottom:16px;">
+        <div class="row gap" style="margin-bottom:12px;">
+          <h2 class="eyebrow" style="margin:0;flex:1;">
+            Snapshot <span id="viewerSnapId"></span>
+          </h2>
+          <button id="viewerClose" class="button button-secondary button-xs">Close</button>
+        </div>
+        <div id="viewerCompareHeader" style="display:none;margin-bottom:12px;">
+          <select id="viewerCompareSelect"></select>
+          <button id="viewerCompareBtn" class="button button-xs" style="margin-left:6px;">Diff</button>
+          <button id="viewerClearDiffBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Clear diff</button>
+          <button id="diffLayoutBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Side by side</button>
+        </div>
+        <div id="viewerCompareSkeleton" style="display:none;margin-bottom:12px;gap:8px;align-items:center;">
+          <span class="skeleton-select-bar" style="width:240px;"></span>
+          <span class="skeleton-btn-bar"></span>
+        </div>
+        <div id="viewerContent" style="display:flex;gap:0;min-height:200px;">
+          <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:4px;">
+              <button id="viewerExpandAll" class="button button-secondary button-xs" style="flex:1;">Expand all</button>
+              <button id="viewerCollapseAll" class="button button-secondary button-xs" style="flex:1;">Collapse all</button>
+            </div>
+            <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;"></div>
+          </div>
+          <div id="viewerDragHandle" style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;">
+            <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
+          </div>
+          <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;"></div>
+        </div>
+        <div id="viewerLoading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+        <div id="viewerHeightHandle" style="height:10px;cursor:row-resize;display:flex;align-items:center;justify-content:center;user-select:none;margin-top:8px;">
+          <div style="width:40px;height:3px;border-radius:2px;background:var(--border);"></div>
+        </div>
+      </section>
+
+      <div class="split">
       <div>
         <section id="lockPanel" class="panel lock-panel" style="display:none;">
           <div id="lockPanelContent">
@@ -157,9 +194,18 @@
         </div>
       </div>
 
-      <section class="panel table-panel">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <section id="volumeStatsPanel" class="panel stats-panel" style="display:none;margin-bottom:0;">
+          <div id="statsHeader" style="cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;">
+            <span id="statsToggleIcon" style="transition:transform 0.15s;">▶</span>
+            <h2 class="stats-heading" style="margin:0;">Stats</h2>
+          </div>
+          <div id="volumeStatsGrid" class="stats-grid" style="display:none;"></div>
+        </section>
+
+        <section class="panel table-panel" style="margin-bottom:0;">
         <div class="row gap" style="margin-bottom:16px;">
-          <input id="searchInput" class="input" type="search" placeholder="Filter by name, path, or tag" />
+          <input id="searchInput" class="input" type="search" placeholder="Filter by name or tag" />
           <button id="sortButton" class="button button-secondary">Sort by newest</button>
           <label class="toggle-label" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;white-space:nowrap;">
             <input id="showHotToggle" type="checkbox" checked />
@@ -172,9 +218,9 @@
               <tr>
                 <th>Snapshot ID</th>
                 <th>Host</th>
-                <th>Paths</th>
-                <th>Hot / Cold</th>
-                <th>Restore Point</th>
+                <th>Type</th>
+                <th>Restore Point <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time.">i</span></th>
+                <th>Size</th>
                 <th>Date</th>
                 <th>Actions</th>
               </tr>
@@ -185,47 +231,9 @@
         </div>
         <div id="statusMessage" class="status"></div>
       </section>
-
-      <div style="grid-column:1/-1;">
-        <section id="volumeStatsPanel" class="panel stats-panel" style="display:none;">
-          <div id="statsHeader" style="cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;">
-            <span id="statsToggleIcon" style="transition:transform 0.15s;">▶</span>
-            <h2 class="stats-heading" style="margin:0;">Stats</h2>
-          </div>
-          <div id="volumeStatsGrid" class="stats-grid" style="display:none;"></div>
-        </section>
       </div>
     </div>
 
-    <section id="snapshotViewer" class="panel" style="display:none;">
-      <div class="row gap" style="margin-bottom:12px;">
-        <h2 class="eyebrow" style="margin:0;flex:1;">
-          Snapshot <span id="viewerSnapId"></span>
-        </h2>
-        <button id="viewerClose" class="button button-secondary button-xs">Close</button>
-      </div>
-      <div id="viewerCompareHeader" style="display:none;margin-bottom:12px;">
-        <select id="viewerCompareSelect"></select>
-        <button id="viewerCompareBtn" class="button button-xs" style="margin-left:6px;">Diff</button>
-        <button id="viewerClearDiffBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Clear diff</button>
-        <button id="diffLayoutBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Side by side</button>
-      </div>
-      <div id="viewerCompareSkeleton" style="display:none;margin-bottom:12px;gap:8px;align-items:center;">
-        <span class="skeleton-select-bar" style="width:240px;"></span>
-        <span class="skeleton-btn-bar"></span>
-      </div>
-      <div id="viewerContent" style="display:flex;gap:12px;max-height:70vh;min-height:300px;">
-        <div style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;gap:4px;">
-            <button id="viewerExpandAll" class="button button-secondary button-xs" style="flex:1;">Expand all</button>
-            <button id="viewerCollapseAll" class="button button-secondary button-xs" style="flex:1;">Collapse all</button>
-          </div>
-          <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;"></div>
-        </div>
-        <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;"></div>
-      </div>
-      <div id="viewerLoading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
-    </section>
   </div>
 
   <script src="types.js"></script>
