@@ -28,6 +28,10 @@ class App {
   private testVolumeInput: HTMLInputElement;
   private testCreateBtn: HTMLButtonElement;
   private testStatus: HTMLDivElement;
+  private statsToggleIcon: HTMLElement;
+  private statsHeader: HTMLElement;
+  private statsGrid: HTMLDivElement;
+  private statsLoaded = false;
   private themeToggle: HTMLButtonElement;
   private themeIcon: HTMLElement;
   private moonSvg: string;
@@ -52,6 +56,9 @@ class App {
     const lockOwner = document.getElementById('lockOwner') as HTMLDivElement;
     const lockExpiry = document.getElementById('lockExpiry') as HTMLDivElement;
     const statsGrid = document.getElementById('volumeStatsGrid') as HTMLDivElement;
+    this.statsGrid = statsGrid;
+    this.statsHeader = document.getElementById('statsHeader') as HTMLElement;
+    this.statsToggleIcon = document.getElementById('statsToggleIcon') as HTMLElement;
     const volumeView = document.getElementById('volumeView') as HTMLElement;
     const lockPanelContent = document.getElementById('lockPanelContent') as HTMLElement;
     const lockPanelSkeleton = document.getElementById('lockPanelSkeleton') as HTMLElement;
@@ -135,10 +142,12 @@ class App {
       const vol = this.state.selectedVolume;
       try { await fetch('/api/stats/refresh', { method: 'POST' }); } catch {}
       if (vol) {
-        await Promise.all([
-          this.statsMgr.load(vol).catch(e => App.setBanner(e.message, true)),
-          this.snapMgr.load(vol).catch(e => App.setBanner(e.message, true)),
-        ]);
+        await this.snapMgr.load(vol).catch(e => App.setBanner(e.message, true));
+        if (this.statsGrid.style.display !== 'none') {
+          this.statsMgr.load(vol).catch(e => App.setBanner(e.message, true));
+        } else {
+          this.statsLoaded = false;
+        }
       }
       await this.pillsMgr.load().catch(e => App.setBanner(e.message, true));
       if (vol) this.lockMgr.refresh();
@@ -199,6 +208,20 @@ class App {
       }
     });
 
+    this.statsHeader.addEventListener('click', () => {
+      const grid = this.statsGrid;
+      const expanded = grid.style.display !== 'none';
+      grid.style.display = expanded ? 'none' : '';
+      this.statsToggleIcon.style.transform = expanded ? 'rotate(0deg)' : 'rotate(90deg)';
+      if (!expanded && !this.statsLoaded) {
+        const vol = this.state.selectedVolume;
+        if (vol) {
+          this.statsLoaded = true;
+          this.statsMgr.load(vol).catch(() => {});
+        }
+      }
+    });
+
     this.themeToggle.addEventListener('click', () => {
       const isLight = document.body.classList.toggle('light');
       this.themeIcon.innerHTML = isLight ? this.moonSvg : this.sunSvg;
@@ -254,8 +277,11 @@ class App {
       this.volumeStatsPanel.style.display = '';
       this.volumeTroubleshootPanel.style.display = '';
       this.snapMgr.load(vol).catch(() => {});
-      this.statsMgr.load(vol).catch(() => {});
       this.lockMgr.refresh();
+      this.statsLoaded = false;
+      this.statsGrid.style.display = 'none';
+      this.statsGrid.innerHTML = '';
+      this.statsToggleIcon.style.transform = 'rotate(0deg)';
     } else {
       this.volumeView.style.display = 'none';
       this.volumeStatsPanel.style.display = 'none';

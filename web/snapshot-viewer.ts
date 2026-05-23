@@ -28,9 +28,12 @@ class SnapshotViewer {
   private compHeader: HTMLElement;
   private compSelect: HTMLSelectElement;
   private compBtn: HTMLElement;
+  private clearDiffBtn: HTMLElement;
   private compareSkeleton: HTMLElement;
   private currentSnapshot: Snapshot | null = null;
   private allSnapshots: Snapshot[] = [];
+  private lastNodes: FileNode[] = [];
+  private currentDiffResult: DiffResult | null = null;
 
   constructor() {
     this.panel = document.getElementById('snapshotViewer')!;
@@ -42,6 +45,7 @@ class SnapshotViewer {
     this.compHeader = document.getElementById('viewerCompareHeader')!;
     this.compSelect = document.getElementById('viewerCompareSelect')! as HTMLSelectElement;
     this.compBtn = document.getElementById('viewerCompareBtn')!;
+    this.clearDiffBtn = document.getElementById('viewerClearDiffBtn')!;
     this.compareSkeleton = document.getElementById('viewerCompareSkeleton')!;
     this.listen();
   }
@@ -53,6 +57,7 @@ class SnapshotViewer {
     });
     this.closeBtn.addEventListener('click', () => this.close());
     this.compBtn.addEventListener('click', () => this.doDiff());
+    this.clearDiffBtn.addEventListener('click', () => this.clearDiff());
   }
 
   private showError(msg: string): void {
@@ -93,7 +98,11 @@ class SnapshotViewer {
       return;
     }
 
-    this.renderTree(nodes);
+    this.lastNodes = nodes;
+    this.currentDiffResult = null;
+    this.diffOtherId = '';
+    this.clearDiffBtn.style.display = 'none';
+    this.renderTree(nodes, null);
     this.populateCompareSelect(snapshot).catch(err => console.warn('populateCompareSelect failed', err));
   }
 
@@ -131,10 +140,35 @@ class SnapshotViewer {
     }
   }
 
-  private renderTree(nodes: FileNode[]): void {
+  private renderTree(nodes: FileNode[], diff: DiffResult | null): void {
     this.tree.innerHTML = '';
+    const diffMap = diff ? this.buildDiffMap(diff) : null;
+
+    // Inject virtual nodes for added files not in the current snapshot's tree
+    let allNodes = nodes;
+    if (diff) {
+      const existingPaths = new Set<string>();
+      for (const n of nodes) {
+        if (n.path) existingPaths.add(n.path.replace(/^\//, ''));
+      }
+      for (const cs of (diff.change_sets || [])) {
+        if (cs.type !== 'added') continue;
+        for (const p of (cs.paths || [])) {
+          const norm = p.replace(/^\.\//, '').replace(/^\//, '');
+          if (!norm || existingPaths.has(norm)) continue;
+          allNodes = [...allNodes, {
+            name: norm.split('/').pop() || norm,
+            type: 'file',
+            path: '/' + norm,
+            full_path: p,
+          }];
+          existingPaths.add(norm);
+        }
+      }
+    }
+
     const root: any = { name: '/', type: 'dir', children: {} };
-    for (const n of nodes) {
+    for (const n of allNodes) {
       if (!n.path || n.path === '/') continue;
       const parts = n.path.replace(/^\//, '').split('/');
       let cur = root;
@@ -154,17 +188,35 @@ class SnapshotViewer {
         }
       }
     }
-    this.renderNode(root, this.tree, 0);
+    this.renderNode(root, this.tree, 0, diffMap);
   }
 
-  private renderNode(node: any, parent: HTMLElement, depth: number): void {
+  private buildDiffMap(diff: DiffResult): Map<string, string> {
+    const m = new Map<string, string>();
+    for (const cs of (diff.change_sets || [])) {
+      for (const p of (cs.paths || [])) {
+        m.set(p, cs.type);
+        // Normalize: strip leading ./ and / so it matches tree node paths
+        const norm = p.replace(/^\.\//, '').replace(/^\//, '');
+        m.set(norm, cs.type);
+        if (norm.includes('/')) {
+          // Store parent-relative path too (e.g. "config/app.json")
+          const parentRel = norm.split('/').slice(1).join('/');
+          if (parentRel) m.set(parentRel, cs.type);
+        }
+      }
+    }
+    return m;
+  }
+
+  private renderNode(node: any, parent: HTMLElement, depth: number, diffMap: Map<string, string> | null): void {
     if (node.name === '/' && depth === 0) {
       const sorted = Object.values(node.children).sort((a: any, b: any) => {
         if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
       for (const child of sorted as any[]) {
-        this.renderNode(child, parent, depth + 1);
+        this.renderNode(child, parent, depth + 1, diffMap);
       }
       return;
     }
@@ -190,11 +242,20 @@ class SnapshotViewer {
         return a.name.localeCompare(b.name);
       });
       for (const child of sorted as any[]) {
-        this.renderNode(child, content, depth + 1);
+        this.renderNode(child, content, depth + 1, diffMap);
       }
       details.appendChild(content);
       parent.appendChild(details);
     } else {
+      // Determine diff type for this file
+      let diffType = '';
+      if (diffMap) {
+        const nodePath = (node.path || '').replace(/^\//, '');
+        diffType = diffMap.get(node.full_path || '') || diffMap.get(nodePath) || diffMap.get(node.name) || '';
+      }
+      const diffColor = diffType === 'added' ? 'var(--green)' : diffType === 'removed' ? 'var(--red)' : diffType === 'modified' ? 'var(--yellow)' : '';
+      const otherId = this.diffOtherId;
+
       const item = document.createElement('div');
       item.style.cursor = 'pointer';
       item.style.padding = '2px 4px';
@@ -207,6 +268,9 @@ class SnapshotViewer {
       icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = node.name;
+      if (diffColor) {
+        nameSpan.style.color = diffColor;
+      }
       if (node.size != null) {
         const sizeSpan = document.createElement('span');
         sizeSpan.style.color = 'var(--muted)';
@@ -217,6 +281,34 @@ class SnapshotViewer {
       }
       item.prepend(icon);
       item.appendChild(nameSpan);
+
+      // Add view button for diff items
+      if (diffType && otherId) {
+        const viewBtn = document.createElement('a');
+        viewBtn.href = '#';
+        viewBtn.style.color = 'var(--accent)';
+        viewBtn.style.fontSize = '0.75rem';
+        viewBtn.style.textDecoration = 'none';
+        viewBtn.style.marginLeft = 'auto';
+        if (diffType === 'modified') {
+          viewBtn.textContent = 'view diff';
+          viewBtn.addEventListener('click', (e: Event) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showFileDiff(node.full_path || node.path, otherId);
+          });
+        } else {
+          const vid = diffType === 'added' ? otherId : this.currentSnapshot!.id;
+          viewBtn.textContent = diffType === 'added' ? 'view new' : 'view old';
+          viewBtn.addEventListener('click', (e: Event) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.viewFileFromId(node.full_path || node.path, vid);
+          });
+        }
+        item.appendChild(viewBtn);
+      }
+
       item.addEventListener('click', () => this.viewFile(node.full_path || node.path));
       item.addEventListener('mouseenter', () => item.style.background = 'rgba(255,255,255,0.06)');
       item.addEventListener('mouseleave', () => item.style.background = '');
@@ -347,7 +439,6 @@ class SnapshotViewer {
   private sideBySide = false;
   private currentDiffPath = '';
   private currentDiffData: { t: string; line: string }[] = [];
-  private savedTreeHTML = '';
 
   async doDiff(): Promise<void> {
     if (!this.currentSnapshot) return;
@@ -357,75 +448,26 @@ class SnapshotViewer {
       return;
     }
     this.diffOtherId = otherId;
-    this.detail.innerHTML = '<span style="color:var(--muted)">Loading diff...</span>';
+    this.detail.innerHTML = '';
+    this.tree.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">Loading diff...</div>';
     try {
       const resp = await fetch(`/api/snapshot-view/${encodeURIComponent(this.currentSnapshot.id)}/diff/${encodeURIComponent(otherId)}?volume=${encodeURIComponent(this.currentSnapshot.volume)}`);
       if (!resp.ok) throw new Error('Diff failed');
       const result = await resp.json() as DiffResult;
-      this.renderDiff(result, otherId);
+      this.currentDiffResult = result;
+      this.clearDiffBtn.style.display = '';
+      this.renderTree(this.lastNodes, result);
     } catch (err) {
       this.showError((err as Error).message);
     }
   }
 
-  private restoreTree(): void {
-    this.tree.innerHTML = this.savedTreeHTML;
-    this.savedTreeHTML = '';
+  private clearDiff(): void {
+    this.currentDiffResult = null;
+    this.diffOtherId = '';
+    this.clearDiffBtn.style.display = 'none';
     this.detail.innerHTML = '';
-  }
-
-  private renderDiff(result: DiffResult, otherId: string): void {
-    // Save current tree so we can restore it
-    if (!this.savedTreeHTML) {
-      this.savedTreeHTML = this.tree.innerHTML;
-    }
-    this.detail.innerHTML = '';
-
-    const html: string[] = [];
-    html.push('<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;"><button id="diffBackBtn" style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;">← Back to files</button><span style="font-weight:700;font-size:0.9rem;">Changes</span></div>');
-    for (const cs of (result.change_sets || [])) {
-      const color = cs.type === 'added' ? 'var(--green)' : cs.type === 'removed' ? 'var(--red)' : 'var(--yellow)';
-      const label = cs.type.toUpperCase();
-      html.push(`<div style="margin-top:8px;"><span style="background:${color};color:#000;padding:1px 8px;border-radius:4px;font-weight:700;font-size:0.75rem;">${label}</span> (${cs.paths.length} items)</div>`);
-      for (const p of (cs.paths || []).slice(0, 50)) {
-        if (cs.type === 'modified') {
-          html.push(`<div style="padding:1px 0 1px 16px;font-size:0.85rem;color:${color};display:flex;align-items:center;gap:6px;"><span>${this.escapeHtml(p)}</span> <a href="#" style="color:var(--accent);font-size:0.75rem;text-decoration:none;" data-path="${this.escapeHtml(p)}" data-other="${this.escapeHtml(otherId)}" class="file-diff-link">[diff]</a></div>`);
-        } else if (cs.type === 'added' || cs.type === 'removed') {
-          const viewId = cs.type === 'added' ? otherId : this.currentSnapshot!.id;
-          const viewLabel = cs.type === 'added' ? 'new' : 'old';
-          html.push(`<div style="padding:1px 0 1px 16px;font-size:0.85rem;color:${color};display:flex;align-items:center;gap:6px;"><span>${this.escapeHtml(p)}</span> <a href="#" style="color:var(--accent);font-size:0.75rem;text-decoration:none;" data-path="${this.escapeHtml(p)}" data-view-id="${this.escapeHtml(viewId)}" class="file-view-link">[view ${viewLabel}]</a></div>`);
-        } else {
-          html.push(`<div style="padding:1px 0 1px 16px;font-size:0.85rem;color:${color};">${this.escapeHtml(p)}</div>`);
-        }
-      }
-      if (cs.paths.length > 50) {
-        html.push(`<div style="padding:1px 0 1px 16px;font-size:0.85rem;color:var(--muted);">... and ${cs.paths.length - 50} more</div>`);
-      }
-    }
-    if (html.length === 1) {
-      html.push('<div style="color:var(--muted);padding:20px;text-align:center;">Snapshots are identical.</div>');
-    }
-    this.tree.innerHTML = html.join('\n');
-
-    const backBtn = document.getElementById('diffBackBtn');
-    if (backBtn) backBtn.addEventListener('click', () => this.restoreTree());
-
-    this.tree.querySelectorAll('.file-diff-link').forEach(el => {
-      el.addEventListener('click', (e: Event) => {
-        e.preventDefault();
-        const path = el.getAttribute('data-path');
-        const other = el.getAttribute('data-other');
-        if (path && other) this.showFileDiff(path, other);
-      });
-    });
-    this.tree.querySelectorAll('.file-view-link').forEach(el => {
-      el.addEventListener('click', (e: Event) => {
-        e.preventDefault();
-        const path = el.getAttribute('data-path');
-        const viewId = el.getAttribute('data-view-id');
-        if (path && viewId) this.viewFileFromId(path, viewId);
-      });
-    });
+    this.renderTree(this.lastNodes, null);
   }
 
   async showFileDiff(path: string, otherId: string): Promise<void> {
@@ -634,9 +676,12 @@ class SnapshotViewer {
   close(): void {
     this.panel.style.display = 'none';
     this.currentSnapshot = null;
+    this.currentDiffResult = null;
+    this.diffOtherId = '';
     this.tree.innerHTML = '';
     this.detail.innerHTML = '';
     this.compHeader.style.display = 'none';
+    this.clearDiffBtn.style.display = 'none';
     this.hideCompareSkeleton();
   }
 }

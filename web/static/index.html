@@ -64,27 +64,36 @@
     </section>
 
     <div id="volumeView" class="split" style="display:none;">
-      <section id="lockPanel" class="panel lock-panel" style="display:none;">
-        <div id="lockPanelContent">
-          <h2 class="lock-panel-title">Lock</h2>
-          <div class="lock-info">
-            <div id="lockStatusText" class="lock-status-text">No lock</div>
-            <div id="lockOwner" class="lock-owner"></div>
-            <div id="lockExpiry" class="lock-expiry"></div>
+      <div>
+        <section id="lockPanel" class="panel lock-panel" style="display:none;">
+          <div id="lockPanelContent">
+            <h2 class="lock-panel-title">Lock</h2>
+            <div class="lock-info">
+              <div id="lockStatusText" class="lock-status-text">No lock</div>
+              <div id="lockOwner" class="lock-owner"></div>
+              <div id="lockExpiry" class="lock-expiry"></div>
+            </div>
+            <div class="lock-actions">
+              <button id="createLockButton" class="button button-block">Create lock</button>
+              <button id="deleteLocksButton" class="button button-secondary button-block">Delete locks</button>
+            </div>
           </div>
-          <div class="lock-actions">
-            <button id="createLockButton" class="button button-block">Create lock</button>
-            <button id="deleteLocksButton" class="button button-secondary button-block">Delete locks</button>
+          <div id="lockPanelSkeleton" style="display:none;">
+            <div class="skeleton" style="height:28px;width:120px;border-radius:6px;margin-bottom:12px;"></div>
+            <div class="skeleton" style="height:18px;width:160px;border-radius:6px;margin-bottom:8px;"></div>
+            <div class="skeleton" style="height:18px;width:200px;border-radius:6px;margin-bottom:20px;"></div>
+            <div class="skeleton" style="height:40px;border-radius:999px;"></div>
+            <div class="skeleton" style="height:40px;border-radius:999px;margin-top:10px;"></div>
           </div>
-        </div>
-        <div id="lockPanelSkeleton" style="display:none;">
-          <div class="skeleton" style="height:28px;width:120px;border-radius:6px;margin-bottom:12px;"></div>
-          <div class="skeleton" style="height:18px;width:160px;border-radius:6px;margin-bottom:8px;"></div>
-          <div class="skeleton" style="height:18px;width:200px;border-radius:6px;margin-bottom:20px;"></div>
-          <div class="skeleton" style="height:40px;border-radius:999px;"></div>
-          <div class="skeleton" style="height:40px;border-radius:999px;margin-top:10px;"></div>
-        </div>
-      </section>
+        </section>
+        <section id="volumeTroubleshootPanel" class="panel troubleshoot-panel" style="display:none;">
+          <h2 class="stats-heading">Repo Health</h2>
+          <div class="troubleshoot-actions">
+            <button id="volumeCheckButton" class="button button-secondary button-block" title="Check repository integrity">Check</button>
+            <button id="volumeRepairButton" class="button button-secondary button-block" title="Unlock and rebuild repository index">Repair</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel table-panel">
         <div class="row gap" style="margin-bottom:16px;">
@@ -110,17 +119,12 @@
       </section>
 
       <div style="grid-column:1/-1;">
-        <section id="volumeTroubleshootPanel" class="panel troubleshoot-panel" style="display:none;">
-          <h2 class="stats-heading">Troubleshooting</h2>
-          <div class="troubleshoot-actions">
-            <button id="volumeCheckButton" class="button button-secondary" title="Check repository integrity">Check</button>
-            <button id="volumeRepairButton" class="button button-secondary" title="Unlock and rebuild repository index">Repair</button>
-          </div>
-        </section>
-
         <section id="volumeStatsPanel" class="panel stats-panel" style="display:none;">
-          <h2 class="stats-heading">Overview</h2>
-          <div id="volumeStatsGrid" class="stats-grid"></div>
+          <div id="statsHeader" style="cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;">
+            <span id="statsToggleIcon" style="transition:transform 0.15s;">▶</span>
+            <h2 class="stats-heading" style="margin:0;">Stats</h2>
+          </div>
+          <div id="volumeStatsGrid" class="stats-grid" style="display:none;"></div>
         </section>
       </div>
     </div>
@@ -135,6 +139,7 @@
       <div id="viewerCompareHeader" style="display:none;margin-bottom:12px;">
         <select id="viewerCompareSelect"></select>
         <button id="viewerCompareBtn" class="button button-xs" style="margin-left:6px;">Diff</button>
+        <button id="viewerClearDiffBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Clear diff</button>
         <button id="diffLayoutBtn" class="button button-secondary button-xs" style="margin-left:6px;display:none;">Side by side</button>
       </div>
       <div id="viewerCompareSkeleton" style="display:none;margin-bottom:12px;gap:8px;align-items:center;">

@@ -91,7 +91,6 @@ class SnapshotManager {
 
     const filtered = st.snapshots
       .filter(sn => {
-        if (st.selectedVolume && !sn.paths.some(p => extractVolumeName(p) === st.selectedVolume)) return false;
         if (!st.query) return true;
         const text = [sn.id, sn.short_id, sn.paths.join(' '), sn.tags.join(' ')].join(' ').toLowerCase();
         return text.includes(st.query);
