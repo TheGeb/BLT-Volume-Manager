@@ -65,7 +65,7 @@ export function renderStatBar(
   }
   const wrapper = document.createElement('div');
   wrapper.className = 'bar-wrapper';
-  wrapper.appendChild(bar);
   wrapper.appendChild(legend);
+  wrapper.appendChild(bar);
   return wrapper;
 }

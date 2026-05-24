@@ -17,15 +17,30 @@
     gridEl.style.display = 'flex';
     gridEl.style.flexDirection = 'column';
     gridEl.style.flex = '1';
-    gridEl.style.gap = '16px';
 
     if (s.repo && !s.repo.error) {
       const repoCard = document.createElement('div');
       repoCard.className = 'stat-card-graph';
-      const repoTitle = document.createElement('div');
-      repoTitle.className = 'chart-title';
+
+      const repoTitle = document.createElement('h2');
+      repoTitle.className = 'lock-panel-title';
       repoTitle.textContent = 'Repo Size';
       repoCard.appendChild(repoTitle);
+
+      const info = document.createElement('div');
+      info.className = 'lock-info';
+
+      const totalSize = document.createElement('div');
+      totalSize.className = 'lock-status-text';
+      totalSize.textContent = s.repo.total_uncompressed_size ? formatBytes(s.repo.total_uncompressed_size) : '?';
+      info.appendChild(totalSize);
+
+      const subLabel = document.createElement('div');
+      subLabel.className = 'lock-owner';
+      subLabel.textContent = '(Uncompressed)';
+      info.appendChild(subLabel);
+
+      repoCard.appendChild(info);
 
       const barParts: { value: number; color: string; label: string; display?: string }[] = [];
       if (s.repo.compressed_size && s.repo.total_uncompressed_size) {
