@@ -310,6 +310,7 @@
   function toggleTheme() {
     themeDark = !themeDark;
     document.body.classList.toggle('light', !themeDark);
+    localStorage.setItem('themeDark', JSON.stringify(themeDark));
   }
 
   let landingShown = true;
@@ -335,10 +336,13 @@
   }
 
   onMount(async () => {
-    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    const saved = localStorage.getItem('themeDark');
+    if (saved !== null) {
+      themeDark = JSON.parse(saved);
+    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
       themeDark = false;
-      document.body.classList.add('light');
     }
+    if (!themeDark) document.body.classList.add('light');
     await loadVolumes();
     if (state.volumes.length === 0) {
       setBanner('No volumes found. Create one with: docker volume create --driver s3vol --name <name>');

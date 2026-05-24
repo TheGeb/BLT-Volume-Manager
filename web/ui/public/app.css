@@ -44,9 +44,10 @@ body.light {
   --yellow-bg: rgba(217, 119, 6, 0.1);
   --red: #dc2626;
   --red-bg: rgba(220, 38, 38, 0.1);
-  --blue: #2563eb;
+  --blue: #06b6d4;
   --orange: #ea580c;
 }
+
 
 .page-shell {
   max-width: 1200px;
