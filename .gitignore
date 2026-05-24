@@ -33,7 +33,7 @@ web/static/assets/
 
 # Generated JS (compiled from .ts)
 *.js
-!svelte.config.js
+**/!svelte.config.js
 
 # Built binaries
 blt-volume-manager

@@ -38,34 +38,3 @@ export function escapeHtml(s: string): string {
   div.textContent = s;
   return div.innerHTML;
 }
-
-export function renderStatBar(
-  parts: { value: number; color: string; label: string; names?: string[]; display?: string }[]
-): HTMLDivElement {
-  const total = parts.reduce((s, p) => s + p.value, 0) || 1;
-  const bar = document.createElement('div');
-  bar.className = 'bar-stacked';
-  for (const p of parts) {
-    const seg = document.createElement('div');
-    seg.className = 'bar-segment';
-    const pct = (p.value / total) * 100;
-    seg.style.flex = `${pct} 1 0`;
-    seg.style.background = p.color;
-    if (pct > 15 && p.value > 0) seg.textContent = p.display ?? String(p.value);
-    if (p.names && p.names.length > 0) seg.title = p.names.join('\n');
-    bar.appendChild(seg);
-  }
-  const legend = document.createElement('div');
-  legend.className = 'bar-legend';
-  for (const p of parts) {
-    const item = document.createElement('div');
-    item.className = 'bar-legend-item';
-    item.innerHTML = `<span class="bar-legend-dot" style="background:${p.color}"></span>${p.label}`;
-    legend.appendChild(item);
-  }
-  const wrapper = document.createElement('div');
-  wrapper.className = 'bar-wrapper';
-  wrapper.appendChild(legend);
-  wrapper.appendChild(bar);
-  return wrapper;
-}
