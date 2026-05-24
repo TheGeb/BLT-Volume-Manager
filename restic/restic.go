@@ -327,7 +327,7 @@ func volumeNameFromPath(path string) string {
 }
 
 // SetRestorePoint tags a snapshot as the restore-point for its volume.
-func (m *Manager) SetRestorePoint(snapshotID string) error {
+func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 	snapshots, err := m.ListSnapshots()
 	if err != nil {
 		return fmt.Errorf("list snapshots: %w", err)
@@ -344,6 +344,9 @@ func (m *Manager) SetRestorePoint(snapshotID string) error {
 			}
 			break
 		}
+	}
+	if targetVolume == "" {
+		targetVolume = volume
 	}
 	if targetVolume == "" {
 		return fmt.Errorf("snapshot %s not found or could not determine volume", snapshotID)
@@ -363,7 +366,7 @@ func (m *Manager) SetRestorePoint(snapshotID string) error {
 				break
 			}
 		}
-		if snapVolume != targetVolume {
+		if snapVolume != "" && snapVolume != targetVolume {
 			continue
 		}
 		id := snap.ShortID

@@ -110,7 +110,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		if tag == "restore-point" {
-			if err := rm.SetRestorePoint(snapshotID); err != nil {
+			if err := rm.SetRestorePoint(snapshotID, volName); err != nil {
 				respondError(w, err, http.StatusInternalServerError)
 				return
 			}
