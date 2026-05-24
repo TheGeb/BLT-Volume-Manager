@@ -254,8 +254,9 @@
     }
   }
 
+  $: if (snapshot) open();
+
   onMount(() => {
-    open();
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   });
@@ -295,31 +296,34 @@
     </div>
   {/if}
 
-  {#if loading}
-    <div style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
-  {:else if error}
+  {#if error}
     <div style="color:var(--red);">{error}</div>
-  {:else}
-    <div id="viewerContent" style="display:flex;gap:0;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
-      <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;" bind:this={treePanelEl}>
-        <div style="display:flex;gap:4px;">
-          <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>
-          <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(false)}>Collapse all</button>
-        </div>
-        <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+  {/if}
+
+  <div id="viewerContent" style="display:flex;gap:0;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
+    <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;" bind:this={treePanelEl}>
+      <div style="display:flex;gap:4px;">
+        <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>
+        <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(false)}>Collapse all</button>
+      </div>
+      <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+        {#if loading}
+          <div style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+        {:else}
           <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
             onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} />
-        </div>
+        {/if}
       </div>
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
-        on:mousedown={startColDrag}>
-        <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
-      </div>
-      <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
-        {#if fileContentLoading}
-          <div style="text-align:center;padding:20px;color:var(--muted);">Loading...</div>
-        {:else if currentDiffHunks.length > 0}
+    </div>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
+      on:mousedown={startColDrag}>
+      <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
+    </div>
+    <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
+      {#if loading}
+        <div style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+      {:else if currentDiffHunks.length > 0}
           <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
             <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
             <button class="button button-secondary button-xs" style="margin-left:auto;" on:click={toggleDiffLayout}>
@@ -396,5 +400,4 @@
       on:mousedown={startRowDrag}>
       <div style="width:40px;height:3px;border-radius:2px;background:var(--border);"></div>
     </div>
-  {/if}
 </section>
