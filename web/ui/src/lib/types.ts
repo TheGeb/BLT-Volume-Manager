@@ -83,5 +83,6 @@ export interface AppState {
   hostname: string;
   prevStats: StatsResponse | null;
   pillsCachedAt?: string;
-  showHot: boolean;
+  typeFilter: string;
+  hostFilter: string;
 }

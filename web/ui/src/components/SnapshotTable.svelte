@@ -6,13 +6,16 @@
   export let selectedVolume = '';
   export let sortNewestFirst = true;
   export let query = '';
-  export let showHot = true;
+  export let typeFilter = 'all';
+  export let hostFilter = '';
+  export let hosts: string[] = [];
   export let loading = false;
   export let rpLoading: Record<string, boolean> = {};
   export let sizeLoading: Record<string, boolean> = {};
   export let onSearch: (q: string) => void = () => {};
   export let onToggleSort: () => void = () => {};
-  export let onToggleHot: () => void = () => {};
+  export let onTypeFilter: (t: string) => void = () => {};
+  export let onHostFilter: (h: string) => void = () => {};
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
   export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
@@ -20,9 +23,24 @@
   export let onSizeLoaded: (id: string) => void = () => {};
 
   let searchVal = '';
+  let openFilter: 'type' | 'host' | null = null;
+
   $: searchVal = query;
 
   function handleSearch() { onSearch(searchVal); }
+
+  function toggleFilter(f: 'type' | 'host') {
+    openFilter = openFilter === f ? null : f;
+  }
+
+  function handleFilterKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') openFilter = null;
+  }
+
+  function handleDocClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.filter-wrap')) openFilter = null;
+  }
 
   function handleRPClick(sn: Snapshot) {
     const isRP = sn.tags.includes('restore-point');
@@ -30,17 +48,12 @@
   }
 </script>
 
+<svelte:window on:keydown={handleFilterKeydown} on:click={handleDocClick} />
+
 <section class="panel table-panel" style="margin-bottom:0;">
   <div class="row gap" style="margin-bottom:16px;">
     <input class="input" type="search" placeholder="Filter by name or tag"
       bind:value={searchVal} on:input={handleSearch} />
-    <button class="button button-secondary" on:click={onToggleSort}>
-      Sort by {sortNewestFirst ? 'newest' : 'oldest'}
-    </button>
-    <label class="toggle-label" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" checked={showHot} on:change={onToggleHot} />
-      Show hot backups
-    </label>
   </div>
   <div style="overflow-x:auto;">
     <table class="data-table">
@@ -51,10 +64,52 @@
             <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time.">i</span>
           </th>
           <th>Snapshot ID</th>
-          <th>Type</th>
+          <th>
+            <div class="filter-wrap">
+              <span class="th-label">Type</span>
+              <button class="filter-btn" class:active={openFilter === 'type' || typeFilter !== 'all'} on:click|stopPropagation={() => toggleFilter('type')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+              </button>
+              {#if openFilter === 'type'}
+                <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
+                <div class="filter-dropdown" on:click|stopPropagation>
+                  {#each ['all', 'hot', 'cold'] as opt}
+                    <button class="filter-opt" class:selected={typeFilter === opt}
+                      on:click={() => { onTypeFilter(opt); openFilter = null; }}>
+                      {opt === 'all' ? 'All' : opt}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </th>
           <th style="text-align:center;">Size</th>
-          <th>Host</th>
-          <th>Date</th>
+          <th>
+            <div class="filter-wrap">
+              <span class="th-label">Host</span>
+              <button class="filter-btn" class:active={openFilter === 'host' || hostFilter !== ''} on:click|stopPropagation={() => toggleFilter('host')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+              </button>
+              {#if openFilter === 'host'}
+                <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
+                <div class="filter-dropdown" on:click|stopPropagation>
+                  <button class="filter-opt" class:selected={hostFilter === ''}
+                    on:click={() => { onHostFilter(''); openFilter = null; }}>All</button>
+                  {#each hosts as h}
+                    <button class="filter-opt" class:selected={hostFilter === h}
+                      on:click={() => { onHostFilter(h); openFilter = null; }}>{h}</button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </th>
+          <th style="cursor:pointer;user-select:none;white-space:nowrap;" on:click={onToggleSort}>
+            Date {sortNewestFirst ? '▼' : '▲'}
+          </th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -131,6 +186,66 @@
 </section>
 
 <style>
+  .filter-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .th-label {
+    white-space: nowrap;
+  }
+  .filter-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 0;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--hover-bg);
+    color: var(--text);
+  }
+  .filter-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 20;
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 100px;
+    margin-top: 4px;
+  }
+  .filter-opt {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .filter-opt:hover {
+    background: var(--hover-bg);
+  }
+  .filter-opt.selected {
+    color: var(--accent);
+    font-weight: 600;
+  }
   .rp-btn, .size-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;

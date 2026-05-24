@@ -15,7 +15,8 @@
 
   let state: AppState = {
     snapshots: [], volumes: [], selectedVolume: '', volumeFilter: '',
-    query: '', sortNewestFirst: true, hostname: '', prevStats: null, showHot: true,
+    query: '', sortNewestFirst: true, hostname: '', prevStats: null,
+    typeFilter: 'all', hostFilter: '',
   };
 
   let loading = true;
@@ -50,7 +51,9 @@
   );
 
   $: filteredSnapshots = state.snapshots.filter(sn => {
-    if (!state.showHot && sn.tags.includes('hot')) return false;
+    if (state.typeFilter === 'hot' && !sn.tags.includes('hot')) return false;
+    if (state.typeFilter === 'cold' && !sn.tags.includes('cold')) return false;
+    if (state.hostFilter && sn.hostname !== state.hostFilter) return false;
     if (!state.query) return true;
     const q = state.query;
     return sn.short_id.toLowerCase().includes(q) ||
@@ -63,6 +66,8 @@
     const db = new Date(b.time).getTime();
     return state.sortNewestFirst ? db - da : da - db;
   });
+
+  $: hosts = [...new Set(state.snapshots.map(sn => sn.hostname).filter(Boolean))].sort();
 
   function setBanner(msg: string, isError = false) {
     bannerText = msg;
@@ -162,8 +167,12 @@
     state.volumeFilter = f;
   }
 
-  function onToggleHot() {
-    state.showHot = !state.showHot;
+  function onTypeFilter(t: string) {
+    state.typeFilter = t;
+  }
+
+  function onHostFilter(h: string) {
+    state.hostFilter = h;
   }
 
   function onOpenViewer(snapshot: Snapshot) {
@@ -414,13 +423,16 @@
               selectedVolume={state.selectedVolume}
               sortNewestFirst={state.sortNewestFirst}
               query={state.query}
-              showHot={state.showHot}
+              typeFilter={state.typeFilter}
+              hostFilter={state.hostFilter}
+              {hosts}
               loading={snapsLoading}
               {rpLoading}
               {sizeLoading}
               onSearch={onSearch}
               onToggleSort={onToggleSort}
-              onToggleHot={onToggleHot}
+              onTypeFilter={onTypeFilter}
+              onHostFilter={onHostFilter}
               onOpenViewer={onOpenViewer}
               onAddTag={onAddTag}
               onRemoveTag={onRemoveTag}
