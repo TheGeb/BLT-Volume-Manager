@@ -70,9 +70,15 @@ export async function fetchFileTree(snapshotId: string, volume: string, path?: s
 
 export async function fetchFileContent(snapshotId: string, volume: string, path: string): Promise<string> {
   const url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Failed to read file');
-  return resp.text();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) throw new Error('Failed to read file');
+    return resp.text();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string): Promise<any> {

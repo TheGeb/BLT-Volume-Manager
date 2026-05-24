@@ -18,12 +18,12 @@ func (s *Server) refreshStats() {
 
 	for _, volName := range s.volumeNames() {
 		rm := s.volumeManager(volName)
+		pillSet[volName] = true
 		snaps, err := rm.ListSnapshots()
 		if err != nil {
 			continue
 		}
 		for _, snap := range snaps {
-			pillSet[volName] = true
 			for _, tag := range snap.Tags {
 				switch tag {
 				case "hot", "cold", "excluded":

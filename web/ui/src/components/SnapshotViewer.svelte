@@ -184,6 +184,7 @@
       ]);
       currentDiffHunks = computeDiff(oldContent.split('\n'), newContent.split('\n'));
       sideBySide = false;
+      if (currentDiffHunks.length === 0) fileContent = newContent;
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -307,7 +308,7 @@
           <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(false)}>Collapse all</button>
         </div>
         <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
-          <FileTreeNode node={rootNode} depth={0} {diffMap} {diffOtherId} currentSnapId={snapshot.id}
+          <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
             onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} />
         </div>
       </div>
