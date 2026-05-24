@@ -8,7 +8,8 @@ export async function fetchVolumes(): Promise<string[]> {
 
 export async function fetchSnapshots(volume: string): Promise<Snapshot[]> {
   const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(volume)}`);
-  return resp.json() as Promise<Snapshot[]>;
+  const data = await resp.json() as Snapshot[];
+  return data.map(sn => ({ ...sn, tags: sn.tags ?? [] }));
 }
 
 export async function fetchRepoStatus(volume: string): Promise<RepoStatus> {

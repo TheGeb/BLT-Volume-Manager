@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { StatsResponse } from '../lib/types';
   import { formatBytes, renderStatBar } from '../lib/util';
-  import { onMount } from 'svelte';
 
   export let stats: StatsResponse | null = null;
   export let loading = false;
@@ -17,9 +16,9 @@
     gridEl.innerHTML = '';
     gridEl.style.display = 'flex';
     gridEl.style.flexDirection = 'column';
+    gridEl.style.flex = '1';
     gridEl.style.gap = '16px';
 
-    // Repo size card
     if (s.repo && !s.repo.error) {
       const repoCard = document.createElement('div');
       repoCard.className = 'stat-card-graph';
@@ -31,8 +30,8 @@
       const barParts: { value: number; color: string; label: string; display?: string }[] = [];
       if (s.repo.compressed_size && s.repo.total_uncompressed_size) {
         const saved = s.repo.total_uncompressed_size - s.repo.compressed_size;
-        barParts.push({ value: s.repo.compressed_size, color: 'var(--accent)', label: 'Compressed', display: formatBytes(s.repo.compressed_size) });
-        barParts.push({ value: saved, color: 'var(--surface-strong)', label: 'Space saved', display: formatBytes(saved) });
+        barParts.push({ value: s.repo.compressed_size, color: 'var(--accent)', label: 'On Disk', display: formatBytes(s.repo.compressed_size) });
+        barParts.push({ value: saved, color: 'var(--blue)', label: 'Space saved', display: formatBytes(saved) });
       }
 
       if (barParts.length > 0) {
@@ -48,12 +47,13 @@
       repoCard.appendChild(sub);
       gridEl.appendChild(repoCard);
     }
-
   }
 </script>
 
-<div id="volumeStatsGrid" class="stats-grid" bind:this={gridEl}>
-  {#if !stats && !loading}
-    <div style="text-align:center;padding:40px;color:var(--muted);">No stats available</div>
-  {/if}
-</div>
+<section class="panel" style="display:flex;flex-direction:column;">
+  <div id="volumeStatsGrid" bind:this={gridEl} style="display:flex;flex-direction:column;flex:1;">
+    {#if !stats && !loading}
+      <div style="text-align:center;padding:40px;color:var(--muted);">No stats available</div>
+    {/if}
+  </div>
+</section>

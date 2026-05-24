@@ -24,11 +24,17 @@
     <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
       bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
     <div class="volume-pills" style="opacity: {loading ? 0.4 : 1}">
-      {#each volumes as vol}
-        <button class="volume-pill" class:active={vol === selectedVolume} on:click={() => onSelect(vol)}>
-          {vol}
-        </button>
-      {/each}
+      {#if loading && volumes.length === 0}
+        {#each { length: 5 } as _}
+          <span class="skeleton skeleton-pill"></span>
+        {/each}
+      {:else}
+        {#each volumes as vol}
+          <button class="volume-pill" class:active={vol === selectedVolume} on:click={() => onSelect(vol)}>
+            {vol}
+          </button>
+        {/each}
+      {/if}
     </div>
   </div>
   {#if pillsCachedAt}

@@ -33,7 +33,7 @@
 
 <section class="panel lock-panel" style="display:flex;flex-direction:column;">
   {#if lockStatus}
-    <h2 class="lock-panel-title">Lock</h2>
+    <h2 class="lock-panel-title">Lock Status</h2>
     <div class="lock-info">
       <div class="lock-status-text">
         {lockStatus.locked ? 'Locked' : 'No lock'}
