@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import type { Snapshot, FileNode, DiffResult } from '../lib/types';
-  import { escapeHtml } from '../lib/util';
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
   import * as api from '../lib/api';
@@ -179,8 +178,8 @@
     error = '';
     try {
       const [oldContent, newContent] = await Promise.all([
-        api.fetchFileContent(otherId, snapshot.volume, path),
         api.fetchFileContent(snapshot.id, snapshot.volume, path),
+        api.fetchFileContent(otherId, snapshot.volume, path),
       ]);
       currentDiffHunks = computeDiff(oldContent.split('\n'), newContent.split('\n'));
       sideBySide = false;
@@ -301,7 +300,7 @@
   {:else if error}
     <div style="color:var(--red);">{error}</div>
   {:else}
-    <div id="viewerContent" style="display:flex;gap:0;min-height:200px;" bind:this={contentEl}>
+    <div id="viewerContent" style="display:flex;gap:0;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
       <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;" bind:this={treePanelEl}>
         <div style="display:flex;gap:4px;">
           <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>
@@ -342,7 +341,7 @@
                       <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'del' ? 'rgba(248,113,113,0.1)' : ''};">
                         <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.oldLineNo || ''}</span>
                         <span style="width:1ch;flex-shrink:0;color:{entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'del' ? '-' : ' '}</span>
-                        <span style="flex:1;white-space:pre-wrap;">{escapeHtml(entry.content)}</span>
+                        <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
                       </div>
                     {/if}
                   {/each}
@@ -361,7 +360,7 @@
                       <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'rgba(52,211,153,0.1)' : ''};">
                         <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.newLineNo || ''}</span>
                         <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
-                        <span style="flex:1;white-space:pre-wrap;">{escapeHtml(entry.content)}</span>
+                        <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
                       </div>
                     {/if}
                   {/each}
@@ -378,13 +377,13 @@
                   <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
                   <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
                   <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
-                  <span style="flex:1;white-space:pre-wrap;">{escapeHtml(entry.content)}</span>
+                  <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
                 </div>
               {/each}
             {/each}
           {/if}
         {:else if fileContent}
-          {escapeHtml(fileContent)}
+          {fileContent}
         {:else}
           <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
             Select a file to view its contents

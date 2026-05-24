@@ -28,9 +28,9 @@
       if (otherId && diffType === 'modified') {
         onShowFileDiff(node.full_path || node.path, otherId);
       } else if (otherId && diffType === 'added') {
-        onViewFileFromId(node.full_path || node.path, currentSnapId);
-      } else if (otherId && diffType === 'removed') {
         onViewFileFromId(node.full_path || node.path, otherId);
+      } else if (otherId && diffType === 'removed') {
+        onViewFileFromId(node.full_path || node.path, currentSnapId);
       } else {
         onViewFile(node.full_path || node.path);
       }
@@ -87,7 +87,7 @@
       {:else}
         <!-- svelte-ignore a11y-invalid-attribute -->
         <a href="#" style="color:var(--accent);font-size:0.75rem;text-decoration:none;margin-left:auto;"
-          on:click|preventDefault|stopPropagation={() => onViewFileFromId(node.full_path || node.path, diffType === 'added' ? currentSnapId : otherId)}>
+          on:click|preventDefault|stopPropagation={() => onViewFileFromId(node.full_path || node.path, diffType === 'added' ? otherId : currentSnapId)}>
           view {diffType === 'added' ? 'new' : 'old'}
         </a>
       {/if}
