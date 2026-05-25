@@ -42,3 +42,15 @@
     </div>
   </div>
 </section>
+
+<style>
+  .stats-heading {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .status {
+    margin-top: 16px;
+    color: var(--muted);
+  }
+</style>

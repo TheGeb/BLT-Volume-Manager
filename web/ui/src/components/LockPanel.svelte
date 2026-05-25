@@ -31,15 +31,15 @@
   }
 </script>
 
-<section class="panel lock-panel" style="display:flex;flex-direction:column;">
+<section class="panel panel-layout">
   {#if lockStatus}
-    <h2 class="lock-panel-title">Lock Status</h2>
-    <div class="lock-info">
-      <div class="lock-status-text">
+    <h2 class="panel-title">Lock Status</h2>
+    <div class="panel-info">
+      <div class="panel-info-primary">
         {lockStatus.locked ? 'Locked' : 'No lock'}
       </div>
       {#if lockStatus.owner}
-        <div class="lock-owner">Owner: {lockStatus.owner}</div>
+        <div class="panel-info-secondary">Owner: {lockStatus.owner}</div>
       {/if}
       {#if lockStatus.expires_in != null}
         <div class="lock-expiry">{formatDuration(lockStatus.expires_in)}</div>
@@ -63,3 +63,16 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .lock-expiry {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .lock-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+</style>

@@ -23,3 +23,64 @@
     {/each}
   </div>
 </div>
+
+<style>
+  .bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .bar-stacked {
+    display: flex;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .bar-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.7);
+    transition: flex 0.3s ease;
+    min-width: 0;
+  }
+
+  .bar-segment:first-child {
+    border-radius: 8px 0 0 8px;
+  }
+
+  .bar-segment:last-child {
+    border-radius: 0 8px 8px 0;
+  }
+
+  .bar-segment:only-child {
+    border-radius: 8px;
+  }
+
+  .bar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.8rem;
+  }
+
+  .bar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+  }
+
+  .bar-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+</style>

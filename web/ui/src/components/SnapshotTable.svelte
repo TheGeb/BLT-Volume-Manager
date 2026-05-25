@@ -186,6 +186,45 @@
 </section>
 
 <style>
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 550px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 16px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table th {
+    color: var(--muted);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .data-table tbody tr {
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .data-table tbody tr:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .copy-id {
+    cursor: pointer;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    transition: color 0.15s;
+  }
+
+  .copy-id:hover {
+    color: var(--accent);
+  }
+
   .filter-wrap {
     position: relative;
     display: inline-flex;
@@ -282,5 +321,11 @@
     white-space: normal; width: 260px; z-index: 10; pointer-events: none;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     margin-top: 6px; text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .data-table {
+      min-width: 0;
+    }
   }
 </style>

@@ -21,18 +21,6 @@ export function formatDuration(totalSeconds: number): string {
   return parts.join(' ') + ' remaining';
 }
 
-export function extractVolumeName(path: string): string {
-  const marker = '/volumes/';
-  const idx = path.indexOf(marker);
-  if (idx >= 0) {
-    const subpath = path.slice(idx + marker.length).replace(/^\//, '');
-    const parts = subpath.split('/');
-    return parts[0] || '';
-  }
-  const parts = path.split('/').filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : '';
-}
-
 export function escapeHtml(s: string): string {
   const div = document.createElement('div');
   div.textContent = s;

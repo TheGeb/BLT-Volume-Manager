@@ -14,12 +14,12 @@
     : [];
 </script>
 
-<section class="panel lock-panel" style="display:flex;flex-direction:column;">
+<section class="panel panel-layout">
   {#if stats?.repo && !stats.repo.error}
-    <h2 class="lock-panel-title">Repo Size</h2>
-    <div class="lock-info">
-      <div class="lock-status-text">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
-      <div class="lock-owner">(Uncompressed)</div>
+    <h2 class="panel-title">Repo Size</h2>
+    <div class="panel-info">
+      <div class="panel-info-primary">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
+      <div class="panel-info-secondary">(Uncompressed)</div>
     </div>
     {#if barParts.length > 0}
       <StatBar parts={barParts} />
@@ -31,4 +31,13 @@
     <div style="text-align:center;padding:40px;color:var(--muted);">No stats available</div>
   {/if}
 </section>
+
+<style>
+  .stat-sub {
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+</style>
 

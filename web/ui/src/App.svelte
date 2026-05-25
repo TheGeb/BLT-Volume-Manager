@@ -41,6 +41,100 @@
   });
 </script>
 
+<style>
+  .page-shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .button-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .button-icon:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+  }
+
+  .repo-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .tab {
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 12px 28px;
+    font-size: 1rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    letter-spacing: 0.02em;
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+  }
+
+  .tab:hover {
+    color: var(--text);
+  }
+
+  .tab.tab-active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-panel {
+    display: block;
+  }
+
+  @media (max-width: 900px) {
+    .topbar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+
 <div class="page-shell">
   <header class="topbar">
     <div>
