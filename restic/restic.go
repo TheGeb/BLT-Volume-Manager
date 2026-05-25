@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -326,36 +327,50 @@ func volumeNameFromPath(path string) string {
 	return ""
 }
 
+var setRPMutex sync.Mutex
+
 // SetRestorePoint tags a snapshot as the restore-point for its volume.
 func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
-	snapshots, err := m.ListSnapshots()
-	if err != nil {
-		return fmt.Errorf("list snapshots: %w", err)
+	setRPMutex.Lock()
+	defer setRPMutex.Unlock()
+
+	if snapshotID == "" {
+		return errors.New("snapshot ID is required")
 	}
 
-	targetVolume := ""
-	for _, snap := range snapshots {
-		if snap.ShortID == snapshotID || snap.ID == snapshotID {
+	if err := m.TagSnapshot(snapshotID, "restore-point"); err != nil {
+		return fmt.Errorf("set restore-point: %w", err)
+	}
+
+	targetVolume := volume
+
+	snapshots, err := m.ListSnapshots() //TODO: restic snapshots --tag restore-point instead of filtering
+	if err != nil {
+		return nil
+	}
+
+	if targetVolume == "" {
+		for _, snap := range snapshots {
+			if !hasTag(snap.Tags, "restore-point") {
+				continue
+			}
 			for _, p := range snap.Paths {
 				if v := volumeNameFromPath(p); v != "" {
 					targetVolume = v
 					break
 				}
 			}
-			break
+			if targetVolume != "" {
+				break
+			}
 		}
 	}
 	if targetVolume == "" {
-		targetVolume = volume
-	}
-	if targetVolume == "" {
-		return fmt.Errorf("snapshot %s not found or could not determine volume", snapshotID)
+		return nil
 	}
 
+	rpCount := 0
 	for _, snap := range snapshots {
-		if snap.ShortID == snapshotID || snap.ID == snapshotID {
-			continue
-		}
 		if !hasTag(snap.Tags, "restore-point") {
 			continue
 		}
@@ -369,16 +384,21 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 		if snapVolume != "" && snapVolume != targetVolume {
 			continue
 		}
+		rpCount++
+		if rpCount == 1 {
+			continue
+		}
 		id := snap.ShortID
 		if id == "" {
 			id = snap.ID
 		}
 		if err := m.UntagSnapshot(id, "restore-point"); err != nil {
-			return fmt.Errorf("remove restore-point from %s: %w", id, err)
+			log.Printf("warning: failed to remove duplicate restore-point from %s: %v", id, err)
+			return nil
 		}
 	}
 
-	return m.TagSnapshot(snapshotID, "restore-point")
+	return nil
 }
 
 // FindRestorePoint returns the most recent snapshot with "restore-point" tag

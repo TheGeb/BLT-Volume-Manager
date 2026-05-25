@@ -120,13 +120,31 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		respondJSON(w, map[string]string{"status": "tag added"})
+		snaps, err := rm.ListSnapshots()
+		if err != nil {
+			respondError(w, err, http.StatusInternalServerError)
+			return
+		}
+		result := make([]SnapshotWithVolume, 0, len(snaps))
+		for _, snap := range snaps {
+			result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
+		}
+		respondJSON(w, map[string]interface{}{"status": "tag added", "snapshots": result})
 	case http.MethodDelete:
 		if err := rm.UntagSnapshot(snapshotID, tag); err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
 		}
-		respondJSON(w, map[string]string{"status": "tag removed"})
+		snaps, err := rm.ListSnapshots()
+		if err != nil {
+			respondError(w, err, http.StatusInternalServerError)
+			return
+		}
+		result := make([]SnapshotWithVolume, 0, len(snaps))
+		for _, snap := range snaps {
+			result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
+		}
+		respondJSON(w, map[string]interface{}{"status": "tag removed", "snapshots": result})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

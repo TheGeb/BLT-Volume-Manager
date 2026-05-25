@@ -10,6 +10,7 @@
   import TroubleshootPanel from './components/TroubleshootPanel.svelte';
   import Modal from './components/Modal.svelte';
   import type { Snapshot } from './lib/types';
+  import { get } from 'svelte/store';
   import { 
     snapshots, volumes, selectedVolume, volumeFilter, query, sortNewestFirst, hostname, prevStats, 
     typeFilter, hostFilter, themeDark, loading, activeTab, bannerText, bannerError, lockStatus, 
@@ -17,11 +18,15 @@
     deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
     deleteVolLoading, creatingTest, testStatus, pillsCachedAt, pillsLoading, snapsLoading, 
     landingShown, rpLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
+    diffTargetId, volumeLockInfo,
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
     onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
     openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
-    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded, loadLockStatus
+    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded, loadLockStatus,
+    loadAll, navigateTo, syncUrl, setDiffTarget
   } from './lib/stores';
+
+  let initialSyncDone = false;
 
   onMount(async () => {
     const saved = localStorage.getItem('themeDark');
@@ -37,8 +42,23 @@
     } else {
       setBanner('');
     }
+
+    const params = new URLSearchParams(window.location.search);
+    const volFromUrl = params.get('volume');
+    if (volFromUrl && $volumes.includes(volFromUrl)) {
+      await navigateTo(volFromUrl, {
+        tab: params.get('tab') || undefined,
+        snapshotId: params.get('snapshot') || undefined,
+        diffId: params.get('diff') || undefined,
+      });
+    }
     loading.set(false);
+    initialSyncDone = true;
   });
+
+  $: if (initialSyncDone && !$loading) {
+    syncUrl();
+  }
 </script>
 
 <style>
@@ -180,6 +200,7 @@
         onSelect={onSelectVolume}
         filter={$volumeFilter}
         onFilterChange={onFilterChange}
+        volumeLockInfo={$volumeLockInfo}
       />
     {/if}
   {/if}
@@ -203,6 +224,8 @@
               snapshot={$currentSnapshot}
               allSnapshots={$allSnapshots}
               onClose={onCloseViewer}
+              initialDiffTarget={$diffTargetId}
+              onDiffChange={setDiffTarget}
             />
           {/if}
 

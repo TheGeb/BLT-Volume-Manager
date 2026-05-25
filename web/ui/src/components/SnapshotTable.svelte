@@ -85,7 +85,7 @@
               {/if}
             </div>
           </th>
-          <th style="text-align:center;">Size</th>
+          <th style="text-align:center;width:100px;">Size</th>
           <th>
             <div class="filter-wrap">
               <span class="th-label">Host</span>
@@ -207,11 +207,10 @@
   }
 
   .data-table tbody tr {
-    transition: transform 0.15s ease, background 0.15s ease;
+    transition: background 0.15s ease;
   }
 
   .data-table tbody tr:hover {
-    transform: translateY(-1px);
     background: rgba(255, 255, 255, 0.04);
   }
 

@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Snapshot, StatsResponse, LockStatus } from './types';
+import type { Snapshot, StatsResponse, LockStatus, VolumeLockInfo } from './types';
 import { formatBytes } from './util';
 import * as api from './api';
 
@@ -42,6 +42,8 @@ export const snapsLoading = writable(false);
 export const landingShown = writable(true);
 export const rpLoading = writable<Record<string, boolean>>({});
 export const sizeLoading = writable<Record<string, boolean>>({});
+export const diffTargetId = writable('');
+export const volumeLockInfo = writable<Record<string, VolumeLockInfo>>({});
 
 export const filteredVolumes = derived(
   [volumes, volumeFilter],
@@ -87,11 +89,35 @@ export async function loadVolumes() {
   pillsLoading.set(true);
   try {
     volumes.set(await api.fetchVolumes());
+    fetchAllVolumeLockInfo();
   } catch {
     setBanner('Cannot reach server', true);
   } finally {
     pillsLoading.set(false);
   }
+}
+
+export async function fetchAllVolumeLockInfo() {
+  const vols = get(volumes);
+  if (vols.length === 0) return;
+  const results = await Promise.all(
+    vols.map(name => api.fetchLockStatus(name).catch(() => null))
+  );
+  const info: Record<string, VolumeLockInfo> = {};
+  for (let i = 0; i < vols.length; i++) {
+    const r = results[i];
+    if (r) {
+      info[vols[i]] = {
+        locked: r.locked,
+        owner: r.owner || '',
+        expiresIn: r.expires_in || 0,
+        status: r.locked ? 'locked' : 'unlocked',
+      };
+    } else {
+      info[vols[i]] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
+    }
+  }
+  volumeLockInfo.set(info);
 }
 
 export async function loadSnapshots(volume: string) {
@@ -133,6 +159,8 @@ export async function loadAll(volume: string) {
   sizes.set({});
   deleteVolModal.set(false);
   deleteSnapModal.set(false);
+  testStatus.set('');
+  diffTargetId.set('');
   landingShown.set(!volume);
   if (volume) {
     await Promise.all([
@@ -141,6 +169,52 @@ export async function loadAll(volume: string) {
       loadStats(volume),
     ]);
   }
+  syncUrl();
+}
+
+export async function navigateTo(volume: string, opts?: { tab?: string; snapshotId?: string; diffId?: string }) {
+  selectedVolume.set(volume);
+  allSnapshots.set([]);
+  sizes.set({});
+  deleteVolModal.set(false);
+  deleteSnapModal.set(false);
+  testStatus.set('');
+  landingShown.set(false);
+
+  const tab = opts?.tab || 'snapshots';
+  activeTab.set(tab);
+
+  if (tab === 'snapshots' && opts?.snapshotId) {
+    const placeholder: Snapshot = {
+      id: opts.snapshotId,
+      volume,
+      short_id: opts.snapshotId.slice(0, 8),
+      time: '', tags: [], paths: [], hostname: '',
+    };
+    viewerOpen.set(true);
+    currentSnapshot.set(placeholder);
+    diffTargetId.set(opts.diffId || '');
+  } else {
+    viewerOpen.set(false);
+    currentSnapshot.set(null);
+    diffTargetId.set('');
+  }
+
+  if (tab === 'repo') {
+    await Promise.all([loadLockStatus(), loadStats(volume)]);
+  } else {
+    await loadSnapshots(volume);
+    await loadLockStatus();
+    await loadStats(volume);
+
+    if (opts?.snapshotId) {
+      const snap = get(snapshots).find(s => s.id === opts.snapshotId);
+      if (snap) currentSnapshot.set(snap);
+      allSnapshots.set(get(snapshots));
+    }
+  }
+
+  syncUrl();
 }
 
 export async function handleRefresh() {
@@ -178,30 +252,47 @@ export function onOpenViewer(snapshot: Snapshot) {
   currentSnapshot.set(snapshot);
   allSnapshots.set(get(snapshots));
   viewerOpen.set(true);
+  diffTargetId.set('');
+  syncUrl();
 }
 
 export function onCloseViewer() {
   viewerOpen.set(false);
   currentSnapshot.set(null);
   allSnapshots.set([]);
+  diffTargetId.set('');
+  syncUrl();
+}
+
+export function setDiffTarget(id: string) {
+  diffTargetId.set(id);
+  syncUrl();
 }
 
 export async function onAddTag(id: string, tag: string, vol: string) {
   rpLoading.update(r => ({ ...r, [id]: true }));
   try {
-    await api.addTag(id, tag, vol);
+    const snaps = await api.addTag(id, tag, vol);
+    snapshots.set(snaps);
+  } catch (e) {
+    setBanner(`Failed to add tag: ${e}`, true);
     await loadSnapshots(vol);
-  } catch { setBanner('Failed to add tag', true); }
-  finally { rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; }); }
+  } finally {
+    rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+  }
 }
 
 export async function onRemoveTag(id: string, tag: string, vol: string) {
   rpLoading.update(r => ({ ...r, [id]: true }));
   try {
-    await api.removeTag(id, tag, vol);
+    const snaps = await api.removeTag(id, tag, vol);
+    snapshots.set(snaps);
+  } catch (e) {
+    setBanner(`Failed to remove tag: ${e}`, true);
     await loadSnapshots(vol);
-  } catch { setBanner('Failed to remove tag', true); }
-  finally { rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; }); }
+  } finally {
+    rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+  }
 }
 
 export async function onDeleteSnapshot(sn: Snapshot) {
@@ -294,10 +385,13 @@ export async function handleCreateTestVolume(name: string) {
 
 export function switchTab(tab: 'snapshots' | 'repo') {
   activeTab.set(tab);
+  const vol = get(selectedVolume);
   if (tab === 'repo') {
-    const vol = get(selectedVolume);
     if (vol) loadStats(vol);
+  } else if (vol && get(snapshots).length === 0) {
+    loadSnapshots(vol);
   }
+  syncUrl();
 }
 
 export function toggleTheme() {
@@ -321,4 +415,23 @@ export async function handleSizeLoaded(id: string) {
   } finally {
     sizeLoading.update(s => { const n = { ...s }; delete n[id]; return n; });
   }
+}
+
+function buildUrl(): string {
+  const vol = get(selectedVolume);
+  if (!vol) return '/';
+  const p = new URLSearchParams();
+  p.set('volume', vol);
+  if (get(activeTab) === 'repo') p.set('tab', 'repo');
+  if (get(viewerOpen) && get(currentSnapshot)) {
+    p.set('snapshot', get(currentSnapshot)!.id);
+    const dt = get(diffTargetId);
+    if (dt) p.set('diff', dt);
+  }
+  return '/?' + p.toString();
+}
+
+export function syncUrl() {
+  const url = buildUrl();
+  window.history.replaceState({}, '', url);
 }

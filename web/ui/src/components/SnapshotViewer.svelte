@@ -9,6 +9,8 @@
   export let snapshot: Snapshot;
   export let allSnapshots: Snapshot[] = [];
   export let onClose: () => void = () => {};
+  export let initialDiffTarget: string = '';
+  export let onDiffChange: (otherId: string) => void = () => {};
 
   let nodes: FileNode[] = [];
   let loading = true;
@@ -133,6 +135,10 @@
     try {
       nodes = await api.fetchFileTree(snapshot.id, snapshot.volume);
       await populateCompareSelect();
+      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget)) {
+        selectedCompareId = initialDiffTarget;
+        await doDiff();
+      }
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -159,6 +165,7 @@
       sideBySide = false;
       fileContent = '';
       fileContentPath = '';
+      onDiffChange(selectedCompareId);
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -173,6 +180,7 @@
     fileContent = '';
     fileContentPath = '';
     diffLoading = false;
+    onDiffChange('');
   }
 
   async function viewFile(path: string) {

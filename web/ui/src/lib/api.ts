@@ -89,16 +89,20 @@ export async function fetchDiff(snapshotA: string, snapshotB: string, volume: st
   return resp.json() as Promise<any>;
 }
 
-export async function addTag(snapshotId: string, tag: string, volume: string): Promise<void> {
+export async function addTag(snapshotId: string, tag: string, volume: string): Promise<Snapshot[]> {
   const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
   const resp = await fetch(url, { method: 'POST' });
   if (!resp.ok) throw new Error('Failed to add tag');
+  const data = await resp.json();
+  return data.snapshots || [];
 }
 
-export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<void> {
+export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<Snapshot[]> {
   const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
   const resp = await fetch(url, { method: 'DELETE' });
   if (!resp.ok) throw new Error('Failed to remove tag');
+  const data = await resp.json();
+  return data.snapshots || [];
 }
 
 export async function deleteSnapshot(snapshotId: string, volume: string): Promise<void> {

@@ -15,6 +15,13 @@ export interface LockStatus {
   expires_in?: number;
 }
 
+export interface VolumeLockInfo {
+  locked: boolean;
+  owner: string;
+  expiresIn: number;
+  status: 'locked' | 'unlocked';
+}
+
 export interface RepoStatus {
   initialized: boolean;
   hostname: string;
