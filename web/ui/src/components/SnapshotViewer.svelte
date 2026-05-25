@@ -22,6 +22,7 @@
   let compareSnaps: Snapshot[] = [];
   let selectedCompareId = '';
   let compareLoading = true;
+  let diffLoading = false;
 
   let treeEl: HTMLDivElement;
   let treePanelEl: HTMLDivElement;
@@ -89,7 +90,35 @@
         }
       }
     }
+    computeDirDiffTypes(root, diff ? buildDiffMap(diff) : null);
     return root;
+  }
+
+  function computeDirDiffTypes(node: any, dm: Map<string, string> | null): void {
+    if (!node.children) return;
+    for (const child of Object.values(node.children) as any[]) {
+      if (child.children) computeDirDiffTypes(child, dm);
+    }
+    let result: string | null = null;
+    let hasChildWithType = false;
+    for (const child of Object.values(node.children) as any[]) {
+      let childType: string | null = null;
+      if (child.children) {
+        childType = child.dirDiffType ?? null;
+      } else {
+        const t = dm?.get(child.full_path ?? '') ?? dm?.get((child.path ?? '').replace(/^\//, '')) ?? '';
+        childType = t || null;
+      }
+      if (childType === null) continue;
+      hasChildWithType = true;
+      if (result === null) {
+        result = childType;
+      } else if (result !== childType) {
+        result = null;
+        break;
+      }
+    }
+    node.dirDiffType = hasChildWithType ? result : null;
   }
 
   async function open() {
@@ -122,6 +151,7 @@
 
   async function doDiff() {
     if (!selectedCompareId) return;
+    diffLoading = true;
     diffOtherId = selectedCompareId;
     try {
       const result = await api.fetchDiff(snapshot.id, selectedCompareId, snapshot.volume);
@@ -131,6 +161,8 @@
       fileContentPath = '';
     } catch (e: any) {
       error = e.message;
+    } finally {
+      diffLoading = false;
     }
   }
 
@@ -140,6 +172,7 @@
     currentDiffHunks = [];
     fileContent = '';
     fileContentPath = '';
+    diffLoading = false;
   }
 
   async function viewFile(path: string) {
@@ -223,11 +256,12 @@
   function onMouseMove(e: MouseEvent) {
     if (colDragging && treePanelEl && contentEl) {
       const rect = contentEl.getBoundingClientRect();
-      const minW = 120;
-      const maxW = rect.width - 120;
+      const minW = 40;
+      const maxW = rect.width - 200;
       let w = e.clientX - rect.left;
       if (w < minW) w = minW;
       if (w > maxW) w = maxW;
+      treePanelEl.style.minWidth = '0';
       treePanelEl.style.flex = `0 0 ${w}px`;
     }
     if (rowDragging && contentEl) {
@@ -301,14 +335,27 @@
   {/if}
 
    <div id="viewerContent" style="display:flex;gap:0;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
-    <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;" bind:this={treePanelEl}>
+    <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
       <div style="display:flex;gap:4px;">
         <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>
         <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(false)}>Collapse all</button>
       </div>
-      <div id="viewerTree" style="overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+      <div id="viewerTree" style="overflow:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
         {#if loading}
-          <div style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+          <div style="text-align:center;padding:40px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          </div>
+        {:else if diffLoading}
+          <div style="text-align:center;padding:40px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+            <div style="color:var(--muted);font-size:0.85rem;margin-top:8px;">Computing diff...</div>
+          </div>
         {:else}
           <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
             onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} />
@@ -322,7 +369,12 @@
     </div>
     <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
       {#if loading}
-        <div style="text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+        <div style="text-align:center;padding:40px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" />
+          </svg>
+        </div>
       {:else if currentDiffHunks.length > 0}
           <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
             <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
@@ -388,6 +440,13 @@
           {/if}
         {:else if fileContent}
           {fileContent}
+        {:else if fileContentLoading}
+          <div style="text-align:center;padding:40px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          </div>
         {:else}
           <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
             Select a file to view its contents
@@ -413,4 +472,12 @@
 
   .skeleton-select-bar { height: 32px; width: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
   .skeleton-btn-bar { height: 32px; width: 60px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+  .spin {
+    animation: spin 1s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>

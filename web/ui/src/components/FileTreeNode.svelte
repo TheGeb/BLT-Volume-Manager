@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition';
   import type { FileNode, DiffResult } from '../lib/types';
   import { formatBytes } from '../lib/util';
   import FileTreeNode from './FileTreeNode.svelte';
@@ -17,6 +18,10 @@
     : diffType === 'added' ? 'var(--green)'
     : diffType === 'removed' ? 'var(--red)'
     : diffType === 'modified' ? 'var(--yellow)' : '';
+
+  $: dirDiffColor = node.dirDiffType
+    ? ({ added: 'var(--green)', removed: 'var(--red)', modified: 'var(--yellow)' } as Record<string, string>)[node.dirDiffType] || ''
+    : '';
 
   $: children = node.children ? Object.values(node.children).sort((a: any, b: any) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
@@ -47,28 +52,32 @@
 </script>
 
 {#if node.name === '/' && depth === 0}
-  {#each children as child}
-    <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-      {onViewFile} {onViewFileFromId} {onShowFileDiff} />
+  {#each children as child (child.path || child.name)}
+    <div transition:slide>
+      <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
+        {onViewFile} {onViewFileFromId} {onShowFileDiff} />
+    </div>
   {/each}
 {:else if node.type === 'dir' || node.children}
   <details open={depth <= 1}>
-    <summary style="cursor:pointer;padding:2px 4px;border-radius:4px;color:var(--text);font-size:0.9rem;">
+    <summary style="cursor:pointer;padding:2px 4px;border-radius:4px;color:{dirDiffColor || 'var(--text)'};font-size:0.9rem;white-space:nowrap;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
       {node.name}
     </summary>
     <div style="margin-left:18px">
-      {#each children as child}
-        <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-          {onViewFile} {onViewFileFromId} {onShowFileDiff} />
+      {#each children as child (child.path || child.name)}
+        <div transition:slide>
+          <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
+            {onViewFile} {onViewFileFromId} {onShowFileDiff} />
+        </div>
       {/each}
     </div>
   </details>
 {:else}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor}"
+  <div style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor};white-space:nowrap;"
     on:click={handleClick}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}>

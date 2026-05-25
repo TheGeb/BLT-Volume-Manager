@@ -170,7 +170,7 @@
     </div>
   </header>
 
-  <Banner bannerText={$bannerText} bannerError={$bannerError} />
+  <Banner bannerText={$bannerText} bannerError={$bannerError} onClose={() => setBanner('')} />
 
   <Toolbar
     volumes={$filteredVolumes}
