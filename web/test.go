@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/example/blt-volume-manager/store"
 )
 
 func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +29,10 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 		respondError(w, fmt.Errorf("name is required"), http.StatusBadRequest)
 		return
 	}
+	if !strings.Contains(req.Name, "/") {
+		respondError(w, fmt.Errorf("name must be in the format group/name"), http.StatusBadRequest)
+		return
+	}
 
 	rm := s.volumeManager(req.Name)
 
@@ -35,6 +42,9 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 		respondError(w, fmt.Errorf("create volume dir: %w", err), http.StatusInternalServerError)
 		return
 	}
+
+	// Write volume config so the driver can discover it
+	os.WriteFile(filepath.Join(volPath, "volume.json"), []byte(`{"fs_type":""}`), 0644)
 
 	// Create dummy files and folders
 	dummyContent := map[string]string{
@@ -86,6 +96,18 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 	if err := rm.Backup(".", "cold"); err != nil {
 		respondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
+	}
+
+	if s.s3Bucket != "" {
+		rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName:   s.s3Bucket,
+			AwsVolumePrefix: store.VolumePrefix,
+			S3Endpoint:      s.s3Endpoint,
+			Region:          s.s3Region,
+		})
+		if err == nil {
+			rw.WriteVolumeMarker(req.Name)
+		}
 	}
 
 	respondJSON(w, map[string]string{

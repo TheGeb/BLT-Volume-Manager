@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Banner from './components/Banner.svelte';
-  import Toolbar from './components/Toolbar.svelte';
   import LandingPanel from './components/LandingPanel.svelte';
+  import VolumeList from './components/VolumeList.svelte';
   import SnapshotTable from './components/SnapshotTable.svelte';
   import SnapshotViewer from './components/SnapshotViewer.svelte';
   import StatsGrid from './components/StatsGrid.svelte';
@@ -20,7 +20,7 @@
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
     onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
     openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
-    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded
+    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded, loadLockStatus
   } from './lib/stores';
 
   onMount(async () => {
@@ -137,9 +137,7 @@
 
 <div class="page-shell">
   <header class="topbar">
-    <div>
-      <h1>BLT Volume Manager</h1>
-    </div>
+    <h1>BLT Volume Manager</h1>
     <div class="topbar-actions">
       <button class="button-icon" title="Refresh" on:click={handleRefresh}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -172,23 +170,28 @@
 
   <Banner bannerText={$bannerText} bannerError={$bannerError} onClose={() => setBanner('')} />
 
-  <Toolbar
-    volumes={$filteredVolumes}
-    selectedVolume={$selectedVolume}
-    volumeFilter={$volumeFilter}
-    loading={$pillsLoading}
-    pillsCachedAt={$pillsCachedAt}
-    onSelect={onSelectVolume}
-    onFilterChange={onFilterChange}
-  />
-
   {#if $landingShown}
-    <LandingPanel onCreateTestVolume={handleCreateTestVolume} creatingTest={$creatingTest} testStatus={$testStatus} />
+    {#if $volumes.length === 0 && !$pillsLoading}
+      <LandingPanel onCreateTestVolume={handleCreateTestVolume} creatingTest={$creatingTest} testStatus={$testStatus} />
+    {:else}
+      <VolumeList
+        volumes={$filteredVolumes}
+        loading={$pillsLoading}
+        onSelect={onSelectVolume}
+        filter={$volumeFilter}
+        onFilterChange={onFilterChange}
+      />
+    {/if}
   {/if}
 
   {#if $selectedVolume}
     <div id="volumeView">
       <div class="tab-bar">
+        <button class="tab" on:click={() => onSelectVolume('')} title="Back to volumes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+        </button>
         <button class="tab" class:tab-active={$activeTab === 'snapshots'} on:click={() => switchTab('snapshots')}>Snapshots</button>
         <button class="tab" class:tab-active={$activeTab === 'repo'} on:click={() => switchTab('repo')}>Repo</button>
       </div>

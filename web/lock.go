@@ -20,16 +20,23 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/volume/"), "/")
-	volumeName := parts[0]
-
-	// DELETE /api/volume/<name> — delete the entire volume
-	if len(parts) == 1 && r.Method == http.MethodDelete {
-		s.handleDeleteVolume(w, r, volumeName)
+	path := strings.TrimPrefix(r.URL.Path, "/api/volume/")
+	if path == "" {
+		http.NotFound(w, r)
 		return
 	}
 
-	if len(parts) != 2 || parts[1] != "locks" {
+	if !strings.HasSuffix(path, "/locks") {
+		if r.Method == http.MethodDelete {
+			s.handleDeleteVolume(w, r, path)
+		} else {
+			http.NotFound(w, r)
+		}
+		return
+	}
+
+	volumeName := strings.TrimSuffix(path, "/locks")
+	if volumeName == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -67,11 +74,20 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
-	// 1. Delete S3 locks
+	// 1. Delete S3 locks and volume marker
 	if s.s3Bucket != "" {
 		if err := s.deleteVolumeLocks(volumeName); err != nil {
 			respondError(w, fmt.Errorf("delete locks: %w", err), http.StatusInternalServerError)
 			return
+		}
+		rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName:   s.s3Bucket,
+			AwsVolumePrefix: store.VolumePrefix,
+			S3Endpoint:      s.s3Endpoint,
+			Region:          s.s3Region,
+		})
+		if err == nil {
+			rw.DeleteVolumeMarker(volumeName)
 		}
 	}
 
@@ -124,7 +140,7 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error
 		return nil, err
 	}
 
-	folder := "volume-locks/" + volumeName + "/"
+	folder := store.LockPrefix + volumeName + "/"
 	objects, err := rw.ListObjects(folder)
 	if err != nil {
 		return nil, fmt.Errorf("list lock objects: %w", err)
@@ -188,7 +204,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 		ownerName = fmt.Sprintf("webadmin-%s-%d", mustHostname(), os.Getpid())
 	}
 	expiry := time.Now().Add(24 * time.Hour).Unix()
-	folder := "volume-locks/" + volumeName + "/"
+	folder := store.LockPrefix + volumeName + "/"
 	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, time.Now().UnixNano())
 
 	proposal := store.LockOwner{Name: ownerName, ExpiryTime: expiry}
@@ -262,10 +278,11 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 
 func (s *Server) storeForVolume(volumeName string) (*store.S3rw, error) {
 	opts := store.S3StoreOpts{
-		AwsBucketName: s.s3Bucket,
-		AwsLockFolder: "volume-locks/" + volumeName + "/",
-		S3Endpoint:    s.s3Endpoint,
-		Region:        s.s3Region,
+		AwsBucketName:   s.s3Bucket,
+		AwsLockFolder:   store.LockPrefix + volumeName + "/",
+		AwsVolumePrefix: store.VolumePrefix,
+		S3Endpoint:      s.s3Endpoint,
+		Region:          s.s3Region,
 	}
 
 	return store.NewS3Store(opts)

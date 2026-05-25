@@ -20,16 +20,22 @@ import (
 // LogS3 is a callback for structured S3 call logging. Set by the web server.
 var LogS3 func(op, bucket, key string, dur time.Duration, err error)
 
+const (
+	LockPrefix   = "blt-volume-manager/locks/"
+	VolumePrefix = "blt-volume-manager/registered-volumes/"
+)
+
 type S3rw struct {
 	s3Client *s3.Client
 	opts     S3StoreOpts
 }
 
 type S3StoreOpts struct {
-	AwsBucketName string
-	AwsLockFolder string
-	S3Endpoint    string
-	Region        string
+	AwsBucketName   string
+	AwsLockFolder   string
+	AwsVolumePrefix string
+	S3Endpoint      string
+	Region          string
 }
 
 func (opts S3StoreOpts) validate() error {
@@ -205,6 +211,34 @@ func (s *S3rw) DeleteObjectsWithPrefix(prefix string) error {
 		return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.AwsBucketName, prefix, err)
 	}
 	return nil
+}
+
+func (s *S3rw) WriteVolumeMarker(name string) error {
+	return s.PutObject(s.opts.AwsVolumePrefix+name+".json", nil)
+}
+
+func (s *S3rw) DeleteVolumeMarker(name string) error {
+	return s.DeleteObject(s.opts.AwsVolumePrefix + name + ".json")
+}
+
+func (s *S3rw) ListVolumeMarkers() ([]string, error) {
+	objects, err := s.ListObjects(s.opts.AwsVolumePrefix)
+	if err != nil {
+		return nil, err
+	}
+	prefix := s.opts.AwsVolumePrefix
+	var names []string
+	for _, obj := range objects {
+		if obj.Key == nil {
+			continue
+		}
+		name := strings.TrimPrefix(*obj.Key, prefix)
+		name = strings.TrimSuffix(name, ".json")
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
 }
 
 func (s *S3rw) DeleteLockObjects() error {

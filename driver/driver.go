@@ -326,15 +326,11 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 }
 
 func (d *Driver) List() (*volume.ListResponse, error) {
-	root := filepath.Join(d.root, "volumes")
-	entries, _ := os.ReadDir(root)
-	vols := make([]*volume.Volume, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		p := filepath.Join(root, e.Name())
-		vols = append(vols, &volume.Volume{Name: e.Name(), Mountpoint: p})
+	names := d.VolumeNames()
+	vols := make([]*volume.Volume, 0, len(names))
+	for _, name := range names {
+		p := filepath.Join(d.root, "volumes", name)
+		vols = append(vols, &volume.Volume{Name: name, Mountpoint: p})
 	}
 	return &volume.ListResponse{Volumes: vols}, nil
 }
@@ -356,15 +352,25 @@ func (d *Driver) SnapVolumes() map[string]string {
 }
 
 func (d *Driver) VolumeNames() []string {
-	root := filepath.Join(d.root, "volumes")
-	entries, _ := os.ReadDir(root)
-	names := make([]string, 0, len(entries))
+	var names []string
+	d.collectVolumeNames(filepath.Join(d.root, "volumes"), "", &names)
+	return names
+}
+
+func (d *Driver) collectVolumeNames(base, rel string, names *[]string) {
+	entries, _ := os.ReadDir(filepath.Join(base, rel))
 	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		child := rel + e.Name()
+		childPath := filepath.Join(base, child)
+		if _, err := os.Stat(filepath.Join(childPath, "volume.json")); err == nil {
+			*names = append(*names, child)
+		} else {
+			d.collectVolumeNames(base, child+"/", names)
 		}
 	}
-	return names
 }
 
 func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {

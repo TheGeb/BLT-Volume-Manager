@@ -31,7 +31,7 @@
     <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:20px;">
       <h3 class="stats-heading" style="margin:0 0 12px;">Test Volume</h3>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input class="input" type="text" placeholder="Volume name" style="width:160px;flex:none;" bind:value={testVolName} on:keydown={e => e.key === 'Enter' && handleCreate()} />
+        <input class="input" type="text" placeholder="name or group/name" style="width:200px;flex:none;" bind:value={testVolName} on:keydown={e => e.key === 'Enter' && handleCreate()} />
         <button class="button button-secondary" on:click={handleCreate} disabled={creatingTest}>
           {creatingTest ? 'Creating...' : 'Create & back up'}
         </button>

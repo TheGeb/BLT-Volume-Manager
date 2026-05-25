@@ -17,38 +17,41 @@ func (s *Server) refreshStats() {
 	pillSet := map[string]bool{}
 
 	for _, volName := range s.volumeNames() {
-		rm := s.volumeManager(volName)
-		snaps, err := rm.ListSnapshots()
-		if err != nil {
-			continue
-		}
 		pillSet[volName] = true
-		for _, snap := range snaps {
-			for _, tag := range snap.Tags {
-				switch tag {
-				case "hot", "cold", "excluded":
-				}
-			}
-		}
 	}
 
 	if s.s3Bucket != "" {
 		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName: s.s3Bucket,
-			S3Endpoint:    s.s3Endpoint,
-			Region:        s.s3Region,
+			AwsBucketName:   s.s3Bucket,
+			AwsVolumePrefix: store.VolumePrefix,
+			S3Endpoint:      s.s3Endpoint,
+			Region:          s.s3Region,
 		})
 		if err == nil {
-			prefixes, err := rw.ListCommonPrefixes("volume-locks/", "/")
+			markers, err := rw.ListVolumeMarkers()
+			if err == nil {
+				for _, name := range markers {
+					if strings.Contains(name, "/") || pillSet[name] {
+						pillSet[name] = true
+					} else {
+						rw.DeleteVolumeMarker(name)
+					}
+				}
+			}
+
+			for name := range pillSet {
+				rw.WriteVolumeMarker(name)
+			}
+
+			lockPrefixes, err := rw.ListCommonPrefixes(store.LockPrefix, "/")
 			if err == nil {
 				volStatus := map[string]bool{}
 				lockTTL := 24 * time.Hour
-				for _, folder := range prefixes {
-					name := strings.TrimSuffix(strings.TrimPrefix(folder, "volume-locks/"), "/")
+				for _, folder := range lockPrefixes {
+					name := strings.TrimSuffix(strings.TrimPrefix(folder, store.LockPrefix), "/")
 					if name == "" {
 						continue
 					}
-					pillSet[name] = true
 					objects, err := rw.ListObjects(folder)
 					if err != nil {
 						continue

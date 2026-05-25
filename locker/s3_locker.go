@@ -160,7 +160,7 @@ func (l *s3Lock) IsValid() (bool, error) {
 }
 
 func (s *s3Locker) lockFolder(name string) string {
-	return "volume-locks/" + name + "/"
+	return store.LockPrefix + name + "/"
 }
 
 func getHostname() string {
