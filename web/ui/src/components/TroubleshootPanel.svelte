@@ -7,7 +7,7 @@
 </script>
 
 <section class="panel panel-layout">
-  <h2 class="panel-title">Restic Actions</h2>
+  <h2 class="panel-title">Management</h2>
   <div class="troubleshoot-actions">
     <button class="button button-secondary button-block" title="Check repository integrity" on:click={onCheck} disabled={checking}>
       {checking ? 'Checking...' : 'Check'}

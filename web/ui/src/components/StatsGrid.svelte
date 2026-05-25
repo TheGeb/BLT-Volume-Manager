@@ -16,7 +16,7 @@
 
 <section class="panel panel-layout">
   {#if loading && !stats}
-    <h2 class="panel-title">Repo Size</h2>
+    <h2 class="panel-title">Storage</h2>
     <div style="padding: 4px 0;">
       <div class="skeleton" style="height:32px;width:160px;border-radius:8px;margin-bottom:8px;"></div>
       <div class="skeleton" style="height:18px;width:120px;border-radius:6px;margin-bottom:16px;"></div>
@@ -24,7 +24,7 @@
       <div class="skeleton" style="height:16px;width:100px;border-radius:6px;"></div>
     </div>
   {:else if stats?.repo && !stats.repo.error}
-    <h2 class="panel-title">Repo Size</h2>
+    <h2 class="panel-title">Storage</h2>
     <div class="panel-info">
       <div class="panel-info-primary">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
       <div class="panel-info-secondary">(Uncompressed)</div>
@@ -36,7 +36,7 @@
       <div>Blobs: {stats.repo.total_blob_count?.toLocaleString() ?? '?'}</div>
     </div>
   {:else if stats?.repo?.error}
-    <h2 class="panel-title">Repo Size</h2>
+    <h2 class="panel-title">Storage</h2>
     <div style="color:var(--red);font-size:0.85rem;padding:12px 0;">
       {stats.repo.error}
     </div>
