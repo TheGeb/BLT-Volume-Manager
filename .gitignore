@@ -31,9 +31,8 @@ go.work.sum
 node_modules/
 web/static/assets/
 
-# Generated JS (compiled from .ts)
-*.js
-**/!svelte.config.js
+# Build files
+**/web/static/**
 
 # Built binaries
 blt-volume-manager

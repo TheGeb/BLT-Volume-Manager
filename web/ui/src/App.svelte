@@ -9,347 +9,35 @@
   import LockPanel from './components/LockPanel.svelte';
   import TroubleshootPanel from './components/TroubleshootPanel.svelte';
   import Modal from './components/Modal.svelte';
-  import type { Snapshot, AppState, StatsResponse, LockStatus } from './lib/types';
-  import { formatBytes } from './lib/util';
-  import * as api from './lib/api';
-
-  let state: AppState = {
-    snapshots: [], volumes: [], selectedVolume: '', volumeFilter: '',
-    query: '', sortNewestFirst: true, hostname: '', prevStats: null,
-    typeFilter: 'all', hostFilter: '',
-  };
-
-  let loading = true;
-  let activeTab: 'snapshots' | 'repo' = 'snapshots';
-  let bannerText = '';
-  let bannerError = false;
-  let lockStatus: LockStatus | null = null;
-  let stats: StatsResponse | null = null;
-  let statsLoading = false;
-  let sizes: Record<string, string> = {};
-  let currentSnapshot: Snapshot | null = null;
-  let allSnapshots: Snapshot[] = [];
-  let viewerOpen = false;
-  let checking = false;
-  let repairing = false;
-  let deleteVolModal = false;
-  let deleteSnapModal = false;
-  let deletingSnap: Snapshot | null = null;
-  let deleteConfirmText = '';
-  let snapDeleteInput = '';
-  let deleteVolLoading = false;
-  let creatingTest = false;
-  let testStatus = '';
-  let themeDark = true;
-  let pillsCachedAt = '';
-
-  let pillsLoading = false;
-  let snapsLoading = false;
-
-  $: filteredVolumes = state.volumes.filter(v =>
-    v.toLowerCase().includes(state.volumeFilter.toLowerCase())
-  );
-
-  $: filteredSnapshots = state.snapshots.filter(sn => {
-    if (state.typeFilter === 'hot' && !sn.tags.includes('hot')) return false;
-    if (state.typeFilter === 'cold' && !sn.tags.includes('cold')) return false;
-    if (state.hostFilter && sn.hostname !== state.hostFilter) return false;
-    if (!state.query) return true;
-    const q = state.query;
-    return sn.short_id.toLowerCase().includes(q) ||
-      sn.tags.some(t => t.toLowerCase().includes(q)) ||
-      sn.hostname?.toLowerCase().includes(q);
-  });
-
-  $: sortedSnapshots = [...filteredSnapshots].sort((a, b) => {
-    const da = new Date(a.time).getTime();
-    const db = new Date(b.time).getTime();
-    return state.sortNewestFirst ? db - da : da - db;
-  });
-
-  $: hosts = [...new Set(state.snapshots.map(sn => sn.hostname).filter(Boolean))].sort();
-
-  function setBanner(msg: string, isError = false) {
-    bannerText = msg;
-    bannerError = isError;
-  }
-
-  async function loadVolumes() {
-    pillsLoading = true;
-    try {
-      state.volumes = await api.fetchVolumes();
-      pillsLoading = false;
-    } catch (e) {
-      pillsLoading = false;
-      setBanner('Cannot reach server', true);
-    }
-  }
-
-  async function loadSnapshots(volume: string) {
-    snapsLoading = true;
-    try {
-      state.snapshots = await api.fetchSnapshots(volume);
-      snapsLoading = false;
-    } catch (e) {
-      state.snapshots = [];
-      snapsLoading = false;
-      setBanner('Failed to load snapshots', true);
-    }
-  }
-
-  async function loadAll(volume: string) {
-    state.selectedVolume = volume;
-    allSnapshots = [];
-    viewerOpen = false;
-    currentSnapshot = null;
-    sizes = {};
-    deleteVolModal = false;
-    deleteSnapModal = false;
-    landingShown = !volume;
-    if (volume) {
-      await Promise.all([
-        loadSnapshots(volume),
-        loadLockStatus(volume),
-        loadStats(volume),
-      ]);
-    }
-  }
-
-  async function loadLockStatus(volume: string) {
-    try {
-      lockStatus = await api.fetchLockStatus(volume);
-    } catch { lockStatus = null; }
-  }
-
-  async function loadStats(volume: string) {
-    statsLoading = true;
-    try {
-      stats = await api.fetchStats(volume);
-      state.prevStats = stats;
-      statsLoading = false;
-    } catch {
-      statsLoading = false;
-    }
-  }
-
-  async function handleRefresh() {
-    setBanner('');
-    const vol = state.selectedVolume;
-    try { await api.refreshStats(); } catch {}
-    if (vol) {
-      await Promise.all([
-        loadSnapshots(vol),
-        loadStats(vol),
-      ]);
-    }
-    await loadVolumes();
-    if (vol) loadLockStatus(vol);
-  }
-
-  function onSelectVolume(vol: string) {
-    if (vol === state.selectedVolume) {
-      state.selectedVolume = '';
-      loadAll('');
-      return;
-    }
-    loadAll(vol);
-  }
-
-  function onToggleSort() {
-    state.sortNewestFirst = !state.sortNewestFirst;
-  }
-
-  function onSearch(q: string) {
-    state.query = q;
-  }
-
-  function onFilterChange(f: string) {
-    state.volumeFilter = f;
-  }
-
-  function onTypeFilter(t: string) {
-    state.typeFilter = t;
-  }
-
-  function onHostFilter(h: string) {
-    state.hostFilter = h;
-  }
-
-  function onOpenViewer(snapshot: Snapshot) {
-    currentSnapshot = snapshot;
-    allSnapshots = state.snapshots;
-    viewerOpen = true;
-  }
-
-  function onCloseViewer() {
-    viewerOpen = false;
-    currentSnapshot = null;
-    allSnapshots = [];
-  }
-
-  let rpLoading: Record<string, boolean> = {};
-
-  async function onAddTag(id: string, tag: string, vol: string) {
-    rpLoading = { ...rpLoading, [id]: true };
-    try {
-      await api.addTag(id, tag, vol);
-      await loadSnapshots(vol);
-    } catch { setBanner('Failed to add tag', true); }
-    finally {
-      const next = { ...rpLoading };
-      delete next[id];
-      rpLoading = next;
-    }
-  }
-
-  async function onRemoveTag(id: string, tag: string, vol: string) {
-    rpLoading = { ...rpLoading, [id]: true };
-    try {
-      await api.removeTag(id, tag, vol);
-      await loadSnapshots(vol);
-    } catch { setBanner('Failed to remove tag', true); }
-    finally {
-      const next = { ...rpLoading };
-      delete next[id];
-      rpLoading = next;
-    }
-  }
-
-  async function onDeleteSnapshot(sn: Snapshot) {
-    deletingSnap = sn;
-    snapDeleteInput = '';
-    deleteSnapModal = true;
-  }
-
-  async function confirmDeleteSnapshot() {
-    if (!deletingSnap) return;
-    try {
-      await api.deleteSnapshot(deletingSnap.id, state.selectedVolume);
-      deleteSnapModal = false;
-      deletingSnap = null;
-      setBanner('Snapshot deleted');
-      await loadSnapshots(state.selectedVolume);
-    } catch (e: any) {
-      setBanner(e.message, true);
-    }
-  }
-
-  function openDeleteVolModal() {
-    const vol = state.selectedVolume;
-    if (!vol) return;
-    deleteConfirmText = '';
-    deleteVolModal = true;
-  }
-
-  async function confirmDeleteVolume() {
-    const vol = state.selectedVolume;
-    if (!vol || deleteConfirmText !== vol) return;
-    deleteVolLoading = true;
-    try {
-      await api.deleteVolume(vol);
-      deleteVolModal = false;
-      deleteVolLoading = false;
-      setBanner(`Volume ${vol} deleted`);
-      state.selectedVolume = '';
-      loadAll('');
-      await Promise.all([
-        api.refreshStats().catch(() => {}),
-        loadVolumes(),
-      ]);
-    } catch (e: any) {
-      deleteVolLoading = false;
-      setBanner(e.message, true);
-    }
-  }
-
-  async function handleCheck() {
-    const vol = state.selectedVolume;
-    if (!vol) return;
-    checking = true;
-    setBanner('');
-    try {
-      const msg = await api.checkRepo(vol);
-      setBanner(msg);
-    } catch (e: any) { setBanner(e.message, true); }
-    finally { checking = false; }
-  }
-
-  async function handleRepair() {
-    const vol = state.selectedVolume;
-    if (!vol) return;
-    repairing = true;
-    setBanner('');
-    try {
-      const msg = await api.repairRepo(vol);
-      setBanner(msg);
-    } catch (e: any) { setBanner(e.message, true); }
-    finally { repairing = false; }
-  }
-
-  async function handleCreateTestVolume(name: string) {
-    creatingTest = true;
-    testStatus = '';
-    try {
-      await api.createTestVolume(name);
-      testStatus = 'Updating volume list...';
-      await api.refreshStats().catch(() => {});
-      await loadVolumes();
-      state.selectedVolume = name;
-      loadAll(name);
-    } catch (e: any) { testStatus = e.message; }
-    finally { creatingTest = false; }
-  }
-
-  function switchTab(tab: 'snapshots' | 'repo') {
-    activeTab = tab;
-    if (tab === 'repo' && state.selectedVolume) {
-      loadStats(state.selectedVolume);
-    }
-  }
-
-  function toggleTheme() {
-    themeDark = !themeDark;
-    document.body.classList.toggle('light', !themeDark);
-    localStorage.setItem('themeDark', JSON.stringify(themeDark));
-  }
-
-  let landingShown = true;
-
-  let sizeLoading: Record<string, boolean> = {};
-
-  async function handleSizeLoaded(id: string, vol: string) {
-    sizeLoading = { ...sizeLoading, [id]: true };
-    try {
-      const data = await api.fetchSnapshotSizes(vol, [id]);
-      if (data[id] != null) {
-        sizes = { ...sizes, [id]: formatBytes(data[id]) };
-      } else {
-        sizes = { ...sizes, [id]: 'err' };
-      }
-    } catch {
-      sizes = { ...sizes, [id]: 'err' };
-    } finally {
-      const next = { ...sizeLoading };
-      delete next[id];
-      sizeLoading = next;
-    }
-  }
+  import type { Snapshot } from './lib/types';
+  import { 
+    snapshots, volumes, selectedVolume, volumeFilter, query, sortNewestFirst, hostname, prevStats, 
+    typeFilter, hostFilter, themeDark, loading, activeTab, bannerText, bannerError, lockStatus, 
+    stats, statsLoading, sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
+    deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
+    deleteVolLoading, creatingTest, testStatus, pillsCachedAt, pillsLoading, snapsLoading, 
+    landingShown, rpLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
+    onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
+    onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
+    openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
+    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded
+  } from './lib/stores';
 
   onMount(async () => {
     const saved = localStorage.getItem('themeDark');
     if (saved !== null) {
-      themeDark = JSON.parse(saved);
+      themeDark.set(JSON.parse(saved));
     } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      themeDark = false;
+      themeDark.set(false);
     }
-    if (!themeDark) document.body.classList.add('light');
+    if (!$themeDark) document.body.classList.add('light');
     await loadVolumes();
-    if (state.volumes.length === 0) {
+    if ($volumes.length === 0) {
       setBanner('No volumes found. Create one with: docker volume create --driver s3vol --name <name>');
     } else {
       setBanner('');
     }
-    loading = false;
+    loading.set(false);
   });
 </script>
 
@@ -367,7 +55,7 @@
         </svg>
       </button>
       <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
-        {#if themeDark}
+        {#if $themeDark}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="5"></circle>
           <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -376,7 +64,7 @@
           <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
           <line x1="1" y1="12" x2="3" y2="12"></line>
           <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="4.22", y1="19.78" x2="5.64" y2="18.36"></line>
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
         {:else}
@@ -388,51 +76,51 @@
     </div>
   </header>
 
-  <Banner {bannerText} {bannerError} />
+  <Banner bannerText={$bannerText} bannerError={$bannerError} />
 
   <Toolbar
-    volumes={filteredVolumes}
-    selectedVolume={state.selectedVolume}
-    volumeFilter={state.volumeFilter}
-    loading={pillsLoading}
-    pillsCachedAt={pillsCachedAt}
+    volumes={$filteredVolumes}
+    selectedVolume={$selectedVolume}
+    volumeFilter={$volumeFilter}
+    loading={$pillsLoading}
+    pillsCachedAt={$pillsCachedAt}
     onSelect={onSelectVolume}
     onFilterChange={onFilterChange}
   />
 
-  {#if landingShown}
-    <LandingPanel onCreateTestVolume={handleCreateTestVolume} {creatingTest} {testStatus} />
+  {#if $landingShown}
+    <LandingPanel onCreateTestVolume={handleCreateTestVolume} creatingTest={$creatingTest} testStatus={$testStatus} />
   {/if}
 
-  {#if state.selectedVolume}
+  {#if $selectedVolume}
     <div id="volumeView">
       <div class="tab-bar">
-        <button class="tab" class:tab-active={activeTab === 'snapshots'} on:click={() => switchTab('snapshots')}>Snapshots</button>
-        <button class="tab" class:tab-active={activeTab === 'repo'} on:click={() => switchTab('repo')}>Repo</button>
+        <button class="tab" class:tab-active={$activeTab === 'snapshots'} on:click={() => switchTab('snapshots')}>Snapshots</button>
+        <button class="tab" class:tab-active={$activeTab === 'repo'} on:click={() => switchTab('repo')}>Repo</button>
       </div>
 
-      {#if activeTab === 'snapshots'}
+      {#if $activeTab === 'snapshots'}
         <div class="tab-panel">
-          {#if viewerOpen && currentSnapshot}
+          {#if $viewerOpen && $currentSnapshot}
             <SnapshotViewer
-              snapshot={currentSnapshot}
-              allSnapshots={allSnapshots}
+              snapshot={$currentSnapshot}
+              allSnapshots={$allSnapshots}
               onClose={onCloseViewer}
             />
           {/if}
 
           <SnapshotTable
-              snapshots={sortedSnapshots}
-              sizes={sizes}
-              selectedVolume={state.selectedVolume}
-              sortNewestFirst={state.sortNewestFirst}
-              query={state.query}
-              typeFilter={state.typeFilter}
-              hostFilter={state.hostFilter}
-              {hosts}
-              loading={snapsLoading}
-              {rpLoading}
-              {sizeLoading}
+              snapshots={$sortedSnapshots}
+              sizes={$sizes}
+              selectedVolume={$selectedVolume}
+              sortNewestFirst={$sortNewestFirst}
+              query={$query}
+              typeFilter={$typeFilter}
+              hostFilter={$hostFilter}
+              hosts={$hosts}
+              loading={$snapsLoading}
+              rpLoading={$rpLoading}
+              sizeLoading={$sizeLoading}
               onSearch={onSearch}
               onToggleSort={onToggleSort}
               onTypeFilter={onTypeFilter}
@@ -441,23 +129,23 @@
               onAddTag={onAddTag}
               onRemoveTag={onRemoveTag}
               onDeleteSnapshot={onDeleteSnapshot}
-              onSizeLoaded={(id) => handleSizeLoaded(id, state.selectedVolume)}
+              onSizeLoaded={handleSizeLoaded}
             />
         </div>
       {:else}
         <div class="tab-panel">
           <div class="repo-layout">
-            <StatsGrid {stats} loading={statsLoading} />
+            <StatsGrid stats={$stats} loading={$statsLoading} />
             <LockPanel
-              {lockStatus}
-              volume={state.selectedVolume}
-              hostname={state.hostname}
-              onLockCreated={() => loadLockStatus(state.selectedVolume)}
-              onLocksDeleted={() => loadLockStatus(state.selectedVolume)}
+              lockStatus={$lockStatus}
+              volume={$selectedVolume}
+              hostname={$hostname}
+              onLockCreated={() => loadLockStatus($selectedVolume)}
+              onLocksDeleted={() => loadLockStatus($selectedVolume)}
             />
             <TroubleshootPanel
-              {checking}
-              {repairing}
+              checking={$checking}
+              repairing={$repairing}
               onCheck={handleCheck}
               onRepair={handleRepair}
               onDeleteVolume={openDeleteVolModal}
@@ -469,7 +157,7 @@
   {/if}
 </div>
 
-<Modal show={deleteVolModal} onClose={() => deleteVolModal = false}>
+<Modal show={$deleteVolModal} onClose={() => $deleteVolModal = false}>
   <h3 style="margin:0 0 12px;color:var(--red);">Delete volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
     This will permanently delete the volume, all its snapshots, backups, and locks from S3.
@@ -478,38 +166,38 @@
     Make sure no other hosts are still using this volume before proceeding.
   </p>
   <p style="margin:0 0 8px;font-size:0.85rem;">
-    Type <strong>{state.selectedVolume}</strong> to confirm:
+    Type <strong>{$selectedVolume}</strong> to confirm:
   </p>
-  <input class="input" type="text" placeholder={state.selectedVolume}
+  <input class="input" type="text" placeholder={$selectedVolume}
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
-    bind:value={deleteConfirmText} />
+    bind:value={$deleteConfirmText} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => deleteVolModal = false}>Cancel</button>
+    <button class="button button-secondary" on:click={() => $deleteVolModal = false}>Cancel</button>
     <button class="button" style="background:var(--red);color:#fff;"
-      disabled={deleteConfirmText !== state.selectedVolume || deleteVolLoading}
+      disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading}
       on:click={confirmDeleteVolume}>
-      {deleteVolLoading ? 'Deleting...' : 'Delete'}
+      {$deleteVolLoading ? 'Deleting...' : 'Delete'}
     </button>
   </div>
 </Modal>
 
-<Modal show={deleteSnapModal} onClose={() => deleteSnapModal = false}>
+<Modal show={$deleteSnapModal} onClose={() => $deleteSnapModal = false}>
   <h3 style="margin:0 0 12px;color:var(--red);">Delete snapshot</h3>
-  {#if deletingSnap}
+  {#if $deletingSnap}
   <div style="margin-bottom:16px;font-size:0.85rem;">
-    <div><strong>Hostname:</strong> {deletingSnap.hostname}</div>
-    <div><strong>Date:</strong> {new Date(deletingSnap.time).toLocaleString()}</div>
-    <div><strong>Tags:</strong> {deletingSnap.tags.join(', ') || '—'}</div>
+    <div><strong>Hostname:</strong> {$deletingSnap.hostname}</div>
+    <div><strong>Date:</strong> {new Date($deletingSnap.time).toLocaleString()}</div>
+    <div><strong>Tags:</strong> {$deletingSnap.tags.join(', ') || '—'}</div>
   </div>
   {/if}
   <p style="margin:0 0 8px;font-size:0.85rem;">Type <strong>delete</strong> to confirm:</p>
   <input class="input" type="text" placeholder='Type "delete" to confirm'
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
-    bind:value={snapDeleteInput} />
+    bind:value={$snapDeleteInput} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => deleteSnapModal = false}>Cancel</button>
+    <button class="button button-secondary" on:click={() => $deleteSnapModal = false}>Cancel</button>
     <button class="button" style="background:var(--red);color:#fff;"
-      disabled={snapDeleteInput !== 'delete'}
+      disabled={$snapDeleteInput !== 'delete'}
       on:click={confirmDeleteSnapshot}>Delete</button>
   </div>
 </Modal>

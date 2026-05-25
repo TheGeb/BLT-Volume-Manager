@@ -300,7 +300,7 @@
     <div style="color:var(--red);">{error}</div>
   {/if}
 
-  <div id="viewerContent" style="display:flex;gap:0;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
+   <div id="viewerContent" style="display:flex;gap:0;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
     <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;" bind:this={treePanelEl}>
       <div style="display:flex;gap:4px;">
         <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>

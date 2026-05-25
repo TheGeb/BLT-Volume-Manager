@@ -6,8 +6,8 @@
   export let onDeleteVolume: () => void = () => {};
 </script>
 
-<section class="panel troubleshoot-panel" style="display:flex;flex-direction:column;">
-  <h2 class="stats-heading">Restic Actions</h2>
+<section class="panel lock-panel" style="display:flex;flex-direction:column;">
+  <h2 class="lock-panel-title">Restic Actions</h2>
   <div class="troubleshoot-actions">
     <button class="button button-secondary button-block" title="Check repository integrity" on:click={onCheck} disabled={checking}>
       {checking ? 'Checking...' : 'Check'}

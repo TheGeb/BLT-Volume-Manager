@@ -116,24 +116,24 @@
       <tbody id="snapshotTable" style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
         {#each snapshots as sn (sn.id)}
           <tr>
-            <td style="text-align:center">
-              <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={rpLoading[sn.id]}>
-                {#if rpLoading[sn.id]}
-                  <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
-                    <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--muted)" />
-                    <path d="M6 10 l3 3 l5 -5" stroke="var(--muted)" stroke-width="2" fill="none" opacity="0.5" />
-                  </svg>
-                {:else}
-                  <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
-                    <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
-                      stroke={sn.tags.includes('restore-point') ? 'var(--accent)' : 'var(--border)'} />
-                    {#if sn.tags.includes('restore-point')}
-                      <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
-                    {/if}
-                  </svg>
-                {/if}
-              </button>
-            </td>
+             <td style="text-align:center">
+               {#if rpLoading[sn.id]}
+                 <svg width="20" height="20" viewBox="0 0 20 20" class="spin" style="vertical-align:middle;">
+                   <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
+                   <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+                 </svg>
+               {:else}
+                 <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={rpLoading[sn.id]}>
+                   <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
+                     <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
+                       stroke={sn.tags.includes('restore-point') ? 'var(--accent)' : 'var(--border)'} />
+                     {#if sn.tags.includes('restore-point')}
+                       <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
+                     {/if}
+                   </svg>
+                 </button>
+               {/if}
+             </td>
             <td class="copy-id" title="Click to copy full snapshot ID"
               on:click={() => { navigator.clipboard.writeText(sn.id); }}>
               {sn.short_id.slice(0, 8)}…
@@ -147,12 +147,12 @@
             <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
               {#if sizes[sn.id]}
                 {sizes[sn.id]}
-              {:else if sizeLoading[sn.id]}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin">
-                  <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                </svg>
-              {:else}
+               {:else if sizeLoading[sn.id]}
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+                   <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+                   <path d="M12 2a10 10 0 0 1 10 10" />
+                 </svg>
+               {:else}
                 <button type="button" class="size-btn" title="Compute size"
                   on:click|stopPropagation={() => onSizeLoaded(sn.id)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -14,22 +14,21 @@
     : [];
 </script>
 
-<section class="panel" style="display:flex;flex-direction:column;">
+<section class="panel lock-panel" style="display:flex;flex-direction:column;">
   {#if stats?.repo && !stats.repo.error}
-    <div class="stat-card-graph">
-      <h2 class="lock-panel-title">Repo Size</h2>
-      <div class="lock-info">
-        <div class="lock-status-text">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
-        <div class="lock-owner">(Uncompressed)</div>
-      </div>
-      {#if barParts.length > 0}
-        <StatBar parts={barParts} />
-      {/if}
-      <div class="stat-sub">
-        <div>Blobs: {stats.repo.total_blob_count?.toLocaleString() ?? '?'}</div>
-      </div>
+    <h2 class="lock-panel-title">Repo Size</h2>
+    <div class="lock-info">
+      <div class="lock-status-text">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
+      <div class="lock-owner">(Uncompressed)</div>
+    </div>
+    {#if barParts.length > 0}
+      <StatBar parts={barParts} />
+    {/if}
+    <div class="stat-sub">
+      <div>Blobs: {stats.repo.total_blob_count?.toLocaleString() ?? '?'}</div>
     </div>
   {:else if !loading}
     <div style="text-align:center;padding:40px;color:var(--muted);">No stats available</div>
   {/if}
 </section>
+
