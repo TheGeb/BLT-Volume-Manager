@@ -2,6 +2,8 @@ package restic
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,35 @@ import (
 	"sync"
 	"time"
 )
+
+// ... existing code ...
+
+// FindSnapshotByHash searches for a snapshot matching the criteria derived from host + time + paths.
+func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
+	snapshots, err := m.ListSnapshots()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range snapshots {
+		h := m.generateHash(s)
+		if h == hash {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("snapshot not found for hash %s", hash)
+}
+
+func (m *Manager) generateHash(s Snapshot) string {
+	// Sort paths to ensure consistency
+	paths := make([]string, len(s.Paths))
+	copy(paths, s.Paths)
+	sort.Strings(paths)
+
+	data := fmt.Sprintf("%s|%d|%s", s.Hostname, s.Time.Unix(), strings.Join(paths, ","))
+	h := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(h[:])
+}
 
 // Manager wraps restic operations for a single repository.
 type Manager struct {

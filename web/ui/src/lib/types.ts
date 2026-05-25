@@ -5,7 +5,8 @@ export interface Snapshot {
   tags: string[];
   paths: string[];
   hostname: string;
-  volume: string;
+  volume?: string;
+  fallbackHash?: string;
 }
 
 export interface LockStatus {

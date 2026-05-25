@@ -71,8 +71,9 @@
       {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} />
   {/each}
 {:else if node.type === 'dir' || node.children}
-  <div style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;"
+<div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;"
     on:click={handleClick}
+    on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}>
     <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -96,8 +97,9 @@
   {/if}
 {:else}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor};white-space:nowrap;"
+  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor};white-space:nowrap;"
     on:click={handleClick}
+    on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}>
     <div style="width:16px"></div>

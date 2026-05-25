@@ -61,16 +61,18 @@ export async function fetchSnapshotSizes(volume: string, ids: string[]): Promise
   return resp.json() as Promise<Record<string, number>>;
 }
 
-export async function fetchFileTree(snapshotId: string, volume: string, path?: string): Promise<any[]> {
+export async function fetchFileTree(snapshotId: string, volume: string, path?: string, fallbackHash?: string): Promise<any[]> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/ls?volume=${encodeURIComponent(volume)}`;
   if (path) url += `&path=${encodeURIComponent(path)}`;
+  if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to list snapshot');
   return resp.json() as Promise<any[]>;
 }
 
-export async function fetchFileContent(snapshotId: string, volume: string, path: string): Promise<string> {
-  const url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`;
+export async function fetchFileContent(snapshotId: string, volume: string, path: string, fallbackHash?: string): Promise<string> {
+  let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`;
+  if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
   try {
@@ -82,8 +84,10 @@ export async function fetchFileContent(snapshotId: string, volume: string, path:
   }
 }
 
-export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string): Promise<any> {
-  const url = `/api/snapshot-view/${encodeURIComponent(snapshotA)}/diff/${encodeURIComponent(snapshotB)}?volume=${encodeURIComponent(volume)}`;
+export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string, hashA?: string, hashB?: string): Promise<any> {
+  let url = `/api/snapshot-view/${encodeURIComponent(snapshotA)}/diff/${encodeURIComponent(snapshotB)}?volume=${encodeURIComponent(volume)}`;
+  if (hashA) url += `&fallbackHashA=${encodeURIComponent(hashA)}`;
+  if (hashB) url += `&fallbackHashB=${encodeURIComponent(hashB)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to get diff');
   return resp.json() as Promise<any>;

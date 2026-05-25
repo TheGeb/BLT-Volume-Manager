@@ -150,6 +150,22 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) resolveSnapshotID(rm *restic.Manager, idOrHash string, r *http.Request) (string, error) {
+	// If it's a valid ID (assume 8 chars minimum for short ID), try to list to check if it exists
+	// This is a heuristic. A robust way is to just try a command or have a cache.
+	// For now, if length matches an ID or it doesn't look like our hash, treat as ID.
+	if len(idOrHash) >= 8 {
+		return idOrHash, nil
+	}
+
+	// Assume it's a fallback hash
+	snap, err := rm.FindSnapshotByHash(idOrHash)
+	if err != nil {
+		return "", err
+	}
+	return snap.ID, nil
+}
+
 func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
 		http.NotFound(w, r)
@@ -163,14 +179,30 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	snapshotID := parts[0]
-	action := parts[1]
 	volName := r.URL.Query().Get("volume")
 	if volName == "" {
 		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
 		return
 	}
 	rm := s.volumeManager(volName)
+	
+	snapshotID, err := s.resolveSnapshotID(rm, parts[0], r)
+	if err != nil {
+		hash := r.URL.Query().Get("fallbackHash")
+		if hash != "" {
+			var snap *restic.Snapshot
+			snap, err = rm.FindSnapshotByHash(hash)
+			if err == nil {
+				snapshotID = snap.ID
+			}
+		}
+	}
+	if err != nil {
+		respondError(w, err, http.StatusNotFound)
+		return
+	}
+
+	action := parts[1]
 
 	switch action {
 	case "ls":
@@ -213,7 +245,24 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing second snapshot id", http.StatusBadRequest)
 			return
 		}
-		result, err := rm.DiffSnapshots(snapshotID, parts[2])
+		
+		secondID, err := s.resolveSnapshotID(rm, parts[2], r)
+		if err != nil {
+			hashB := r.URL.Query().Get("fallbackHashB")
+			if hashB != "" {
+				var snap *restic.Snapshot
+				snap, err = rm.FindSnapshotByHash(hashB)
+				if err == nil {
+					secondID = snap.ID
+				}
+			}
+		}
+		if err != nil {
+			respondError(w, err, http.StatusNotFound)
+			return
+		}
+		
+		result, err := rm.DiffSnapshots(snapshotID, secondID)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return

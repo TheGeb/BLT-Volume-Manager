@@ -123,6 +123,14 @@
     node.dirDiffType = hasChildWithType ? result : null;
   }
 
+  async function generateFallbackHash(snap: Snapshot): Promise<string> {
+    const msg = snap.hostname + snap.time + snap.paths.sort().join(',');
+    const msgUint8 = new TextEncoder().encode(msg);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   async function open() {
     loading = true;
     error = '';
@@ -160,7 +168,13 @@
     diffLoading = true;
     diffOtherId = selectedCompareId;
     try {
-      const result = await api.fetchDiff(snapshot.id, selectedCompareId, snapshot.volume);
+      const snapA = snapshot;
+      const snapB = compareSnaps.find(s => s.id === selectedCompareId)!;
+      const [hashA, hashB] = await Promise.all([
+        generateFallbackHash(snapA),
+        generateFallbackHash(snapB)
+      ]);
+      const result = await api.fetchDiff(snapshot.id, selectedCompareId, snapshot.volume, hashA, hashB);
       currentDiffResult = result;
       sideBySide = false;
       fileContent = '';
@@ -189,7 +203,8 @@
     currentDiffHunks = [];
     error = '';
     try {
-      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume, path);
+      const hash = await generateFallbackHash(snapshot);
+      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume, path, hash);
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -203,7 +218,9 @@
     currentDiffHunks = [];
     error = '';
     try {
-      fileContent = await api.fetchFileContent(id, snapshot.volume, path);
+      const snap = allSnapshots.find(s => s.id === id)!;
+      const hash = await generateFallbackHash(snap);
+      fileContent = await api.fetchFileContent(id, snapshot.volume, path, hash);
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -218,9 +235,15 @@
     fileContentLoading = true;
     error = '';
     try {
+      const snapA = snapshot;
+      const snapB = allSnapshots.find(s => s.id === otherId)!;
+      const [hashA, hashB] = await Promise.all([
+        generateFallbackHash(snapA),
+        generateFallbackHash(snapB)
+      ]);
       const [oldContent, newContent] = await Promise.all([
-        api.fetchFileContent(snapshot.id, snapshot.volume, path),
-        api.fetchFileContent(otherId, snapshot.volume, path),
+        api.fetchFileContent(snapshot.id, snapshot.volume, path, hashA),
+        api.fetchFileContent(otherId, snapshot.volume, path, hashB),
       ]);
       currentDiffHunks = computeDiff(oldContent.split('\n'), newContent.split('\n'));
       sideBySide = false;

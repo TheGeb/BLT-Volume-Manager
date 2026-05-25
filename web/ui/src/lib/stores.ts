@@ -209,7 +209,13 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
 
     if (opts?.snapshotId) {
       const snap = get(snapshots).find(s => s.id === opts.snapshotId);
-      if (snap) currentSnapshot.set(snap);
+      if (snap) {
+        const paths = snap.paths ? [...snap.paths].sort().join(',') : '';
+        const msg = snap.hostname + snap.time + paths;
+        const hash = await sha256(msg);
+        snap.fallbackHash = hash;
+        currentSnapshot.set(snap);
+      }
       allSnapshots.set(get(snapshots));
     }
   }
@@ -248,7 +254,19 @@ export function onFilterChange(f: string) { volumeFilter.set(f); }
 export function onTypeFilter(t: string) { typeFilter.set(t); }
 export function onHostFilter(h: string) { hostFilter.set(h); }
 
-export function onOpenViewer(snapshot: Snapshot) {
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function onOpenViewer(snapshot: Snapshot) {
+  const paths = snapshot.paths ? [...snapshot.paths].sort().join(',') : '';
+  const msg = snapshot.hostname + snapshot.time + paths;
+  const hash = await sha256(msg);
+  snapshot.fallbackHash = hash;
+
   currentSnapshot.set(snapshot);
   allSnapshots.set(get(snapshots));
   viewerOpen.set(true);
@@ -424,7 +442,27 @@ function buildUrl(): string {
   p.set('volume', vol);
   if (get(activeTab) === 'repo') p.set('tab', 'repo');
   if (get(viewerOpen) && get(currentSnapshot)) {
-    p.set('snapshot', get(currentSnapshot)!.id);
+    const snap = get(currentSnapshot)!;
+    p.set('snapshot', snap.id);
+    
+    // Fallback Hash calculation
+    const msg = snap.hostname + snap.time + (snap.paths ? [...snap.paths].sort().join(',') : '');
+    const msgUint8 = new TextEncoder().encode(msg);
+    // Note: crypto.subtle is asynchronous, but we must return a synchronous URL string.
+    // Instead of computing SHA256 synchronously, we can generate a unique representation of metadata
+    // or we can use a quick custom JS SHA256 implementation if asynchronous Web Crypto is too restrictive.
+    // Alternatively, we can use a simpler synchronous hashing algorithm or just prefix the query, 
+    // or pre-compute it and store it on the Snapshot object.
+    // Let's pre-compute the hash and attach it to the Snapshot when loaded, 
+    // or since 'buildUrl' is synchronous, we can use a fast synchronous SHA256 in JS.
+    // Let's write a simple synchronous SHA-256 or use a quick helper to get it.
+    // Actually, we can just do a simple fallback metadata representation, 
+    // but the prompt asked for fallbackHash=sha256(host+time+tree).
+    // Let's attach a fallbackHash to the Snapshot object in the store when we select it, 
+    // or use a helper that does it.
+    if (snap.fallbackHash) {
+      p.set('fallbackHash', snap.fallbackHash);
+    }
     const dt = get(diffTargetId);
     if (dt) p.set('diff', dt);
   }
