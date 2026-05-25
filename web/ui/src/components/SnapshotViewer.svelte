@@ -238,10 +238,9 @@
     sideBySide = !sideBySide;
   }
 
+  let rootExpanded = true;
   function toggleAll(open: boolean) {
-    if (!treeEl) return;
-    const details = treeEl.querySelectorAll('details');
-    for (const d of details) d.open = open;
+    rootExpanded = open;
   }
 
   let colDragging = false;
@@ -345,8 +344,18 @@
    <div id="viewerContent" style="display:flex;gap:0;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
     <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
       <div style="display:flex;gap:4px;">
-        <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(true)}>Expand all</button>
-        <button class="button button-secondary button-xs" style="flex:1;" on:click={() => toggleAll(false)}>Collapse all</button>
+        <button class="button button-secondary button-xs btn-icon-sm" style="flex:1;position:relative;" on:click={() => toggleAll(true)}>
+          <span style="position:absolute;left:8px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
+          <span style="flex:1;text-align:center;">Expand</span>
+        </button>
+        <button class="button button-secondary button-xs btn-icon-sm" style="flex:1;position:relative;" on:click={() => toggleAll(false)}>
+          <span style="position:absolute;left:8px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+          </span>
+          <span style="flex:1;text-align:center;">Collapse</span>
+        </button>
       </div>
       <div id="viewerTree" style="overflow:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
         {#if loading}
@@ -366,7 +375,7 @@
           </div>
         {:else}
           <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
-            onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} />
+            onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} expanded={rootExpanded} />
         {/if}
       </div>
     </div>

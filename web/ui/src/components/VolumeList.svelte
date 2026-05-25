@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition';
   import { formatDuration } from '../lib/util';
   import type { VolumeLockInfo } from '../lib/types';
 
@@ -33,6 +34,9 @@
   interface FlatItem { name: string; path: string; depth: number; isGroup: boolean; }
 
   $: tree = buildTree(filtered);
+  $: if (Object.keys(expanded).length === 0 && tree.length > 0) {
+    expanded = allExpanded(tree);
+  }
   $: flatItems = flatten(tree, expanded, 0);
 
   function buildTree(names: string[]): TreeNode[] {
@@ -70,23 +74,29 @@
 
   $: if (filter || statusFilter !== 'all' || hostFilterVal) {
     expanded = allExpanded(tree);
-  } else if (Object.keys(expanded).length === 0) {
-    expanded = allExpanded(tree);
   }
 
   function toggle(path: string) {
-    if (filter || statusFilter !== 'all') return;
     expanded = { ...expanded, [path]: !expanded[path] };
   }
 
   function expandAllGroups() {
-    const all: Record<string, boolean> = {};
-    function walk(nodes: TreeNode[]) { for (const n of nodes) { if (n.children) { all[n.path] = true; walk(n.children); } } }
+    const all: Record<string, boolean> = { ...expanded };
+    function walk(nodes: TreeNode[]) {
+      for (const n of nodes) {
+        if (n.children) {
+          all[n.path] = true;
+          walk(n.children);
+        }
+      }
+    }
     walk(tree);
     expanded = all;
   }
 
-  function collapseAllGroups() { expanded = {}; }
+  function collapseAllGroups() {
+    expanded = {};
+  }
 
   function flatten(nodes: TreeNode[], exp: Record<string, boolean>, depth: number): FlatItem[] {
     const items: FlatItem[] = [];
@@ -150,20 +160,22 @@
     <span class="tree-count">{filtered.length} volume{filtered.length !== 1 ? 's' : ''}</span>
     <div class="tree-actions">
       <button class="button button-secondary button-xs btn-icon-sm" on:click={expandAllGroups}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
         Expand
       </button>
       <button class="button button-secondary button-xs btn-icon-sm" on:click={collapseAllGroups}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
         Collapse
       </button>
     </div>
   </div>
 
   {#if loading && volumes.length === 0}
-    <div class="grid">
+    <div class="tree">
       {#each { length: 6 } as _}
-        <div class="skeleton" style="height:80px;border-radius:16px;"></div>
+        <div class="tree-row" style="padding-left: 20px;">
+          <div class="skeleton" style="width: 100%; height: 24px; border-radius: 6px;"></div>
+        </div>
       {/each}
     </div>
   {:else if flatItems.length === 0 && !filter && statusFilter === 'all' && !hostFilterVal}
@@ -173,54 +185,59 @@
   {:else}
     <div class="tree">
       {#each flatItems as item (item.path)}
-        <div class="tree-row" style="padding-left:{20 + item.depth * 20}px;">
-          {#if item.isGroup}
-            <button class="tree-group" on:click={() => toggle(item.path)} title={item.path}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" class="chevron"
-                style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5;">
-                <polygon points="6 3 20 12 6 21 6 3"/>
-              </svg>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              </svg>
-              <span class="tree-name">{item.name}</span>
-              <span class="lock-info">
-                {#if folderLocks[item.path]}
-                  <span class="lock-badge lock-locked">
-                    <span class="lock-dot lock-dot-locked"></span>
-                    Locked:
-                  </span>
-                  <span class="lock-owner">{folderLocks[item.path].owner}</span>
-                {/if}
-              </span>
-            </button>
-          {:else}
-            <a class="tree-volume" href="/?volume={encodeURIComponent(item.path)}" title={item.path}
-              on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); onSelect(item.path); } }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
-                <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-              </svg>
-              <span class="tree-name">{item.name}</span>
-              <span class="lock-info">
-                {#if volumeLockInfo[item.path]}
-                  <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
-                    <span class="lock-dot lock-dot-{volumeLockInfo[item.path].status}"></span>
-                    {volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked:'}
-                  </span>
-                  {#if volumeLockInfo[item.path].owner}
-                    <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
+        <div transition:slide|local>
+          <div class="tree-row" style="padding-left:{20 + item.depth * 20}px;">
+            {#if item.isGroup}
+              <button class="tree-group" on:click={() => toggle(item.path)} title={item.path}>
+              <div style="width:22px; display:flex; justify-content:center; align-items:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
+                  style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5; transition:transform 0.15s;">
+                  <path d="M7 10l5 5 5-5H7z"/>
+                </svg>
+              </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span class="tree-name">{item.name}</span>
+                <span class="lock-info">
+                  {#if folderLocks[item.path]}
+                    <span class="lock-badge lock-locked">
+                      <span class="lock-dot lock-dot-locked"></span>
+                      Locked:
+                    </span>
+                    <span class="lock-owner">{folderLocks[item.path].owner}</span>
                   {/if}
-                  {#if volumeLockInfo[item.path].locked && volumeLockInfo[item.path].expiresIn > 0}
-                    <span class="lock-expiry">{formatDuration(volumeLockInfo[item.path].expiresIn)}</span>
+                </span>
+              </button>
+            {:else}
+              <a class="tree-volume" href="/?volume={encodeURIComponent(item.path)}" title={item.path}
+                on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); onSelect(item.path); } }}>
+                <div style="width:16px;"></div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                <span class="tree-name">{item.name}</span>
+                <span class="lock-info">
+                  {#if volumeLockInfo[item.path]}
+                    <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
+                      <span class="lock-dot lock-dot-{volumeLockInfo[item.path].status}"></span>
+                      {volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked'}
+                    </span>
+                    {#if volumeLockInfo[item.path].owner}
+                      <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
+                    {/if}
+                    {#if volumeLockInfo[item.path].locked && volumeLockInfo[item.path].expiresIn > 0}
+                      <span class="lock-expiry">{formatDuration(volumeLockInfo[item.path].expiresIn)}</span>
+                    {/if}
+                  {:else if !loading}
+                    <span class="lock-badge">—</span>
                   {/if}
-                {:else if !loading}
-                  <span class="lock-badge">—</span>
-                {/if}
-              </span>
-            </a>
-          {/if}
+                </span>
+              </a>
+            {/if}
+          </div>
         </div>
       {/each}
     </div>
@@ -261,6 +278,7 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; }
   .tree-row { display: flex; align-items: center; min-height: 36px; }
+  .tree-row > * { flex-shrink: 0; }
 
   .tree-group, .tree-volume {
     display: flex; align-items: center; gap: 8px;
