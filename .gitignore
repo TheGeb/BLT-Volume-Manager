@@ -29,10 +29,9 @@ go.work.sum
 
 # Node.js
 node_modules/
-web/static/assets/
 
-# Build files
-**/web/static/**
+# Build output
+/web/static/
 
 # Built binaries
 blt-volume-manager
