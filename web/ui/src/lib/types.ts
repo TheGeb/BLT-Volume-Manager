@@ -91,7 +91,7 @@ export interface AppState {
   sortNewestFirst: boolean;
   hostname: string;
   prevStats: StatsResponse | null;
-  pillsCachedAt?: string;
+  volumesCachedAt?: string;
   typeFilter: string;
   hostFilter: string;
 }

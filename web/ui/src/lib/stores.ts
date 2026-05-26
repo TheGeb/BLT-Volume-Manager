@@ -36,8 +36,7 @@ export const deleteVolLoading = writable(false);
 export const creatingTest = writable(false);
 export const testStatus = writable('');
 export const themeDark = writable(true);
-export const pillsCachedAt = writable('');
-export const pillsLoading = writable(false);
+export const volumesLoading = writable(false);
 export const snapsLoading = writable(false);
 export const landingShown = writable(true);
 export const rpLoading = writable<Record<string, boolean>>({});
@@ -87,14 +86,13 @@ export function setBanner(msg: string, isError = false) {
 }
 
 export async function loadVolumes() {
-  pillsLoading.set(true);
+  volumesLoading.set(true);
   try {
     volumes.set(await api.fetchVolumes());
-    fetchAllVolumeLockInfo();
   } catch {
     setBanner('Cannot reach server', true);
   } finally {
-    pillsLoading.set(false);
+    volumesLoading.set(false);
   }
 }
 

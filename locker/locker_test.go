@@ -94,9 +94,20 @@ func TestNewFileLockerCreatesDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nested", "locks")
 	l := NewFileLocker(dir)
 
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		t.Error("NewFileLocker should create directory")
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Error("NewFileLocker should not create directory immediately")
 	}
 
-	_ = l
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lock, err := l.Acquire(ctx, "testlock")
+	if err != nil {
+		t.Fatalf("failed to acquire lock: %v", err)
+	}
+	defer lock.Release()
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Error("Acquire should create directory")
+	}
 }

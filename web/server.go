@@ -29,9 +29,6 @@ type Server struct {
 	statsMu      sync.RWMutex
 	statsCache   map[string]interface{}
 	statsCacheAt time.Time
-	pillsMu      sync.RWMutex
-	pillsCache   []string
-	pillsCacheAt time.Time
 }
 
 func NewServer(dataDir string, resticBase string, s3Bucket string, s3Endpoint string, s3Region string, drv Driver) *Server {
@@ -56,7 +53,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/volume/", s.handleVolumeAction)
 	inner.HandleFunc("/api/stats", s.handleStats)
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)
-	inner.HandleFunc("/api/pills", s.handlePills)
+	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
 	inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)

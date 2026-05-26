@@ -24,7 +24,6 @@ type fileLocker struct{
 }
 
 func NewFileLocker(dir string) Locker {
-	_ = os.MkdirAll(dir, 0755)
 	return &fileLocker{dir: dir}
 }
 
@@ -33,6 +32,9 @@ type fileLock struct {
 }
 
 func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
+	if err := os.MkdirAll(l.dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create lock directory: %w", err)
+	}
 	path := filepath.Join(l.dir, name+".lock")
 	// Try repeatedly for a short period
 	deadline := time.Now().Add(5 * time.Second)

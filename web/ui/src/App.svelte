@@ -16,7 +16,7 @@
     typeFilter, hostFilter, themeDark, loading, activeTab, bannerText, bannerError, lockStatus, 
     stats, statsLoading, sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
     deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
-    deleteVolLoading, creatingTest, testStatus, pillsCachedAt, pillsLoading, snapsLoading, 
+    deleteVolLoading, creatingTest, testStatus, volumesLoading, snapsLoading, 
     landingShown, rpLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
     diffTargetId, volumeLockInfo,
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
@@ -207,12 +207,12 @@
   <Banner bannerText={$bannerText} bannerError={$bannerError} onClose={() => setBanner('')} />
 
   {#if $landingShown}
-    {#if $volumes.length === 0 && !$pillsLoading}
+    {#if $volumes.length === 0 && !$volumesLoading}
       <LandingPanel onCreateTestVolume={handleCreateTestVolume} creatingTest={$creatingTest} testStatus={$testStatus} />
     {:else}
       <VolumeList
         volumes={$filteredVolumes}
-        loading={$pillsLoading}
+        loading={$volumesLoading}
         onSelect={onSelectVolume}
         filter={$volumeFilter}
         onFilterChange={onFilterChange}

@@ -304,7 +304,7 @@
   function onMouseMove(e: MouseEvent) {
     if (colDragging && treePanelEl && contentEl) {
       const rect = contentEl.getBoundingClientRect();
-      const minW = 40;
+      const minW = 200;
       const maxW = rect.width - 200;
       let w = e.clientX - rect.left;
       if (w < minW) w = minW;
@@ -382,23 +382,51 @@
     <div style="color:var(--red);">{error}</div>
   {/if}
 
-   <div id="viewerContent" style="display:flex;gap:0;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
-    <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
-      <div style="display:flex;gap:4px;">
-        <button class="button button-secondary button-xs btn-icon-sm" style="flex:1;position:relative;" on:click={() => toggleAll(true)}>
-          <span style="position:absolute;left:8px;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </span>
-          <span style="flex:1;text-align:center;">Expand</span>
-        </button>
-        <button class="button button-secondary button-xs btn-icon-sm" style="flex:1;position:relative;" on:click={() => toggleAll(false)}>
-          <span style="position:absolute;left:8px;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
-          </span>
-          <span style="flex:1;text-align:center;">Collapse</span>
-        </button>
+   <div id="viewerContent" style="display:flex;flex-direction:column;gap:8px;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
+    <div style="display:flex;flex:1;min-height:0;">
+      <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(true)}>
+            <span style="position:absolute;left:8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+            <span style="flex:1;text-align:center;">Expand</span>
+          </button>
+          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(false)}>
+            <span style="position:absolute;left:8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+            </span>
+            <span style="flex:1;text-align:center;">Collapse</span>
+          </button>
+        </div>
+        <div id="viewerTree" style="overflow:auto;scrollbar-gutter:stable;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+          {#if loading}
+            <div style="text-align:center;padding:40px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+            </div>
+          {:else if diffLoading}
+            <div style="text-align:center;padding:40px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+              <div style="color:var(--muted);font-size:0.85rem;margin-top:8px;">Computing diff...</div>
+            </div>
+          {:else}
+            <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
+              onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} expanded={rootExpanded} />
+          {/if}
+        </div>
       </div>
-      <div id="viewerTree" style="overflow:auto;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
+        on:mousedown={startColDrag}>
+        <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
+      </div>
+      <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
         {#if loading}
           <div style="text-align:center;padding:40px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
@@ -406,116 +434,90 @@
               <path d="M12 2a10 10 0 0 1 10 10" />
             </svg>
           </div>
-        {:else if diffLoading}
-          <div style="text-align:center;padding:40px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-              <path d="M12 2a10 10 0 0 1 10 10" />
-            </svg>
-            <div style="color:var(--muted);font-size:0.85rem;margin-top:8px;">Computing diff...</div>
-          </div>
-        {:else}
-          <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
-            onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} expanded={rootExpanded} />
-        {/if}
-      </div>
-    </div>
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
-      on:mousedown={startColDrag}>
-      <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
-    </div>
-    <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
-      {#if loading}
-        <div style="text-align:center;padding:40px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-            <path d="M12 2a10 10 0 0 1 10 10" />
-          </svg>
-        </div>
-      {:else if currentDiffHunks.length > 0}
-          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
-            <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
-            <button class="button button-secondary button-xs" style="margin-left:auto;" on:click={toggleDiffLayout}>
-              {sideBySide ? 'Inline' : 'Side-by-side'}
-            </button>
-          </div>
-          {#if sideBySide}
-            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-              <div style="flex:1;overflow-x:auto;border-right:1px solid var(--border);">
-                <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">Old ({diffOtherId.slice(0, 8)})</div>
-                {#each currentDiffHunks as hunk}
-                  <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
-                    @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-                  </div>
-                  {#each hunk.lines as entry}
-                    {#if entry.type === 'add'}
-                      <div style="padding:0 4px;font-size:0.85rem;background:var(--green-bg);">&nbsp;</div>
-                    {:else}
-                      <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'del' ? 'var(--red-bg)' : ''};">
-                        <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.oldLineNo || ''}</span>
-                        <span style="width:1ch;flex-shrink:0;color:{entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'del' ? '-' : ' '}</span>
-                        <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                      </div>
-                    {/if}
+        {:else if currentDiffHunks.length > 0}
+            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+              <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
+              <button class="button button-secondary button-xs" style="margin-left:auto;" on:click={toggleDiffLayout}>
+                {sideBySide ? 'Inline' : 'Side-by-side'}
+              </button>
+            </div>
+            {#if sideBySide}
+              <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+                <div style="flex:1;overflow-x:auto;border-right:1px solid var(--border);">
+                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">Old ({diffOtherId.slice(0, 8)})</div>
+                  {#each currentDiffHunks as hunk}
+                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
+                      @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
+                    </div>
+                    {#each hunk.lines as entry}
+                      {#if entry.type === 'add'}
+                        <div style="padding:0 4px;font-size:0.85rem;background:var(--green-bg);">&nbsp;</div>
+                      {:else}
+                        <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'del' ? 'var(--red-bg)' : ''};">
+                          <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.oldLineNo || ''}</span>
+                          <span style="width:1ch;flex-shrink:0;color:{entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'del' ? '-' : ' '}</span>
+                          <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
+                        </div>
+                      {/if}
+                    {/each}
                   {/each}
-                {/each}
-              </div>
-              <div style="flex:1;overflow-x:auto;">
-                <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">New ({snapshot.short_id.slice(0, 8)})</div>
-                {#each currentDiffHunks as hunk}
-                  <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
-                    @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-                  </div>
-                  {#each hunk.lines as entry}
-                    {#if entry.type === 'del'}
-                      <div style="padding:0 4px;font-size:0.85rem;background:var(--red-bg);">&nbsp;</div>
-                    {:else}
-                      <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : ''};">
-                        <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.newLineNo || ''}</span>
-                        <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
-                        <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                      </div>
-                    {/if}
+                </div>
+                <div style="flex:1;overflow-x:auto;">
+                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">New ({snapshot.short_id.slice(0, 8)})</div>
+                  {#each currentDiffHunks as hunk}
+                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
+                      @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
+                    </div>
+                    {#each hunk.lines as entry}
+                      {#if entry.type === 'del'}
+                        <div style="padding:0 4px;font-size:0.85rem;background:var(--red-bg);">&nbsp;</div>
+                      {:else}
+                        <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : ''};">
+                          <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.newLineNo || ''}</span>
+                          <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
+                          <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
+                        </div>
+                      {/if}
+                    {/each}
                   {/each}
-                {/each}
+                </div>
               </div>
+            {:else}
+              {#each currentDiffHunks as hunk}
+                <div style="padding:2px 8px;margin:4px 0;font-size:0.8rem;color:var(--muted);background:rgba(255,255,255,0.03);border-radius:4px;font-family:monospace;">
+                  @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
+                </div>
+                {#each hunk.lines as entry}
+                  <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
+                    <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
+                    <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
+                    <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
+                    <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
+                  </div>
+                {/each}
+              {/each}
+            {/if}
+          {:else if fileContent}
+            {fileContent}
+          {:else if fileContentLoading}
+            <div style="text-align:center;padding:40px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
             </div>
           {:else}
-            {#each currentDiffHunks as hunk}
-              <div style="padding:2px 8px;margin:4px 0;font-size:0.8rem;color:var(--muted);background:rgba(255,255,255,0.03);border-radius:4px;font-family:monospace;">
-                @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-              </div>
-              {#each hunk.lines as entry}
-                <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
-                  <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
-                  <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
-                  <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
-                  <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                </div>
-              {/each}
-            {/each}
+            <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
+              Select a file to view its contents
+            </div>
           {/if}
-        {:else if fileContent}
-          {fileContent}
-        {:else if fileContentLoading}
-          <div style="text-align:center;padding:40px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-              <path d="M12 2a10 10 0 0 1 10 10" />
-            </svg>
-          </div>
-        {:else}
-          <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
-            Select a file to view its contents
-          </div>
-        {/if}
+        </div>
       </div>
-    </div>
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div style="height:10px;cursor:row-resize;display:flex;align-items:center;justify-content:center;user-select:none;margin-top:8px;"
-      on:mousedown={startRowDrag}>
-      <div style="width:40px;height:3px;border-radius:2px;background:var(--border);"></div>
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div style="height:10px;cursor:row-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
+        on:mousedown={startRowDrag}>
+        <div style="width:40px;height:3px;border-radius:2px;background:var(--border);"></div>
+      </div>
     </div>
 </section>
 

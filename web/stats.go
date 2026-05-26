@@ -1,129 +1,20 @@
 package web
 
 import (
-	"encoding/json"
 	"net/http"
-	"sort"
-	"strings"
 	"time"
-
-	"github.com/example/blt-volume-manager/store"
 )
 
 func (s *Server) refreshStats() {
-	lockStats := map[string]interface{}{
-		"total_volumes": 0, "active": 0, "expired": 0, "unlocked": 0,
-	}
-	pillSet := map[string]bool{}
-
-	for _, volName := range s.volumeNames() {
-		pillSet[volName] = true
-	}
-
-	if s.s3Bucket != "" {
-		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName:   s.s3Bucket,
-			AwsVolumePrefix: store.VolumePrefix,
-			S3Endpoint:      s.s3Endpoint,
-			Region:          s.s3Region,
-		})
-		if err == nil {
-			markers, err := rw.ListVolumeMarkers()
-			if err == nil {
-				for _, name := range markers {
-					if strings.Contains(name, "/") || pillSet[name] {
-						pillSet[name] = true
-					} else {
-						rw.DeleteVolumeMarker(name)
-					}
-				}
-			}
-
-			for name := range pillSet {
-				rw.WriteVolumeMarker(name)
-			}
-
-			lockPrefixes, err := rw.ListCommonPrefixes(store.LockPrefix, "/")
-			if err == nil {
-				volStatus := map[string]bool{}
-				lockTTL := 24 * time.Hour
-				for _, folder := range lockPrefixes {
-					name := strings.TrimSuffix(strings.TrimPrefix(folder, store.LockPrefix), "/")
-					if name == "" {
-						continue
-					}
-					objects, err := rw.ListObjects(folder)
-					if err != nil {
-						continue
-					}
-					locked := false
-					for _, obj := range objects {
-						if obj.Key == nil {
-							continue
-						}
-						if obj.LastModified != nil && time.Since(*obj.LastModified) > lockTTL {
-							continue
-						}
-						raw, err := rw.ReadObject(*obj.Key)
-						if err != nil || raw == nil {
-							continue
-						}
-						var owner store.LockOwner
-						if err := json.Unmarshal(raw, &owner); err != nil {
-							continue
-						}
-						if owner.GetRemainingTimeinSeconds() > 0 {
-							locked = true
-							break
-						}
-					}
-					volStatus[name] = locked
-				}
-
-				active, expired := 0, 0
-				var activeVols, expiredVols []string
-				for name, locked := range volStatus {
-					if locked {
-						active++
-						activeVols = append(activeVols, name)
-					} else {
-						expired++
-						expiredVols = append(expiredVols, name)
-					}
-				}
-				sort.Strings(activeVols)
-				sort.Strings(expiredVols)
-				lockStats = map[string]interface{}{
-					"total_volumes":   len(volStatus),
-					"active":          active,
-					"expired":         expired,
-					"unlocked":        len(volStatus) - active - expired,
-					"active_volumes":  activeVols,
-					"expired_volumes": expiredVols,
-				}
-			}
-		}
-	}
+	volNames := s.volumeNames()
 
 	s.statsMu.Lock()
 	s.statsCache = map[string]interface{}{
-		"locks":         lockStats,
 		"cached_at":     time.Now().UTC().Format(time.RFC3339),
-		"total_volumes": len(pillSet),
+		"total_volumes": len(volNames),
 	}
 	s.statsCacheAt = time.Now()
 	s.statsMu.Unlock()
-
-	pills := make([]string, 0, len(pillSet))
-	for v := range pillSet {
-		pills = append(pills, v)
-	}
-	sort.Strings(pills)
-
-	s.pillsMu.Lock()
-	s.pillsCache = pills
-	s.pillsCacheAt = time.Now()
-	s.pillsMu.Unlock()
 
 	logInfo("stats_refreshed")
 }
@@ -214,7 +105,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	s.statsMu.RLock()
 	if s.statsCache != nil {
-		resp["locks"] = s.statsCache["locks"]
 		resp["cached_at"] = s.statsCache["cached_at"]
 		resp["total_volumes"] = s.statsCache["total_volumes"]
 	}
@@ -235,25 +125,14 @@ func (s *Server) handleStatsRefresh(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, cached)
 }
 
-func (s *Server) handlePills(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleVolumes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.pillsMu.RLock()
-	pills := s.pillsCache
-	at := s.pillsCacheAt
-	s.pillsMu.RUnlock()
-	if len(pills) == 0 {
-		s.refreshStats()
-		s.pillsMu.RLock()
-		pills = s.pillsCache
-		at = s.pillsCacheAt
-		s.pillsMu.RUnlock()
+	volumes := s.volumeNames()
+	if volumes == nil {
+		volumes = []string{}
 	}
-	resp := map[string]interface{}{"volumes": pills}
-	if !at.IsZero() {
-		resp["cached_at"] = at.UTC().Format(time.RFC3339)
-	}
-	respondJSON(w, resp)
+	respondJSON(w, map[string]interface{}{"volumes": volumes})
 }

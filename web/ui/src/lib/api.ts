@@ -1,7 +1,7 @@
 import type { Snapshot, LockStatus, RepoStatus, StatsResponse } from './types';
 
 export async function fetchVolumes(): Promise<string[]> {
-  const resp = await fetch('/api/pills');
+  const resp = await fetch('/api/volumes');
   const data = await resp.json() as { volumes: string[] };
   return data.volumes || [];
 }
