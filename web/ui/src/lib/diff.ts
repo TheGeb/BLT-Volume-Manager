@@ -51,8 +51,8 @@ function groupHunks(lines: DiffLine[]): DiffHunk[] {
         if (cur.length >= CTX) {
           const ctxBefore = cur.slice(-CTX);
           let firstNonCtx = ctxBefore.findIndex(l => l.type !== 'ctx');
-          if (firstNonCtx === -1) firstNonCtx = CTX;
-          const hunkLines = cur.slice(0, -(CTX - firstNonCtx));
+          const keepCtx = firstNonCtx === -1 ? CTX : CTX - firstNonCtx;
+          const hunkLines = cur.slice(0, -keepCtx);
           if (hunkLines.length > 0) {
             hunks.push(buildHunk(hunkLines));
           }
@@ -68,7 +68,7 @@ function groupHunks(lines: DiffLine[]): DiffHunk[] {
       cur.push(line);
     }
   }
-  if (cur.length > 0) {
+  if (cur.length > 0 && cur.some(l => l.type !== 'ctx')) {
     hunks.push(buildHunk(cur));
   }
   return hunks;
