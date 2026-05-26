@@ -42,7 +42,7 @@ func (m *Manager) generateHash(s Snapshot) string {
 	copy(paths, s.Paths)
 	sort.Strings(paths)
 
-	data := s.Hostname + s.Time.Format(time.RFC3339Nano) + strings.Join(paths, ",")
+	data := s.Hostname + s.Time.Format(time.RFC3339Nano) + s.Tree + strings.Join(paths, ",")
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])
 }
@@ -56,6 +56,7 @@ type Snapshot struct {
 	ID       string    `json:"id"`
 	ShortID  string    `json:"short_id"`
 	Time     time.Time `json:"time"`
+	Tree     string    `json:"tree"`
 	Tags     []string  `json:"tags"`
 	Paths    []string  `json:"paths"`
 	Hostname string    `json:"hostname"`

@@ -2,6 +2,7 @@ export interface Snapshot {
   id: string;
   short_id: string;
   time: string;
+  tree?: string;
   tags: string[];
   paths: string[];
   hostname: string;

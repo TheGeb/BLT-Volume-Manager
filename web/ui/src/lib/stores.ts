@@ -204,8 +204,7 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
       let snap = get(snapshots).find(s => s.id === opts.snapshotId || s.short_id === opts.snapshotId);
       if (!snap && opts?.fallbackHash) {
         for (const s of get(snapshots)) {
-          const paths = s.paths ? [...s.paths].sort().join(',') : '';
-          const msg = s.hostname + s.time + paths;
+          const msg = snapshotHashInput(s);
           const hash = await sha256Short(msg, s.short_id.length);
           if (hash === opts.fallbackHash) {
             snap = s;
@@ -221,8 +220,7 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
         let diffSnap = get(snapshots).find(s => s.id === opts.diffId || s.short_id === opts.diffId);
         if (!diffSnap) {
           for (const s of get(snapshots)) {
-            const paths = s.paths ? [...s.paths].sort().join(',') : '';
-            const msg = s.hostname + s.time + paths;
+            const msg = snapshotHashInput(s);
             const hash = await sha256Short(msg, s.short_id.length);
             if (hash === opts.diffFallbackHash) {
               diffSnap = s;
@@ -281,9 +279,13 @@ async function sha256Short(message: string, length: number): Promise<string> {
   return fullHash.substring(0, length);
 }
 
+function snapshotHashInput(snap: Snapshot): string {
+  const paths = snap.paths ? [...snap.paths].sort().join(',') : '';
+  return snap.hostname + snap.time + (snap.tree || '') + paths;
+}
+
 export async function onOpenViewer(snapshot: Snapshot) {
-  const paths = snapshot.paths ? [...snapshot.paths].sort().join(',') : '';
-  const msg = snapshot.hostname + snapshot.time + paths;
+  const msg = snapshotHashInput(snapshot);
   const hash = await sha256Short(msg, snapshot.short_id.length);
   snapshot.fallbackHash = hash;
 
@@ -305,8 +307,7 @@ export function onCloseViewer() {
 export async function setDiffTarget(id: string) {
   const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
   if (snap) {
-    const paths = snap.paths ? [...snap.paths].sort().join(',') : '';
-    const msg = snap.hostname + snap.time + paths;
+    const msg = snapshotHashInput(snap);
     const hash = await sha256Short(msg, snap.short_id.length);
     snap.fallbackHash = hash;
   }
@@ -482,8 +483,7 @@ function buildUrl(): string {
       if (dtSnap && dtSnap.fallbackHash) {
         p.set('diffFallbackHash', dtSnap.fallbackHash);
       } else if (dtSnap) {
-        const paths = dtSnap.paths ? [...dtSnap.paths].sort().join(',') : '';
-        const msg = dtSnap.hostname + dtSnap.time + paths;
+        const msg = snapshotHashInput(dtSnap);
         sha256Short(msg, dtSnap.short_id.length).then(h => {
           dtSnap.fallbackHash = h;
           syncUrl();
