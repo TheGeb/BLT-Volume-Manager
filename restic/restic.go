@@ -17,8 +17,6 @@ import (
 	"time"
 )
 
-// ... existing code ...
-
 // FindSnapshotByHash searches for a snapshot matching the criteria derived from host + time + paths.
 func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	snapshots, err := m.ListSnapshots()
@@ -27,8 +25,11 @@ func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	}
 
 	for _, s := range snapshots {
-		h := m.generateHash(s)
-		if h == hash {
+		// Use same length as shortID
+		fullHash := m.generateHash(s)
+		shortHash := fullHash[:len(s.ShortID)]
+		log.Printf("Comparing hash: %s with snapshot %s (full: %s, short: %s)", hash, s.ID, fullHash, shortHash)
+		if shortHash == hash {
 			return &s, nil
 		}
 	}
@@ -41,7 +42,7 @@ func (m *Manager) generateHash(s Snapshot) string {
 	copy(paths, s.Paths)
 	sort.Strings(paths)
 
-	data := fmt.Sprintf("%s|%d|%s", s.Hostname, s.Time.Unix(), strings.Join(paths, ","))
+	data := s.Hostname + s.Time.Format(time.RFC3339Nano) + strings.Join(paths, ",")
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])
 }

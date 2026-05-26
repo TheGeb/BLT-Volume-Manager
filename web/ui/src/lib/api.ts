@@ -86,8 +86,8 @@ export async function fetchFileContent(snapshotId: string, volume: string, path:
 
 export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string, hashA?: string, hashB?: string): Promise<any> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotA)}/diff/${encodeURIComponent(snapshotB)}?volume=${encodeURIComponent(volume)}`;
-  if (hashA) url += `&fallbackHashA=${encodeURIComponent(hashA)}`;
-  if (hashB) url += `&fallbackHashB=${encodeURIComponent(hashB)}`;
+  if (hashA) url += `&fallbackHash=${encodeURIComponent(hashA)}`;
+  if (hashB) url += `&diffFallbackHash=${encodeURIComponent(hashB)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to get diff');
   return resp.json() as Promise<any>;

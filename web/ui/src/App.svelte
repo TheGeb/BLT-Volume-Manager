@@ -50,6 +50,8 @@
         tab: params.get('tab') || undefined,
         snapshotId: params.get('snapshot') || undefined,
         diffId: params.get('diff') || undefined,
+        fallbackHash: params.get('fallbackHash') || undefined,
+        diffFallbackHash: params.get('diffFallbackHash') || undefined,
       });
     }
     loading.set(false);

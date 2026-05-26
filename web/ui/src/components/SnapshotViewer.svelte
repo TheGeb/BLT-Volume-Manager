@@ -128,7 +128,8 @@
     const msgUint8 = new TextEncoder().encode(msg);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const fullHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return fullHash.substring(0, snap.short_id.length);
   }
 
   async function open() {
@@ -141,10 +142,10 @@
     diffOtherId = '';
     sideBySide = false;
     try {
-      nodes = await api.fetchFileTree(snapshot.id, snapshot.volume);
-      await populateCompareSelect();
-      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget)) {
-        selectedCompareId = initialDiffTarget;
+      nodes = await api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash);
+      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget)) {
+        const target = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
+        selectedCompareId = target ? target.id : initialDiffTarget;
         await doDiff();
       }
     } catch (e: any) {
@@ -154,12 +155,11 @@
     }
   }
 
-  async function populateCompareSelect() {
-    compareLoading = true;
-    compareSnaps = allSnapshots.filter(s => s.id !== snapshot.id);
-    if (compareSnaps.length > 0) {
-      selectedCompareId = compareSnaps[0].id;
-    }
+  $: compareSnaps = allSnapshots.filter(s => s.id !== snapshot.id);
+  $: if (compareSnaps.length > 0 && !selectedCompareId) {
+    selectedCompareId = compareSnaps[0].id;
+  }
+  $: if (allSnapshots.length > 0) {
     compareLoading = false;
   }
 
@@ -169,7 +169,7 @@
     diffOtherId = selectedCompareId;
     try {
       const snapA = snapshot;
-      const snapB = compareSnaps.find(s => s.id === selectedCompareId)!;
+      const snapB = compareSnaps.find(s => s.id === selectedCompareId || s.short_id === selectedCompareId)!;
       const [hashA, hashB] = await Promise.all([
         generateFallbackHash(snapA),
         generateFallbackHash(snapB)

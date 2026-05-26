@@ -150,22 +150,6 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) resolveSnapshotID(rm *restic.Manager, idOrHash string, r *http.Request) (string, error) {
-	// If it's a valid ID (assume 8 chars minimum for short ID), try to list to check if it exists
-	// This is a heuristic. A robust way is to just try a command or have a cache.
-	// For now, if length matches an ID or it doesn't look like our hash, treat as ID.
-	if len(idOrHash) >= 8 {
-		return idOrHash, nil
-	}
-
-	// Assume it's a fallback hash
-	snap, err := rm.FindSnapshotByHash(idOrHash)
-	if err != nil {
-		return "", err
-	}
-	return snap.ID, nil
-}
-
 func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
 		http.NotFound(w, r)
@@ -185,23 +169,9 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.volumeManager(volName)
-	
-	snapshotID, err := s.resolveSnapshotID(rm, parts[0], r)
-	if err != nil {
-		hash := r.URL.Query().Get("fallbackHash")
-		if hash != "" {
-			var snap *restic.Snapshot
-			snap, err = rm.FindSnapshotByHash(hash)
-			if err == nil {
-				snapshotID = snap.ID
-			}
-		}
-	}
-	if err != nil {
-		respondError(w, err, http.StatusNotFound)
-		return
-	}
 
+	rawID := parts[0]
+	fallbackHash := r.URL.Query().Get("fallbackHash")
 	action := parts[1]
 
 	switch action {
@@ -211,7 +181,12 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		path := r.URL.Query().Get("path")
-		nodes, err := rm.ListSnapshotFiles(snapshotID, path)
+		nodes, err := rm.ListSnapshotFiles(rawID, path)
+		if err != nil && fallbackHash != "" {
+			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+				nodes, err = rm.ListSnapshotFiles(snap.ID, path)
+			}
+		}
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -228,7 +203,12 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing path", http.StatusBadRequest)
 			return
 		}
-		data, err := rm.DumpFile(snapshotID, path)
+		data, err := rm.DumpFile(rawID, path)
+		if err != nil && fallbackHash != "" {
+			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+				data, err = rm.DumpFile(snap.ID, path)
+			}
+		}
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -245,26 +225,26 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing second snapshot id", http.StatusBadRequest)
 			return
 		}
-		
-		secondID, err := s.resolveSnapshotID(rm, parts[2], r)
+
+		secondID := parts[2]
+		diffFallback := r.URL.Query().Get("diffFallbackHash")
+		result, err := rm.DiffSnapshots(rawID, secondID)
 		if err != nil {
-			hashB := r.URL.Query().Get("fallbackHashB")
-			if hashB != "" {
-				var snap *restic.Snapshot
-				snap, err = rm.FindSnapshotByHash(hashB)
-				if err == nil {
-					secondID = snap.ID
+			resolvedFirst, resolvedSecond := rawID, secondID
+			if fallbackHash != "" {
+				if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+					resolvedFirst = snap.ID
 				}
 			}
+			if diffFallback != "" {
+				if snap, lookupErr := rm.FindSnapshotByHash(diffFallback); lookupErr == nil {
+					resolvedSecond = snap.ID
+				}
+			}
+			result, err = rm.DiffSnapshots(resolvedFirst, resolvedSecond)
 		}
 		if err != nil {
 			respondError(w, err, http.StatusNotFound)
-			return
-		}
-		
-		result, err := rm.DiffSnapshots(snapshotID, secondID)
-		if err != nil {
-			respondError(w, err, http.StatusInternalServerError)
 			return
 		}
 		respondJSON(w, result)
