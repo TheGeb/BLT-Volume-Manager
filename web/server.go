@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +65,41 @@ func (s *Server) Register(mux *http.ServeMux) {
 	if err != nil {
 		panic(err)
 	}
-	inner.Handle("/", http.FileServer(http.FS(uiFS)))
+	rootFileServer := http.FileServer(http.FS(uiFS))
+	uiHandler := http.StripPrefix("/ui", rootFileServer)
+
+	// Serve root-level static assets (e.g. /assets/*, /base.css, /index.html)
+	inner.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/ui/", http.StatusFound)
+			return
+		}
+		rootFileServer.ServeHTTP(w, r)
+	})
+
+	// SPA at /ui/ — serve files directly, fallback to index.html for client-side routes
+	inner.HandleFunc("/ui/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/ui")
+		if path == "" || path == "/" {
+			uiHandler.ServeHTTP(w, r)
+			return
+		}
+		if _, err := uiFS.Open(strings.TrimPrefix(path, "/")); err == nil {
+			uiHandler.ServeHTTP(w, r)
+			return
+		}
+		data, err := fs.ReadFile(uiFS, "index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	})
+	inner.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ui/", http.StatusFound)
+	})
 
 	mux.Handle("/", loggingMiddleware(inner))
 }

@@ -464,9 +464,9 @@ export async function handleSizeLoaded(id: string) {
 
 function buildUrl(): string {
   const vol = get(selectedVolume);
-  if (!vol) return '/';
+  if (!vol) return '/ui';
+  const encodedVol = vol.split('/').map(encodeURIComponent).join('/');
   const p = new URLSearchParams();
-  p.set('volume', vol);
   if (get(activeTab) === 'repo') p.set('tab', 'repo');
   if (get(viewerOpen) && get(currentSnapshot)) {
     const snap = get(currentSnapshot)!;
@@ -482,18 +482,17 @@ function buildUrl(): string {
       if (dtSnap && dtSnap.fallbackHash) {
         p.set('diffFallbackHash', dtSnap.fallbackHash);
       } else if (dtSnap) {
-        // Fallback for when diffFallbackHash isn't generated yet (syncing issues)
         const paths = dtSnap.paths ? [...dtSnap.paths].sort().join(',') : '';
         const msg = dtSnap.hostname + dtSnap.time + paths;
         sha256Short(msg, dtSnap.short_id.length).then(h => {
           dtSnap.fallbackHash = h;
-          // Trigger syncUrl to catch up once calculated
           syncUrl();
         });
       }
     }
   }
-  return '/?' + p.toString();
+  const qs = p.toString();
+  return qs ? `/ui/volume/${encodedVol}?${qs}` : `/ui/volume/${encodedVol}`;
 }
 
 export function syncUrl() {

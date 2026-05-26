@@ -44,7 +44,17 @@
     }
 
     const params = new URLSearchParams(window.location.search);
-    const volFromUrl = params.get('volume');
+
+    // Volume from path: /ui/volume/1/2/test
+    let volFromUrl = '';
+    const path = window.location.pathname;
+    const volumePrefix = '/ui/volume/';
+    if (path.startsWith(volumePrefix)) {
+      volFromUrl = path.slice(volumePrefix.length);
+      // Decode any percent-encoded segments
+      volFromUrl = volFromUrl.split('/').map(decodeURIComponent).join('/');
+    }
+
     if (volFromUrl && $volumes.includes(volFromUrl)) {
       await navigateTo(volFromUrl, {
         tab: params.get('tab') || undefined,
