@@ -201,3 +201,50 @@ func TestCommonPathPrefixIdentical(t *testing.T) {
 		t.Errorf("expected '/a/b/c', got %q", got)
 	}
 }
+
+func TestPathBelongsToVolume(t *testing.T) {
+	tests := []struct {
+		path    string
+		volume  string
+		want    bool
+	}{
+		{"/var/lib/docker-volumes/volumes/my-vol/data/file.txt", "my-vol", true},
+		{"/volumes/my-vol/data", "my-vol", true},
+		{"/volumes/group/sub-vol/data", "group", true},
+		{"/volumes/group/sub-vol/data", "group/sub-vol", true},
+		{"/volumes/", "my-vol", false},
+		{"/some/path/vol1-cold-snap", "vol1", true},
+		{"/some/path/vol1-pre-restore", "vol1", true},
+		{"/snaps/group/sub-vol-cold-snap", "group/sub-vol", true},
+		{"/some/path", "vol1", false},
+		{"", "vol1", false},
+		{"/snaps/my-vol-cold-snap", "vol", false},
+		{"/volumes/other-vol", "my-vol", false},
+	}
+
+	for _, tt := range tests {
+		got := pathBelongsToVolume(tt.path, tt.volume)
+		if got != tt.want {
+			t.Errorf("pathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
+		}
+	}
+}
+
+func TestPathBelongsToVolumeColdSnapEdgeCases(t *testing.T) {
+	tests := []struct {
+		path    string
+		volume  string
+		want    bool
+	}{
+		{"/snaps/my-vol-cold-snap", "my-vol", true},
+		{"/snaps/group/sub-vol-cold-snap", "group/sub-vol", true},
+		{"/snaps/vol-cold-snap", "vol", true},
+		{"/snaps/other-vol-cold-snap", "vol", false},
+	}
+	for _, tt := range tests {
+		got := pathBelongsToVolume(tt.path, tt.volume)
+		if got != tt.want {
+			t.Errorf("pathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
+		}
+	}
+}

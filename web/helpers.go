@@ -35,9 +35,27 @@ func volumeNameFromPath(path string) string {
 	return parts[len(parts)-1]
 }
 
+// pathBelongsToVolume checks whether a snapshot path belongs to the given volume.
+// Unlike volumeNameFromPath, this handles nested volume names containing "/".
+func pathBelongsToVolume(snapPath, volume string) bool {
+	marker := "/volumes/"
+	if idx := strings.Index(snapPath, marker); idx >= 0 {
+		rest := strings.TrimPrefix(snapPath[idx+len(marker):], "/")
+		if rest == volume || strings.HasPrefix(rest, volume+"/") {
+			return true
+		}
+	}
+	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
+		if strings.HasSuffix(snapPath, "/"+volume+suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 func snapshotMatchesVolume(snapshot restic.Snapshot, volume string) bool {
 	for _, path := range snapshot.Paths {
-		if volumeNameFromPath(path) == volume {
+		if pathBelongsToVolume(path, volume) {
 			return true
 		}
 	}

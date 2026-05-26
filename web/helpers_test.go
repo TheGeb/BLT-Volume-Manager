@@ -69,6 +69,12 @@ func TestSnapshotMatchesVolumeNested(t *testing.T) {
 	if !snapshotMatchesVolume(snap, "group") {
 		t.Error("expected match for group volume")
 	}
+	if !snapshotMatchesVolume(snap, "group/sub-vol") {
+		t.Error("expected match for nested volume group/sub-vol")
+	}
+	if snapshotMatchesVolume(snap, "other") {
+		t.Error("expected no match for other volume")
+	}
 }
 
 func TestMustHostname(t *testing.T) {

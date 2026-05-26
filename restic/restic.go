@@ -313,7 +313,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "stats", snapshotID, "--json")  //TODO: No-lock?
+	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", snapshotID, "--json")
 	if err != nil {
 		return nil, err
 	}
@@ -360,6 +360,39 @@ func volumeNameFromPath(path string) string {
 	return ""
 }
 
+// pathBelongsToVolume checks whether a snapshot path belongs to the given volume.
+// Unlike volumeNameFromPath, this handles nested volume names containing "/" because
+// it uses the volume name as context rather than trying to extract an unknown name.
+func pathBelongsToVolume(snapPath, volume string) bool {
+	marker := "/volumes/"
+	if idx := strings.Index(snapPath, marker); idx >= 0 {
+		rest := strings.TrimPrefix(snapPath[idx+len(marker):], "/")
+		if rest == volume || strings.HasPrefix(rest, volume+"/") {
+			return true
+		}
+	}
+	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
+		if strings.HasSuffix(snapPath, "/"+volume+suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+// retryUntag calls UntagSnapshot with retries to handle transient restic lock contention.
+func retryUntag(m *Manager, snapshotID, tag string) error {
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		if err := m.UntagSnapshot(snapshotID, tag); err != nil {
+			lastErr = err
+			time.Sleep(time.Duration(1<<i) * time.Second)
+			continue
+		}
+		return nil
+	}
+	return lastErr
+}
+
 var setRPMutex sync.Mutex
 
 // SetRestorePoint tags a snapshot as the restore-point for its volume.
@@ -381,31 +414,23 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		// If command fails (e.g. no snapshots with tag), assume no existing restore point
-		log.Printf("failed to list restore-point snapshots: %v", err)
-	} else {
-		var snapshots []Snapshot
-		if err := json.Unmarshal(out, &snapshots); err == nil {
-			for _, snap := range snapshots {
-				if snap.ID == snapshotID {
-					continue
-				}
+		return fmt.Errorf("list restore-point snapshots: %w", err)
+	}
+	var snapshots []Snapshot
+	if err := json.Unmarshal(out, &snapshots); err != nil {
+		return fmt.Errorf("parse restore-point snapshots: %w", err)
+	}
+	for _, snap := range snapshots {
+		if snap.ID == snapshotID {
+			continue
+		}
 
-				// Check if it belongs to the same volume
-				snapVolume := ""
-				for _, p := range snap.Paths {
-					if v := volumeNameFromPath(p); v != "" {
-						snapVolume = v
-						break
-					}
+		for _, p := range snap.Paths {
+			if pathBelongsToVolume(p, volume) {
+				if err := retryUntag(m, snap.ID, "restore-point"); err != nil {
+					return fmt.Errorf("remove previous restore-point from %s: %w", snap.ID, err)
 				}
-				if snapVolume != volume {
-					continue
-				}
-
-				if err := m.UntagSnapshot(snap.ID, "restore-point"); err != nil {
-					log.Printf("warning: failed to remove restore-point from %s: %v", snap.ID, err)
-				}
+				break
 			}
 		}
 	}
@@ -425,7 +450,12 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", fmt.Errorf("list snapshots: %w", err)
 	}
 
-	targetVolume := volumeNameFromPath(volPath)
+	marker := "/volumes/"
+	idx := strings.Index(volPath, marker)
+	if idx < 0 {
+		return "", nil
+	}
+	targetVolume := strings.TrimPrefix(volPath[idx+len(marker):], "/")
 	if targetVolume == "" {
 		return "", nil
 	}
@@ -436,7 +466,7 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 			continue
 		}
 		for _, p := range snap.Paths {
-			if volumeNameFromPath(p) == targetVolume {
+			if pathBelongsToVolume(p, targetVolume) {
 				candidates = append(candidates, snap)
 				break
 			}
@@ -497,11 +527,11 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	args := []string{"ls", snapshotID}
+	args := []string{"ls", "--no-lock", snapshotID}
 	if path != "" && path != "/" {
 		args = append(args, path)
 	}
-	cmd, err := m.resticCommand(ctx, args...)  //TODO: No-lock?
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -600,7 +630,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "dump", snapshotID, path)  //TODO: No-lock?
+	cmd, err := m.resticCommand(ctx, "dump", "--no-lock", snapshotID, path)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +646,7 @@ func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "diff", snapID1, snapID2) //TODO: No-lock?
+	cmd, err := m.resticCommand(ctx, "diff", "--no-lock", snapID1, snapID2)
 	if err != nil {
 		return nil, err
 	}

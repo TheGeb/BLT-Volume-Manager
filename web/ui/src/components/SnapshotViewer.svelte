@@ -155,27 +155,51 @@
   $: if (compareSnaps.length > 0 && !selectedCompareId) {
     selectedCompareId = compareSnaps[0].id;
   }
+  let lastInitialDiffTarget = '';
+  $: if (initialDiffTarget) {
+    const found = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
+    if (found) {
+      if (found.id !== selectedCompareId) {
+        selectedCompareId = found.id;
+      }
+      if (lastInitialDiffTarget && lastInitialDiffTarget !== initialDiffTarget) {
+        const prevStale = !compareSnaps.some(s => s.id === lastInitialDiffTarget || s.short_id === lastInitialDiffTarget);
+        if (prevStale) {
+          doDiff(true);
+        }
+      }
+      lastInitialDiffTarget = initialDiffTarget;
+    } else {
+      lastInitialDiffTarget = initialDiffTarget;
+    }
+  } else if (selectedCompareId && compareSnaps.length > 0 && !compareSnaps.some(s => s.id === selectedCompareId || s.short_id === selectedCompareId)) {
+    selectedCompareId = compareSnaps[0].id;
+  }
   $: if (allSnapshots.length > 0) {
     compareLoading = false;
   }
 
-  async function doDiff() {
+  async function doDiff(skipCallback = false) {
     if (!selectedCompareId) return;
+    const targetId = selectedCompareId;
     diffLoading = true;
-    diffOtherId = selectedCompareId;
+    diffOtherId = targetId;
     try {
       const snapA = snapshot;
-      const snapB = compareSnaps.find(s => s.id === selectedCompareId || s.short_id === selectedCompareId)!;
+      const snapB = compareSnaps.find(s => s.id === targetId || s.short_id === targetId)!;
       const [hashA, hashB] = await Promise.all([
         getSnapshotHash(snapA),
         getSnapshotHash(snapB)
       ]);
-      const result = await api.fetchDiff(snapshot.id, selectedCompareId, snapshot.volume, hashA, hashB);
+      const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume, hashA, hashB);
+      if (diffOtherId !== targetId) return;
       currentDiffResult = result;
       sideBySide = false;
       fileContent = '';
       fileContentPath = '';
-      onDiffChange(selectedCompareId);
+      if (!skipCallback) {
+        onDiffChange(targetId);
+      }
     } catch (e: any) {
       error = e.message;
     } finally {

@@ -23,7 +23,7 @@ export const stats = writable<StatsResponse | null>(null);
 export const statsLoading = writable(false);
 export const sizes = writable<Record<string, string>>({});
 export const currentSnapshot = writable<Snapshot | null>(null);
-export const allSnapshots = writable<Snapshot[]>([]);
+export const allSnapshots = derived(snapshots, $s => $s);
 export const viewerOpen = writable(false);
 export const checking = writable(false);
 export const repairing = writable(false);
@@ -43,6 +43,7 @@ export const landingShown = writable(true);
 export const rpLoading = writable<Record<string, boolean>>({});
 export const sizeLoading = writable<Record<string, boolean>>({});
 export const diffTargetId = writable('');
+export const diffTargetFallbackHash = writable('');
 export const volumeLockInfo = writable<Record<string, VolumeLockInfo>>({});
 
 export const filteredVolumes = derived(
@@ -129,6 +130,7 @@ export async function loadSnapshots(volume: string) {
     setBanner('Failed to load snapshots', true);
   } finally {
     snapsLoading.set(false);
+    reconcileViewerSnapshots();
   }
 }
 
@@ -153,7 +155,6 @@ export async function loadStats(volume: string) {
 
 export async function loadAll(volume: string) {
   selectedVolume.set(volume);
-  allSnapshots.set([]);
   viewerOpen.set(false);
   currentSnapshot.set(null);
   sizes.set({});
@@ -161,6 +162,7 @@ export async function loadAll(volume: string) {
   deleteSnapModal.set(false);
   testStatus.set('');
   diffTargetId.set('');
+  diffTargetFallbackHash.set('');
   landingShown.set(!volume);
   if (volume) {
     await Promise.all([
@@ -174,7 +176,6 @@ export async function loadAll(volume: string) {
 
 export async function navigateTo(volume: string, opts?: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string }) {
   selectedVolume.set(volume);
-  allSnapshots.set([]);
   sizes.set({});
   deleteVolModal.set(false);
   deleteSnapModal.set(false);
@@ -187,10 +188,16 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
   if (tab === 'snapshots' && opts?.snapshotId) {
     viewerOpen.set(true);
     diffTargetId.set(opts.diffId || '');
+    if (opts.diffFallbackHash) {
+      diffTargetFallbackHash.set(opts.diffFallbackHash);
+    } else if (!opts.diffId) {
+      diffTargetFallbackHash.set('');
+    }
   } else {
     viewerOpen.set(false);
     currentSnapshot.set(null);
     diffTargetId.set('');
+    diffTargetFallbackHash.set('');
   }
 
   if (tab === 'repo') {
@@ -230,11 +237,11 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
         }
         if (diffSnap) {
           diffSnap.fallbackHash = opts.diffFallbackHash;
+          diffTargetFallbackHash.set(opts.diffFallbackHash);
           diffTargetId.set(diffSnap.id);
         }
       }
     }
-    allSnapshots.set(get(snapshots));
   }
 
   syncUrl();
@@ -298,7 +305,6 @@ export async function onOpenViewer(snapshot: Snapshot) {
   snapshot.fallbackHash = hash;
 
   currentSnapshot.set(snapshot);
-  allSnapshots.set(get(snapshots));
   viewerOpen.set(true);
   diffTargetId.set('');
   syncUrl();
@@ -307,19 +313,19 @@ export async function onOpenViewer(snapshot: Snapshot) {
 export function onCloseViewer() {
   viewerOpen.set(false);
   currentSnapshot.set(null);
-  allSnapshots.set([]);
   diffTargetId.set('');
+  diffTargetFallbackHash.set('');
   syncUrl();
 }
 
 export async function setDiffTarget(id: string) {
   const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
-  if (snap) {
-    const msg = snapshotHashInput(snap);
-    const hash = await sha256Short(msg, snap.short_id.length);
-    snap.fallbackHash = hash;
-  }
-  diffTargetId.set(id);
+  if (!snap) return;
+  const msg = snapshotHashInput(snap);
+  const hash = await sha256Short(msg, snap.short_id.length);
+  snap.fallbackHash = hash;
+  diffTargetFallbackHash.set(hash);
+  diffTargetId.set(snap.id);
   syncUrl();
 }
 
@@ -328,6 +334,7 @@ export async function onAddTag(id: string, tag: string, vol: string) {
   try {
     const snaps = await api.addTag(id, tag, vol);
     snapshots.set(snaps);
+    reconcileViewerSnapshots();
   } catch (e) {
     setBanner(`Failed to add tag: ${e}`, true);
     await loadSnapshots(vol);
@@ -341,6 +348,7 @@ export async function onRemoveTag(id: string, tag: string, vol: string) {
   try {
     const snaps = await api.removeTag(id, tag, vol);
     snapshots.set(snaps);
+    reconcileViewerSnapshots();
   } catch (e) {
     setBanner(`Failed to remove tag: ${e}`, true);
     await loadSnapshots(vol);
@@ -386,7 +394,6 @@ export async function confirmDeleteVolume() {
     setBanner(`Volume ${vol} deleted`);
     selectedVolume.set('');
     landingShown.set(true);
-    allSnapshots.set([]);
     currentSnapshot.set(null);
     viewerOpen.set(false);
     sizes.set({});
@@ -471,6 +478,60 @@ export async function handleSizeLoaded(id: string) {
   }
 }
 
+async function reconcileViewerSnapshots() {
+  if (!get(viewerOpen) || !get(currentSnapshot)) return;
+
+  const $snapshots = get(snapshots);
+  const $current = get(currentSnapshot)!;
+  const $diffId = get(diffTargetId);
+
+  let found = $snapshots.find(s => s.id === $current.id || s.short_id === $current.short_id);
+  if (!found && $current.fallbackHash) {
+    const hash = $current.fallbackHash;
+    for (const s of $snapshots) {
+      const msg = snapshotHashInput(s);
+      const computed = await sha256Short(msg, s.short_id.length);
+      if (computed === hash) {
+        found = s;
+        s.fallbackHash = hash;
+        break;
+      }
+    }
+  }
+
+  if (found) {
+    currentSnapshot.set(found);
+  } else {
+    currentSnapshot.set(null);
+    viewerOpen.set(false);
+    diffTargetId.set('');
+    return;
+  }
+
+  if ($diffId) {
+    let dtSnap = $snapshots.find(s => s.id === $diffId || s.short_id === $diffId);
+    if (!dtSnap) {
+      const $hash = get(diffTargetFallbackHash);
+      if ($hash) {
+        for (const s of $snapshots) {
+          const msg = snapshotHashInput(s);
+          const computed = await sha256Short(msg, s.short_id.length);
+          if (computed === $hash) {
+            dtSnap = s;
+            break;
+          }
+        }
+      }
+    }
+    if (dtSnap) {
+      diffTargetId.set(dtSnap.id);
+    } else {
+      diffTargetId.set('');
+      diffTargetFallbackHash.set('');
+    }
+  }
+}
+
 function buildUrl(): string {
   const vol = get(selectedVolume);
   if (!vol) return '/ui';
@@ -487,15 +548,18 @@ function buildUrl(): string {
     const dtId = get(diffTargetId);
     if (dtId) {
       const dtSnap = get(allSnapshots).find(s => s.id === dtId || s.short_id === dtId);
-      p.set('diff', dtSnap ? dtSnap.short_id : dtId);
-      if (dtSnap && dtSnap.fallbackHash) {
-        p.set('diffFallbackHash', dtSnap.fallbackHash);
-      } else if (dtSnap) {
-        const msg = snapshotHashInput(dtSnap);
-        sha256Short(msg, dtSnap.short_id.length).then(h => {
-          dtSnap.fallbackHash = h;
-          syncUrl();
-        });
+      if (dtSnap) {
+        p.set('diff', dtSnap.short_id);
+        const hash = dtSnap.fallbackHash || get(diffTargetFallbackHash);
+        if (hash) {
+          p.set('diffFallbackHash', hash);
+        } else {
+          const msg = snapshotHashInput(dtSnap);
+          sha256Short(msg, dtSnap.short_id.length).then(h => {
+            dtSnap.fallbackHash = h;
+            syncUrl();
+          });
+        }
       }
     }
   }
