@@ -271,7 +271,7 @@ export function onFilterChange(f: string) { volumeFilter.set(f); }
 export function onTypeFilter(t: string) { typeFilter.set(t); }
 export function onHostFilter(h: string) { hostFilter.set(h); }
 
-async function sha256Short(message: string, length: number): Promise<string> {
+export async function sha256Short(message: string, length: number): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -279,9 +279,17 @@ async function sha256Short(message: string, length: number): Promise<string> {
   return fullHash.substring(0, length);
 }
 
-function snapshotHashInput(snap: Snapshot): string {
+export function snapshotHashInput(snap: Snapshot): string {
   const paths = snap.paths ? [...snap.paths].sort().join(',') : '';
   return snap.hostname + snap.time + (snap.tree || '') + paths;
+}
+
+export async function getSnapshotHash(snap: Snapshot): Promise<string> {
+  if (snap.fallbackHash) return snap.fallbackHash;
+  const msg = snapshotHashInput(snap);
+  const hash = await sha256Short(msg, snap.short_id.length);
+  snap.fallbackHash = hash;
+  return hash;
 }
 
 export async function onOpenViewer(snapshot: Snapshot) {

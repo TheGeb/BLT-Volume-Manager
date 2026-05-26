@@ -4,6 +4,7 @@
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
   import * as api from '../lib/api';
+  import { getSnapshotHash } from '../lib/stores';
   import FileTreeNode from './FileTreeNode.svelte';
 
   export let snapshot: Snapshot;
@@ -123,15 +124,6 @@
     node.dirDiffType = hasChildWithType ? result : null;
   }
 
-  async function generateFallbackHash(snap: Snapshot): Promise<string> {
-    const msg = snap.hostname + snap.time + snap.paths.sort().join(',');
-    const msgUint8 = new TextEncoder().encode(msg);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const fullHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return fullHash.substring(0, snap.short_id.length);
-  }
-
   async function open() {
     loading = true;
     error = '';
@@ -142,12 +134,16 @@
     diffOtherId = '';
     sideBySide = false;
     try {
-      nodes = await api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash);
-      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget)) {
+      const shouldDiff = initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
+      if (shouldDiff) {
         const target = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
         selectedCompareId = target ? target.id : initialDiffTarget;
-        await doDiff();
       }
+      const [fetchedNodes] = await Promise.all([
+        api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash),
+        shouldDiff ? doDiff() : Promise.resolve(),
+      ]);
+      nodes = fetchedNodes;
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -171,8 +167,8 @@
       const snapA = snapshot;
       const snapB = compareSnaps.find(s => s.id === selectedCompareId || s.short_id === selectedCompareId)!;
       const [hashA, hashB] = await Promise.all([
-        generateFallbackHash(snapA),
-        generateFallbackHash(snapB)
+        getSnapshotHash(snapA),
+        getSnapshotHash(snapB)
       ]);
       const result = await api.fetchDiff(snapshot.id, selectedCompareId, snapshot.volume, hashA, hashB);
       currentDiffResult = result;
@@ -203,8 +199,7 @@
     currentDiffHunks = [];
     error = '';
     try {
-      const hash = await generateFallbackHash(snapshot);
-      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume, path, hash);
+      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume, path, await getSnapshotHash(snapshot));
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -219,8 +214,7 @@
     error = '';
     try {
       const snap = allSnapshots.find(s => s.id === id)!;
-      const hash = await generateFallbackHash(snap);
-      fileContent = await api.fetchFileContent(id, snapshot.volume, path, hash);
+      fileContent = await api.fetchFileContent(id, snapshot.volume, path, await getSnapshotHash(snap));
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -238,8 +232,8 @@
       const snapA = snapshot;
       const snapB = allSnapshots.find(s => s.id === otherId)!;
       const [hashA, hashB] = await Promise.all([
-        generateFallbackHash(snapA),
-        generateFallbackHash(snapB)
+        getSnapshotHash(snapA),
+        getSnapshotHash(snapB)
       ]);
       const [oldContent, newContent] = await Promise.all([
         api.fetchFileContent(snapshot.id, snapshot.volume, path, hashA),
