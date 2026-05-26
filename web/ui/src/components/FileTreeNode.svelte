@@ -76,7 +76,7 @@
     on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}>
-    <div style="width:22px; display:flex; justify-content:center; align-items:center;">
+    <div style="width:22px; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
         style="transform:rotate({localExpanded ? 0 : -90}deg);opacity:0.5;transition:transform 0.15s;">
         <path d="M7 10l5 5 5-5H7z"/>
@@ -102,7 +102,7 @@
     on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}>
-    <div style="width:16px"></div>
+    <div style="width:16px; flex-shrink:0;"></div>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
     </svg>

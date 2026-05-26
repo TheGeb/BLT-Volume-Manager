@@ -286,10 +286,17 @@
 
   let colDragging = false;
   let rowDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let startWidth = 0;
+  let startHeight = 0;
+  let startMaxHeight = 0;
 
   function startColDrag(e: MouseEvent) {
     e.preventDefault();
     colDragging = true;
+    startX = e.clientX;
+    startWidth = treePanelEl ? treePanelEl.offsetWidth : 300;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }
@@ -297,6 +304,14 @@
   function startRowDrag(e: MouseEvent) {
     e.preventDefault();
     rowDragging = true;
+    startY = e.clientY;
+    startHeight = contentEl ? contentEl.offsetHeight : 400;
+    if (contentEl) {
+      const contentRect = contentEl.getBoundingClientRect();
+      startMaxHeight = window.innerHeight - contentRect.top - 40;
+    } else {
+      startMaxHeight = window.innerHeight - 200;
+    }
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
   }
@@ -306,19 +321,19 @@
       const rect = contentEl.getBoundingClientRect();
       const minW = 200;
       const maxW = rect.width - 200;
-      let w = e.clientX - rect.left;
+      const deltaX = e.clientX - startX;
+      let w = startWidth + deltaX;
       if (w < minW) w = minW;
       if (w > maxW) w = maxW;
       treePanelEl.style.minWidth = '0';
       treePanelEl.style.flex = `0 0 ${w}px`;
     }
     if (rowDragging && contentEl) {
-      const contentRect = contentEl.getBoundingClientRect();
       const minH = 200;
-      const maxH = window.innerHeight - contentRect.top - 40;
-      let h = e.clientY - contentRect.top;
+      const deltaY = e.clientY - startY;
+      let h = startHeight + deltaY;
       if (h < minH) h = minH;
-      if (h > maxH) h = maxH;
+      if (h > startMaxHeight) h = startMaxHeight;
       contentEl.style.height = h + 'px';
     }
   }
