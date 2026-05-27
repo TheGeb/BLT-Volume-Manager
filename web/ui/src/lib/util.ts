@@ -21,6 +21,12 @@ export function formatDuration(totalSeconds: number): string {
   return parts.join(' ') + ' remaining';
 }
 
+export function formatExpiration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return 'Expired';
+  const expDate = new Date(Date.now() + totalSeconds * 1000);
+  return `Expires: ${expDate.toLocaleString()}`;
+}
+
 export function escapeHtml(s: string): string {
   const div = document.createElement('div');
   div.textContent = s;

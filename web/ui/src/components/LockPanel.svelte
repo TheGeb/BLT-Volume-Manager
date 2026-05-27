@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LockStatus } from '../lib/types';
-  import { formatDuration } from '../lib/util';
+  import { formatExpiration } from '../lib/util';
   import * as api from '../lib/api';
 
   export let lockStatus: LockStatus | null = null;
@@ -42,7 +42,7 @@
         <div class="panel-info-secondary">Owner: {lockStatus.owner}</div>
       {/if}
       {#if lockStatus.expires_in != null}
-        <div class="lock-expiry">{formatDuration(lockStatus.expires_in)}</div>
+        <div class="lock-expiry">{formatExpiration(lockStatus.expires_in)}</div>
       {/if}
     </div>
     <div class="lock-actions">

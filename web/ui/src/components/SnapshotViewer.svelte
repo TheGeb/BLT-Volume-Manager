@@ -287,15 +287,13 @@
   let colDragging = false;
   let rowDragging = false;
   let startX = 0;
-  let startY = 0;
   let startWidth = 0;
-  let startHeight = 0;
   let startMaxHeight = 0;
 
   function startColDrag(e: MouseEvent) {
     e.preventDefault();
     colDragging = true;
-    startX = e.clientX;
+    startX = e.pageX;
     startWidth = treePanelEl ? treePanelEl.offsetWidth : 300;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -304,14 +302,9 @@
   function startRowDrag(e: MouseEvent) {
     e.preventDefault();
     rowDragging = true;
-    startY = e.clientY;
-    startHeight = contentEl ? contentEl.offsetHeight : 400;
-    if (contentEl) {
-      const contentRect = contentEl.getBoundingClientRect();
-      startMaxHeight = window.innerHeight - contentRect.top - 40;
-    } else {
-      startMaxHeight = window.innerHeight - 200;
-    }
+    const rect = contentEl!.getBoundingClientRect();
+    startMaxHeight = window.innerHeight - rect.top - 40;
+    document.body.style.overflow = 'hidden';
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
   }
@@ -321,7 +314,7 @@
       const rect = contentEl.getBoundingClientRect();
       const minW = 200;
       const maxW = rect.width - 200;
-      const deltaX = e.clientX - startX;
+      const deltaX = e.pageX - startX;
       let w = startWidth + deltaX;
       if (w < minW) w = minW;
       if (w > maxW) w = maxW;
@@ -329,9 +322,9 @@
       treePanelEl.style.flex = `0 0 ${w}px`;
     }
     if (rowDragging && contentEl) {
+      const rect = contentEl.getBoundingClientRect();
       const minH = 200;
-      const deltaY = e.clientY - startY;
-      let h = startHeight + deltaY;
+      let h = e.clientY - rect.top;
       if (h < minH) h = minH;
       if (h > startMaxHeight) h = startMaxHeight;
       contentEl.style.height = h + 'px';
@@ -346,6 +339,7 @@
     }
     if (rowDragging) {
       rowDragging = false;
+      document.body.style.overflow = '';
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     }
@@ -385,7 +379,7 @@
             <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()})</option>
           {/each}
         </select>
-        <button class="button button-xs" style="margin-left:6px;" on:click={doDiff}>Diff</button>
+        <button class="button button-xs" style="margin-left:6px;" on:click={() => doDiff()}>Diff</button>
       {/if}
       {#if currentDiffResult}
         <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={clearDiff}>Clear diff</button>

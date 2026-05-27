@@ -1,6 +1,6 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
-  import { formatDuration } from '../lib/util';
+  import { formatExpiration } from '../lib/util';
   import type { VolumeLockInfo } from '../lib/types';
 
   export let volumes: string[] = [];
@@ -229,7 +229,7 @@
                       <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
                     {/if}
                     {#if volumeLockInfo[item.path].locked && volumeLockInfo[item.path].expiresIn > 0}
-                      <span class="lock-expiry">{formatDuration(volumeLockInfo[item.path].expiresIn)}</span>
+                      <span class="lock-expiry">{formatExpiration(volumeLockInfo[item.path].expiresIn)}</span>
                     {/if}
                   {:else if !loading}
                     <span class="lock-badge">—</span>
