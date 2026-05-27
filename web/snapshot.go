@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/example/blt-volume-manager/restic"
@@ -32,12 +33,21 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	restorePointID := ""
+	volPath := filepath.Join(s.dataDir, "volumes", volumeFilter)
+	if id, err := rm.FindRestorePoint(volPath); err == nil {
+		restorePointID = id
+	}
+
 	result := make([]SnapshotWithVolume, 0, len(snapshots))
 	for _, snap := range snapshots {
 		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volumeFilter})
 	}
 
-	respondJSON(w, result)
+	respondJSON(w, map[string]interface{}{
+		"snapshots":      result,
+		"restorePointID": restorePointID,
+	})
 }
 
 func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
@@ -125,26 +135,43 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 			respondError(w, err, http.StatusInternalServerError)
 			return
 		}
+		restorePointID := ""
+		volPath := filepath.Join(s.dataDir, "volumes", volName)
+		if id, err := rm.FindRestorePoint(volPath); err == nil {
+			restorePointID = id
+		}
 		result := make([]SnapshotWithVolume, 0, len(snaps))
 		for _, snap := range snaps {
 			result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
 		}
-		respondJSON(w, map[string]interface{}{"status": "tag added", "snapshots": result})
+		respondJSON(w, map[string]interface{}{"status": "tag added", "snapshots": result, "restorePointID": restorePointID})
 	case http.MethodDelete:
-		if err := rm.UntagSnapshot(snapshotID, tag); err != nil {
-			respondError(w, err, http.StatusInternalServerError)
-			return
+		if tag == "restore-point" {
+			if err := rm.DeleteRestorePoint(volName); err != nil {
+				respondError(w, err, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			if err := rm.UntagSnapshot(snapshotID, tag); err != nil {
+				respondError(w, err, http.StatusInternalServerError)
+				return
+			}
 		}
 		snaps, err := rm.ListSnapshots()
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
 		}
+		restorePointID := ""
+		volPath := filepath.Join(s.dataDir, "volumes", volName)
+		if id, err := rm.FindRestorePoint(volPath); err == nil {
+			restorePointID = id
+		}
 		result := make([]SnapshotWithVolume, 0, len(snaps))
 		for _, snap := range snaps {
 			result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
 		}
-		respondJSON(w, map[string]interface{}{"status": "tag removed", "snapshots": result})
+		respondJSON(w, map[string]interface{}{"status": "tag removed", "snapshots": result, "restorePointID": restorePointID})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

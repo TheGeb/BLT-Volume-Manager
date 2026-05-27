@@ -21,6 +21,7 @@
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onDeleteSnapshot: (sn: Snapshot) => void = () => {};
   export let onSizeLoaded: (id: string) => void = () => {};
+  export let restorePointID = '';
 
   let searchVal = '';
   let openFilter: 'type' | 'host' | null = null;
@@ -43,7 +44,7 @@
   }
 
   function handleRPClick(sn: Snapshot) {
-    const isRP = sn.tags.includes('restore-point');
+    const isRP = sn.id === restorePointID || sn.short_id === restorePointID;
     isRP ? onRemoveTag(sn.id, 'restore-point', selectedVolume) : onAddTag(sn.id, 'restore-point', selectedVolume);
   }
 </script>
@@ -123,11 +124,11 @@
                    <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
                  </svg>
                {:else}
-                 <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={rpLoading[sn.id]}>
-                   <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
-                     <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
-                       stroke={sn.tags.includes('restore-point') ? 'var(--accent)' : 'var(--border)'} />
-                     {#if sn.tags.includes('restore-point')}
+                  <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={rpLoading[sn.id]}>
+                    <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
+                      <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
+                        stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
+                      {#if sn.id === restorePointID || sn.short_id === restorePointID}
                        <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
                      {/if}
                    </svg>

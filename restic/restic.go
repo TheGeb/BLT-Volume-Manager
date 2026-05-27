@@ -13,8 +13,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/example/blt-volume-manager/store"
 )
 
 // FindSnapshotByHash searches for a snapshot matching the criteria derived from host + time + paths.
@@ -50,6 +51,11 @@ func (m *Manager) generateHash(s Snapshot) string {
 // Manager wraps restic operations for a single repository.
 type Manager struct {
 	repo string
+	s3rw store.S3Store
+}
+
+func (m *Manager) SetS3Store(s3rw store.S3Store) {
+	m.s3rw = s3rw
 }
 
 type Snapshot struct {
@@ -379,75 +385,37 @@ func pathBelongsToVolume(snapPath, volume string) bool {
 	return false
 }
 
-// retryUntag calls UntagSnapshot with retries to handle transient restic lock contention.
-func retryUntag(m *Manager, snapshotID, tag string) error {
-	var lastErr error
-	for i := 0; i < 3; i++ {
-		if err := m.UntagSnapshot(snapshotID, tag); err != nil {
-			lastErr = err
-			time.Sleep(time.Duration(1<<i) * time.Second)
-			continue
-		}
-		return nil
-	}
-	return lastErr
-}
-
-var setRPMutex sync.Mutex
-
-// SetRestorePoint tags a snapshot as the restore-point for its volume.
+// SetRestorePoint stores the snapshot as the restore-point for its volume in S3.
 func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
-	setRPMutex.Lock()
-	defer setRPMutex.Unlock()
-
 	if snapshotID == "" {
 		return errors.New("snapshot ID is required")
 	}
-
-	// Filter snapshots for the target volume that have "restore-point" tag
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json", "--tag", "restore-point")
-	if err != nil {
-		return err
-	}
-	out, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("list restore-point snapshots: %w", err)
-	}
-	var snapshots []Snapshot
-	if err := json.Unmarshal(out, &snapshots); err != nil {
-		return fmt.Errorf("parse restore-point snapshots: %w", err)
-	}
-	for _, snap := range snapshots {
-		if snap.ID == snapshotID {
-			continue
-		}
-
-		for _, p := range snap.Paths {
-			if pathBelongsToVolume(p, volume) {
-				if err := retryUntag(m, snap.ID, "restore-point"); err != nil {
-					return fmt.Errorf("remove previous restore-point from %s: %w", snap.ID, err)
-				}
-				break
-			}
-		}
+	if m.s3rw == nil {
+		return errors.New("S3 store not configured for restore points")
 	}
 
-	if err := m.TagSnapshot(snapshotID, "restore-point"); err != nil {
-		return fmt.Errorf("set restore-point: %w", err)
+	var fallbackHash string
+	if snap, err := m.findSnapshotByID(snapshotID); err == nil {
+		fullHash := m.generateHash(*snap)
+		fallbackHash = fullHash[:len(snap.ShortID)]
+	}
+
+	rp := store.RestorePoint{
+		SnapshotID:   snapshotID,
+		FallbackHash: fallbackHash,
+	}
+	if err := m.s3rw.WriteRestorePoint(volume, rp); err != nil {
+		return fmt.Errorf("write restore point: %w", err)
 	}
 
 	return nil
 }
 
-// FindRestorePoint returns the most recent snapshot with "restore-point" tag
-// whose paths match the given volume path. Returns empty string if none found.
+// FindRestorePoint reads the restore-point from S3 for the given volume path.
+// Returns the snapshot ID string, or empty string if none found.
 func (m *Manager) FindRestorePoint(volPath string) (string, error) {
-	snapshots, err := m.ListSnapshots()
-	if err != nil {
-		return "", fmt.Errorf("list snapshots: %w", err)
+	if m.s3rw == nil {
+		return "", nil
 	}
 
 	marker := "/volumes/"
@@ -460,35 +428,35 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", nil
 	}
 
-	var candidates []Snapshot
-	for _, snap := range snapshots {
-		if !hasTag(snap.Tags, "restore-point") {
-			continue
-		}
-		for _, p := range snap.Paths {
-			if pathBelongsToVolume(p, targetVolume) {
-				candidates = append(candidates, snap)
-				break
-			}
-		}
+	rp, err := m.s3rw.ReadRestorePoint(targetVolume)
+	if err != nil {
+		return "", fmt.Errorf("read restore point: %w", err)
 	}
-	if len(candidates) == 0 {
+	if rp == nil || rp.SnapshotID == "" {
 		return "", nil
 	}
+	return rp.SnapshotID, nil
+}
 
-	id := candidates[0].ShortID
-	if id == "" {
-		id = candidates[0].ID
+// DeleteRestorePoint removes the restore-point from S3 for the given volume.
+func (m *Manager) DeleteRestorePoint(volume string) error {
+	if m.s3rw == nil {
+		return nil
 	}
-	for _, c := range candidates[1:] {
-		if c.Time.After(candidates[0].Time) {
-			id = c.ShortID
-			if id == "" {
-				id = c.ID
-			}
+	return m.s3rw.DeleteRestorePoint(volume)
+}
+
+func (m *Manager) findSnapshotByID(snapshotID string) (*Snapshot, error) {
+	snapshots, err := m.ListSnapshots()
+	if err != nil {
+		return nil, err
+	}
+	for i := range snapshots {
+		if snapshots[i].ID == snapshotID || snapshots[i].ShortID == snapshotID {
+			return &snapshots[i], nil
 		}
 	}
-	return id, nil
+	return nil, fmt.Errorf("snapshot not found: %s", snapshotID)
 }
 
 func hasTag(tags []string, target string) bool {

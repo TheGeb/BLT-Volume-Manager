@@ -83,15 +83,20 @@ export interface DiffResult {
 }
 
 export interface AppState {
-  snapshots: Snapshot[];
-  volumes: string[];
-  selectedVolume: string;
-  volumeFilter: string;
-  query: string;
-  sortNewestFirst: boolean;
-  hostname: string;
-  prevStats: StatsResponse | null;
-  volumesCachedAt?: string;
-  typeFilter: string;
-  hostFilter: string;
+	snapshots: Snapshot[];
+	volumes: string[];
+	selectedVolume: string;
+	volumeFilter: string;
+	query: string;
+	sortNewestFirst: boolean;
+	hostname: string;
+	prevStats: StatsResponse | null;
+	volumesCachedAt?: string;
+	typeFilter: string;
+	hostFilter: string;
+}
+
+export interface SnapshotsResponse {
+	snapshots: Snapshot[];
+	restorePointID?: string;
 }

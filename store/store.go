@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,9 +22,26 @@ import (
 var LogS3 func(op, bucket, key string, dur time.Duration, err error)
 
 const (
-	LockPrefix   = "blt-volume-manager/locks/"
-	VolumePrefix = "blt-volume-manager/registered-volumes/"
+	LockPrefix         = "blt-volume-manager/locks/"
+	VolumePrefix       = "blt-volume-manager/registered-volumes/"
+	RestorePointPrefix = "blt-volume-manager/restore-points/"
 )
+
+type S3Store interface {
+	PutObject(key string, data []byte) error
+	ReadObject(key string) ([]byte, error)
+	DeleteObject(key string) error
+	ListObjects(prefix string) ([]types.Object, error)
+	ListCommonPrefixes(prefix, delimiter string) ([]string, error)
+	DeleteObjectsWithPrefix(prefix string) error
+	WriteVolumeMarker(name string) error
+	DeleteVolumeMarker(name string) error
+	ListVolumeMarkers() ([]string, error)
+	DeleteLockObjects() error
+	WriteRestorePoint(vol string, rp RestorePoint) error
+	ReadRestorePoint(vol string) (*RestorePoint, error)
+	DeleteRestorePoint(vol string) error
+}
 
 type S3rw struct {
 	s3Client *s3.Client
@@ -45,7 +63,9 @@ func (opts S3StoreOpts) validate() error {
 	return nil
 }
 
-func NewS3Store(opts S3StoreOpts) (*S3rw, error) {
+var _ S3Store = (*S3rw)(nil)
+
+func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 	loadOpts := []func(*config.LoadOptions) error{}
 	if opts.Region != "" {
 		loadOpts = append(loadOpts, config.WithRegion(opts.Region))
@@ -243,4 +263,34 @@ func (s *S3rw) ListVolumeMarkers() ([]string, error) {
 
 func (s *S3rw) DeleteLockObjects() error {
 	return s.DeleteObjectsWithPrefix(s.opts.AwsLockFolder)
+}
+
+func (s *S3rw) WriteRestorePoint(volumeName string, rp RestorePoint) error {
+	data, err := json.Marshal(rp)
+	if err != nil {
+		return fmt.Errorf("marshal restore point: %w", err)
+	}
+	key := RestorePointPrefix + volumeName + ".json"
+	return s.PutObject(key, data)
+}
+
+func (s *S3rw) ReadRestorePoint(volumeName string) (*RestorePoint, error) {
+	key := RestorePointPrefix + volumeName + ".json"
+	data, err := s.ReadObject(key)
+	if err != nil {
+		return nil, err
+	}
+	if data == nil {
+		return nil, nil
+	}
+	var rp RestorePoint
+	if err := json.Unmarshal(data, &rp); err != nil {
+		return nil, fmt.Errorf("parse restore point: %w", err)
+	}
+	return &rp, nil
+}
+
+func (s *S3rw) DeleteRestorePoint(volumeName string) error {
+	key := RestorePointPrefix + volumeName + ".json"
+	return s.DeleteObject(key)
 }

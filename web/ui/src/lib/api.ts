@@ -1,15 +1,16 @@
-import type { Snapshot, LockStatus, RepoStatus, StatsResponse } from './types';
+import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse } from './types';
 
 export async function fetchVolumes(): Promise<string[]> {
-  const resp = await fetch('/api/volumes');
-  const data = await resp.json() as { volumes: string[] };
-  return data.volumes || [];
+	const resp = await fetch('/api/volumes');
+	const data = await resp.json() as { volumes: string[] };
+	return data.volumes || [];
 }
 
-export async function fetchSnapshots(volume: string): Promise<Snapshot[]> {
-  const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(volume)}`);
-  const data = await resp.json() as Snapshot[];
-  return data.map(sn => ({ ...sn, tags: sn.tags ?? [] }));
+export async function fetchSnapshots(volume: string): Promise<SnapshotsResponse> {
+	const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(volume)}`);
+	const data = await resp.json() as SnapshotsResponse;
+	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
+	return { snapshots, restorePointID: data.restorePointID || '' };
 }
 
 export async function fetchRepoStatus(volume: string): Promise<RepoStatus> {
@@ -93,20 +94,22 @@ export async function fetchDiff(snapshotA: string, snapshotB: string, volume: st
   return resp.json() as Promise<any>;
 }
 
-export async function addTag(snapshotId: string, tag: string, volume: string): Promise<Snapshot[]> {
-  const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
-  const resp = await fetch(url, { method: 'POST' });
-  if (!resp.ok) throw new Error('Failed to add tag');
-  const data = await resp.json();
-  return data.snapshots || [];
+export async function addTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {
+	const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
+	const resp = await fetch(url, { method: 'POST' });
+	if (!resp.ok) throw new Error('Failed to add tag');
+	const data = await resp.json() as SnapshotsResponse;
+	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
+	return { snapshots, restorePointID: data.restorePointID || '' };
 }
 
-export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<Snapshot[]> {
-  const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
-  const resp = await fetch(url, { method: 'DELETE' });
-  if (!resp.ok) throw new Error('Failed to remove tag');
-  const data = await resp.json();
-  return data.snapshots || [];
+export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {
+	const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
+	const resp = await fetch(url, { method: 'DELETE' });
+	if (!resp.ok) throw new Error('Failed to remove tag');
+	const data = await resp.json() as SnapshotsResponse;
+	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
+	return { snapshots, restorePointID: data.restorePointID || '' };
 }
 
 export async function deleteSnapshot(snapshotId: string, volume: string): Promise<void> {

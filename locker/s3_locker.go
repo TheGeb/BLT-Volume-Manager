@@ -36,7 +36,7 @@ type s3Locker struct {
 }
 
 type s3Lock struct {
-	rw    *store.S3rw
+	rw    store.S3Store
 	myKey string
 }
 

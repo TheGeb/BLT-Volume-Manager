@@ -74,7 +74,7 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
-	// 1. Delete S3 locks and volume marker
+	// 1. Delete S3 locks, volume marker, and restore point
 	if s.s3Bucket != "" {
 		if err := s.deleteVolumeLocks(volumeName); err != nil {
 			respondError(w, fmt.Errorf("delete locks: %w", err), http.StatusInternalServerError)
@@ -88,6 +88,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 		})
 		if err == nil {
 			rw.DeleteVolumeMarker(volumeName)
+			rw.DeleteRestorePoint(volumeName)
 		}
 	}
 
@@ -276,7 +277,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 	}, nil
 }
 
-func (s *Server) storeForVolume(volumeName string) (*store.S3rw, error) {
+func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 	opts := store.S3StoreOpts{
 		AwsBucketName:   s.s3Bucket,
 		AwsLockFolder:   store.LockPrefix + volumeName + "/",

@@ -16,6 +16,7 @@ import (
 	"github.com/example/blt-volume-manager/locker"
 	"github.com/example/blt-volume-manager/restic"
 	"github.com/example/blt-volume-manager/snapshot"
+	"github.com/example/blt-volume-manager/store"
 )
 
 type volumeConfig struct {
@@ -38,6 +39,7 @@ type Driver struct {
 	vols       map[string]*VolumeInfo
 	mu         sync.Mutex
 	zfsParent  string
+	s3rw       store.S3Store
 }
 
 func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint string, s3Region string) *Driver {
@@ -65,12 +67,29 @@ func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint str
 		vols:       make(map[string]*VolumeInfo),
 		zfsParent:  zfsParent,
 	}
+
+	if lockBucket != "" {
+		if rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName: lockBucket,
+			S3Endpoint:    s3Endpoint,
+			Region:        s3Region,
+		}); err == nil {
+			drv.s3rw = rw
+		} else {
+			log.Printf("failed to init s3 store for restore points: %v", err)
+		}
+	}
+
 	go drv.monitorOrphanedSnapshots(context.Background())
 	return drv
 }
 
 func (d *Driver) ResticManager(volName string) *restic.Manager {
-	return restic.NewManager(d.resticBase + "/restic/" + volName)
+	m := restic.NewManager(d.resticBase + "/restic/" + volName)
+	if d.s3rw != nil {
+		m.SetS3Store(d.s3rw)
+	}
+	return m
 }
 
 func (d *Driver) Create(r *volume.CreateRequest) error {
@@ -93,8 +112,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 	ctx := context.Background()
 	lock, err := d.locker.Acquire(ctx, name)
 	if err == nil { 
-		//FIXME: Need to adjust this restore logic to check snapshot tags for restore point
-		// Also should it take latest even if it's a hot backup? Maybe send an alert
+		//FIXME: Should it take latest even if it's a hot backup? Maybe send an alert
 		restoreMode := "latest"
 		if r.Options != nil {
 			restoreMode = r.Options["restore"]
@@ -255,9 +273,9 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 					if err := rm.RestoreSnapshot(snapID, volPath); err != nil {
 						log.Printf("restore-point restore failed: %v", err)
 					} else {
-						log.Printf("restore-point restored, removing tag")
-						if err := rm.UntagSnapshot(snapID, "restore-point"); err != nil {
-							log.Printf("remove restore-point tag: %v", err)
+						log.Printf("restore-point restored, removing restore point")
+						if err := rm.DeleteRestorePoint(name); err != nil {
+							log.Printf("remove restore point: %v", err)
 						}
 					}
 					if preSnap != nil {

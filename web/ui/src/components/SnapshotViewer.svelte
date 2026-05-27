@@ -286,8 +286,14 @@
 
   let colDragging = false;
   let rowDragging = false;
+  let atBottom = false;
+  let atBottomStartHeight = 0;
+  let panelEl: HTMLElement;
+  let tabPanelEl: HTMLElement | null = null;
   let startX = 0;
+  let startY = 0;
   let startWidth = 0;
+  let startHeight = 0;
   let startMaxHeight = 0;
 
   function startColDrag(e: MouseEvent) {
@@ -302,8 +308,12 @@
   function startRowDrag(e: MouseEvent) {
     e.preventDefault();
     rowDragging = true;
-    const rect = contentEl!.getBoundingClientRect();
-    startMaxHeight = window.innerHeight - rect.top - 40;
+    startY = e.clientY;
+    startHeight = contentEl!.offsetHeight;
+    startMaxHeight = window.innerHeight - contentEl!.getBoundingClientRect().top - 40;
+    atBottom = false;
+    atBottomStartHeight = startHeight;
+    tabPanelEl = panelEl.closest('.tab-panel') as HTMLElement | null;
     document.body.style.overflow = 'hidden';
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -322,12 +332,24 @@
       treePanelEl.style.flex = `0 0 ${w}px`;
     }
     if (rowDragging && contentEl) {
-      const rect = contentEl.getBoundingClientRect();
+      const deltaY = e.clientY - startY;
       const minH = 200;
-      let h = e.clientY - rect.top;
+      let h = startHeight + deltaY;
       if (h < minH) h = minH;
       if (h > startMaxHeight) h = startMaxHeight;
       contentEl.style.height = h + 'px';
+      if (h < startHeight) {
+        if (!atBottom && window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1) {
+          atBottom = true;
+          atBottomStartHeight = h;
+        }
+        if (atBottom && h < atBottomStartHeight && tabPanelEl) {
+          tabPanelEl.style.marginBottom = (atBottomStartHeight - h) + 'px';
+        }
+      } else if (atBottom) {
+        atBottom = false;
+        if (tabPanelEl) tabPanelEl.style.marginBottom = '';
+      }
     }
   }
 
@@ -339,6 +361,15 @@
     }
     if (rowDragging) {
       rowDragging = false;
+      atBottom = false;
+      if (tabPanelEl) {
+        tabPanelEl.style.marginBottom = '';
+        tabPanelEl = null;
+      }
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (window.scrollY > maxScroll) {
+        window.scrollTo(0, Math.max(0, maxScroll));
+      }
       document.body.style.overflow = '';
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -358,7 +389,7 @@
   });
 </script>
 
-<section class="panel" style="margin-bottom:16px;">
+<section class="panel" style="margin-bottom:16px;" bind:this={panelEl}>
   <div class="row gap" style="margin-bottom:12px;">
     <h2 class="eyebrow" style="margin:0;flex:1;">
       Snapshot <span>{snapshot.short_id}</span>

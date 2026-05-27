@@ -40,6 +40,7 @@ export const volumesLoading = writable(false);
 export const snapsLoading = writable(false);
 export const landingShown = writable(true);
 export const rpLoading = writable<Record<string, boolean>>({});
+export const restorePointID = writable('');
 export const sizeLoading = writable<Record<string, boolean>>({});
 export const diffTargetId = writable('');
 export const diffTargetFallbackHash = writable('');
@@ -121,16 +122,19 @@ export async function fetchAllVolumeLockInfo() {
 }
 
 export async function loadSnapshots(volume: string) {
-  snapsLoading.set(true);
-  try {
-    snapshots.set(await api.fetchSnapshots(volume));
-  } catch {
-    snapshots.set([]);
-    setBanner('Failed to load snapshots', true);
-  } finally {
-    snapsLoading.set(false);
-    reconcileViewerSnapshots();
-  }
+	snapsLoading.set(true);
+	try {
+		const result = await api.fetchSnapshots(volume);
+		snapshots.set(result.snapshots);
+		restorePointID.set(result.restorePointID || '');
+	} catch {
+		snapshots.set([]);
+		restorePointID.set('');
+		setBanner('Failed to load snapshots', true);
+	} finally {
+		snapsLoading.set(false);
+		reconcileViewerSnapshots();
+	}
 }
 
 export async function loadLockStatus() {
@@ -329,31 +333,33 @@ export async function setDiffTarget(id: string) {
 }
 
 export async function onAddTag(id: string, tag: string, vol: string) {
-  rpLoading.update(r => ({ ...r, [id]: true }));
-  try {
-    const snaps = await api.addTag(id, tag, vol);
-    snapshots.set(snaps);
-    reconcileViewerSnapshots();
-  } catch (e) {
-    setBanner(`Failed to add tag: ${e}`, true);
-    await loadSnapshots(vol);
-  } finally {
-    rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
-  }
+	rpLoading.update(r => ({ ...r, [id]: true }));
+	try {
+		const result = await api.addTag(id, tag, vol);
+		snapshots.set(result.snapshots);
+		restorePointID.set(result.restorePointID || '');
+		reconcileViewerSnapshots();
+	} catch (e) {
+		setBanner(`Failed to add tag: ${e}`, true);
+		await loadSnapshots(vol);
+	} finally {
+		rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+	}
 }
 
 export async function onRemoveTag(id: string, tag: string, vol: string) {
-  rpLoading.update(r => ({ ...r, [id]: true }));
-  try {
-    const snaps = await api.removeTag(id, tag, vol);
-    snapshots.set(snaps);
-    reconcileViewerSnapshots();
-  } catch (e) {
-    setBanner(`Failed to remove tag: ${e}`, true);
-    await loadSnapshots(vol);
-  } finally {
-    rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
-  }
+	rpLoading.update(r => ({ ...r, [id]: true }));
+	try {
+		const result = await api.removeTag(id, tag, vol);
+		snapshots.set(result.snapshots);
+		restorePointID.set(result.restorePointID || '');
+		reconcileViewerSnapshots();
+	} catch (e) {
+		setBanner(`Failed to remove tag: ${e}`, true);
+		await loadSnapshots(vol);
+	} finally {
+		rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+	}
 }
 
 export async function onDeleteSnapshot(sn: Snapshot) {

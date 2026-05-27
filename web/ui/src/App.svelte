@@ -18,7 +18,7 @@
     deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
     deleteVolLoading, creatingTest, testStatus, volumesLoading, snapsLoading, 
     landingShown, rpLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
-    diffTargetId, volumeLockInfo,
+    diffTargetId, volumeLockInfo, restorePointID,
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
     onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
     openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
@@ -272,6 +272,7 @@
               loading={$snapsLoading}
               rpLoading={$rpLoading}
               sizeLoading={$sizeLoading}
+              restorePointID={$restorePointID}
               onSearch={onSearch}
               onToggleSort={onToggleSort}
               onTypeFilter={onTypeFilter}
