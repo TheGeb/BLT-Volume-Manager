@@ -136,6 +136,79 @@
   }
 
   $: folderLocks = computeFolderLocks(tree, volumeLockInfo);
+
+  $: flatItemLocks = flatItems.map(item => {
+    let owner = '';
+    let status = '';
+    if (item.isGroup) {
+      const fl = folderLocks[item.path];
+      if (fl) {
+        owner = fl.owner;
+        status = 'locked';
+      }
+    } else {
+      const li = volumeLockInfo[item.path];
+      if (li && li.locked) {
+        owner = li.owner;
+        status = li.status;
+      }
+    }
+    return { path: item.path, owner, status };
+  });
+
+  $: bracketStyles = flatItemLocks.map((curr, idx) => {
+    if (!curr.owner) return null;
+    
+    const prev = idx > 0 ? flatItemLocks[idx - 1] : null;
+    const next = idx < flatItemLocks.length - 1 ? flatItemLocks[idx + 1] : null;
+    
+    const isSameAsPrev = prev && prev.owner === curr.owner;
+    const isSameAsNext = next && next.owner === curr.owner;
+    
+    if (isSameAsPrev && isSameAsNext) return 'middle';
+    if (isSameAsPrev && !isSameAsNext) return 'end';
+    if (!isSameAsPrev && isSameAsNext) return 'start';
+    return 'single';
+  });
+
+  $: labelAtIdx = (() => {
+    const map: Record<number, boolean> = {};
+    for (let i = 0; i < bracketStyles.length; i++) {
+      const style = bracketStyles[i];
+      if (!style) continue;
+      if (style === 'single') { map[i] = true; continue; }
+      if (style === 'start') {
+        let len = 1;
+        for (let j = i + 1; j < bracketStyles.length; j++) {
+          if (!bracketStyles[j] || bracketStyles[j] === 'start') break;
+          len++;
+        }
+        const mid = i + Math.floor((len - 1) / 2);
+        map[mid] = true;
+      }
+    }
+    return map;
+  })();
+
+  $: labelOffset = (() => {
+    const map: Record<number, string> = {};
+    for (let i = 0; i < bracketStyles.length; i++) {
+      const style = bracketStyles[i];
+      if (!style) continue;
+      if (style === 'start') {
+        let len = 1;
+        for (let j = i + 1; j < bracketStyles.length; j++) {
+          if (!bracketStyles[j] || bracketStyles[j] === 'start') break;
+          len++;
+        }
+        if (len > 1 && len % 2 === 0) {
+          const mid = i + len / 2 - 1;
+          map[mid] = 'translateY(50%)';
+        }
+      }
+    }
+    return map;
+  })();
 </script>
 
 <section class="panel" style="display:block;">
@@ -184,9 +257,9 @@
     <p class="empty">No volumes match the current filters</p>
   {:else}
     <div class="tree">
-      {#each flatItems as item (item.path)}
+      {#each flatItems as item, idx (item.path)}
         <div transition:slide|local>
-          <div class="tree-row" style="padding-left:{20 + item.depth * 20}px;">
+          <div class="tree-row" class:in-bracket={!!bracketStyles[idx]} data-bracket={bracketStyles[idx] || ''} style="padding-left:{20 + item.depth * 20}px;">
             {#if item.isGroup}
               <button class="tree-group" on:click={() => toggle(item.path)} title={item.path}>
               <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -199,11 +272,10 @@
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
                 <span class="tree-name">{item.name}</span>
-                <span class="lock-info">
-                  {#if folderLocks[item.path]}
+                <span class="lock-info" style={labelOffset[idx] ? `transform:${labelOffset[idx]}` : ''}>
+                  {#if folderLocks[item.path] && labelAtIdx[idx]}
                     <span class="lock-badge lock-locked">
-                      <span class="lock-dot lock-dot-locked"></span>
-                      Locked:
+                      <span class="lock-text">Locked:</span>
                     </span>
                     <span class="lock-owner">{folderLocks[item.path].owner}</span>
                   {/if}
@@ -219,23 +291,24 @@
                   <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                 </svg>
                 <span class="tree-name">{item.name}</span>
-                <span class="lock-info">
+                <span class="lock-info" style={labelOffset[idx] ? `transform:${labelOffset[idx]}` : ''}>
                   {#if volumeLockInfo[item.path]}
-                    <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
-                      <span class="lock-dot lock-dot-{volumeLockInfo[item.path].status}"></span>
-                      {volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked'}
-                    </span>
-                    {#if volumeLockInfo[item.path].owner}
-                      <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
+                    {#if !bracketStyles[idx] || labelAtIdx[idx]}
+                      <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
+                        <span class="lock-text">{volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                      </span>
+                      {#if volumeLockInfo[item.path].owner}
+                        <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
+                      {/if}
                     {/if}
-                    {#if volumeLockInfo[item.path].locked && volumeLockInfo[item.path].expiresIn > 0}
-                      <span class="lock-expiry">{formatExpiration(volumeLockInfo[item.path].expiresIn)}</span>
-                    {/if}
-                  {:else if !loading}
+                  {:else if !loading && !bracketStyles[idx]}
                     <span class="lock-badge">—</span>
                   {/if}
                 </span>
               </a>
+            {/if}
+            {#if bracketStyles[idx]}
+              <span class="lock-bracket" class:bracket-start={bracketStyles[idx] === 'start'} class:bracket-middle={bracketStyles[idx] === 'middle'} class:bracket-end={bracketStyles[idx] === 'end'} class:bracket-single={bracketStyles[idx] === 'single'}></span>
             {/if}
           </div>
         </div>
@@ -277,7 +350,21 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; }
-  .tree-row { display: flex; align-items: center; min-height: 36px; }
+  .tree-row { display: flex; align-items: center; min-height: 36px; position: relative; }
+  .tree-row.in-bracket {
+    background: color-mix(in srgb, var(--green) 8%, transparent);
+  }
+  .tree-row[data-bracket="start"] {
+    border-radius: 8px 0 0 0;
+  }
+  .tree-row[data-bracket="end"] {
+    border-radius: 0 0 0 8px;
+    border-bottom: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
+  }
+  .tree-row[data-bracket="single"] {
+    border-radius: 8px 0 0 8px;
+    border-bottom: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
+  }
   .tree-row > * { flex-shrink: 0; }
 
   .tree-group, .tree-volume {
@@ -295,7 +382,7 @@
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
   .lock-info {
-    display: flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0;
+    display: flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0; padding-right: 18px;
   }
   .lock-badge {
     display: inline-flex; align-items: center; gap: 5px;
@@ -303,11 +390,58 @@
   }
   .lock-locked { color: var(--green); }
   .lock-unlocked { color: var(--muted); }
-  .lock-dot {
-    width: 6px; height: 6px; border-radius: 50%; display: inline-block;
-  }
-  .lock-dot-locked { background: var(--green); }
-  .lock-dot-unlocked { background: var(--muted); }
   .lock-owner { font-size: 0.8rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
+  .lock-bracket {
+    position: absolute;
+    right: 4px;
+    top: 0;
+    height: 100%;
+    width: 10px;
+    pointer-events: none;
+  }
+  .lock-bracket::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    border-right: 2px solid var(--green);
+  }
+  .lock-bracket.bracket-start::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 50%;
+    border-top: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+    border-top-right-radius: 4px;
+  }
+  .lock-bracket.bracket-end::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    height: 50%;
+    border-bottom: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+    border-bottom-right-radius: 4px;
+  }
+  .lock-bracket.bracket-single::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    border-top: 2px solid var(--green);
+    border-bottom: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
 </style>

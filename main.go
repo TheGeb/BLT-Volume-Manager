@@ -46,7 +46,7 @@ func main() {
 	drv := driver.NewDriver(dataDir, resticBase, lockBucket, s3Endpoint, s3Region)
 	if httpAddr != "" {
 		mux := http.NewServeMux()
-		web.NewServer(dataDir, resticBase, lockBucket, s3Endpoint, s3Region, drv).Register(mux)
+		web.NewServer(dataDir, resticBase, lockBucket, s3Endpoint, s3Region).Register(mux)
 		go func() {
 			log.Printf("serving BLT Volume Manager on http://%s", httpAddr)
 			if err := http.ListenAndServe(httpAddr, mux); err != nil {

@@ -90,10 +90,31 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 			"volumes":  1,
 			"newest":   newestStr,
 			"oldest":   oldestStr,
-			"hot_volumes":      func() []string { if hot > 0 { return []string{volName} }; return nil }(),
-			"cold_volumes":     func() []string { if cold > 0 { return []string{volName} }; return nil }(),
-			"excluded_volumes": func() []string { if excluded > 0 { return []string{volName} }; return nil }(),
-			"other_volumes":    func() []string { o := len(snaps) - hot - cold - excluded; if o > 0 { return []string{volName} }; return nil }(),
+			"hot_volumes": func() []string {
+				if hot > 0 {
+					return []string{volName}
+				}
+				return nil
+			}(),
+			"cold_volumes": func() []string {
+				if cold > 0 {
+					return []string{volName}
+				}
+				return nil
+			}(),
+			"excluded_volumes": func() []string {
+				if excluded > 0 {
+					return []string{volName}
+				}
+				return nil
+			}(),
+			"other_volumes": func() []string {
+				o := len(snaps) - hot - cold - excluded
+				if o > 0 {
+					return []string{volName}
+				}
+				return nil
+			}(),
 		}
 	}
 

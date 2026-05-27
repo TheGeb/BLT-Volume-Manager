@@ -9,15 +9,11 @@ import (
 	"time"
 
 	"github.com/example/blt-volume-manager/restic"
+	"github.com/example/blt-volume-manager/store"
 )
 
 //go:embed static/*
 var staticFiles embed.FS
-
-type Driver interface {
-	ResticManager(volName string) *restic.Manager
-	VolumeNames() []string
-}
 
 type Server struct {
 	dataDir      string
@@ -25,22 +21,43 @@ type Server struct {
 	s3Bucket     string
 	s3Endpoint   string
 	s3Region     string
-	driver       Driver
 	statsMu      sync.RWMutex
 	statsCache   map[string]interface{}
 	statsCacheAt time.Time
 }
 
-func NewServer(dataDir string, resticBase string, s3Bucket string, s3Endpoint string, s3Region string, drv Driver) *Server {
-	return &Server{dataDir: dataDir, resticBase: resticBase, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region, driver: drv}
+func NewServer(dataDir string, resticBase string, s3Bucket string, s3Endpoint string, s3Region string) *Server {
+	return &Server{dataDir: dataDir, resticBase: resticBase, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
 }
 
 func (s *Server) volumeManager(volName string) *restic.Manager {
-	return s.driver.ResticManager(volName)
+	m := restic.NewManager(s.resticBase + "/restic/" + volName)
+	if s.s3Bucket != "" {
+		if rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName: s.s3Bucket,
+			S3Endpoint:    s.s3Endpoint,
+			Region:        s.s3Region,
+		}); err == nil {
+			m.SetS3Store(rw)
+		}
+	}
+	return m
 }
 
 func (s *Server) volumeNames() []string {
-	return s.driver.VolumeNames()
+	if s.s3Bucket != "" {
+		if rw, err := store.NewS3Store(store.S3StoreOpts{
+			AwsBucketName:   s.s3Bucket,
+			AwsVolumePrefix: store.VolumePrefix,
+			S3Endpoint:      s.s3Endpoint,
+			Region:          s.s3Region,
+		}); err == nil {
+			if names, err := rw.ListVolumeMarkers(); err == nil {
+				return names
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
