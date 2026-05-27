@@ -308,12 +308,13 @@
   function startRowDrag(e: MouseEvent) {
     e.preventDefault();
     rowDragging = true;
+    if (tabPanelEl) tabPanelEl.style.marginBottom = '';
+    tabPanelEl = panelEl.closest('.tab-panel') as HTMLElement | null;
     startY = e.clientY;
     startHeight = contentEl!.offsetHeight;
     startMaxHeight = window.innerHeight - contentEl!.getBoundingClientRect().top - 40;
     atBottom = false;
     atBottomStartHeight = startHeight;
-    tabPanelEl = panelEl.closest('.tab-panel') as HTMLElement | null;
     document.body.style.overflow = 'hidden';
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -362,17 +363,25 @@
     if (rowDragging) {
       rowDragging = false;
       atBottom = false;
-      if (tabPanelEl) {
-        tabPanelEl.style.marginBottom = '';
-        tabPanelEl = null;
-      }
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (window.scrollY > maxScroll) {
-        window.scrollTo(0, Math.max(0, maxScroll));
-      }
       document.body.style.overflow = '';
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+    }
+  }
+
+  function shrinkMarginOnScroll() {
+    if (tabPanelEl) {
+      const s = tabPanelEl.style.marginBottom;
+      if (s && s !== '' && s !== '0px' && s !== '0') {
+        const m = parseFloat(s);
+        if (m > 0) {
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const distFromBottom = maxScroll - window.scrollY;
+          if (distFromBottom > 0) {
+            tabPanelEl.style.marginBottom = Math.max(0, m - distFromBottom) + 'px';
+          }
+        }
+      }
     }
   }
 
@@ -381,11 +390,14 @@
   onMount(() => {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('scroll', shrinkMarginOnScroll);
   });
 
   onDestroy(() => {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
+    window.removeEventListener('scroll', shrinkMarginOnScroll);
+    if (tabPanelEl) tabPanelEl.style.marginBottom = '';
   });
 </script>
 
