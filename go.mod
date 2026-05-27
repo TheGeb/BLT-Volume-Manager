@@ -28,6 +28,5 @@ require (
 	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
-	github.com/restic/restic v0.18.1 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 )
