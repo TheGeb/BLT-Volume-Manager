@@ -13,6 +13,16 @@
   let filterVal = '';
   let statusFilter: 'all' | 'locked' | 'unlocked' = 'all';
   let hostFilterVal = '';
+  let showLockBorders = true;
+
+  const savedPref = typeof localStorage !== 'undefined' ? localStorage.getItem('showLockBorders') : null;
+  if (savedPref !== null) showLockBorders = JSON.parse(savedPref);
+
+  function toggleLockBorders() {
+    showLockBorders = !showLockBorders;
+    localStorage.setItem('showLockBorders', JSON.stringify(showLockBorders));
+  }
+
   $: filterVal = filter;
 
   function handleInput() { onFilterChange(filterVal); }
@@ -240,6 +250,9 @@
         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
         Collapse
       </button>
+      <button class="button button-secondary button-xs btn-icon-sm" on:click={toggleLockBorders}>
+        {showLockBorders ? 'Hide' : 'Show'} borders
+      </button>
     </div>
   </div>
 
@@ -259,7 +272,7 @@
     <div class="tree">
       {#each flatItems as item, idx (item.path)}
         <div transition:slide|local>
-          <div class="tree-row" class:in-lock={!!lockStyles[idx]} data-lock={lockStyles[idx] || ''} style="padding-left:{20 + item.depth * 20 - (lockStyles[idx] ? 2 : 0)}px;">
+          <div class="tree-row" class:in-lock={showLockBorders && !!lockStyles[idx]} data-lock={showLockBorders ? lockStyles[idx] || '' : ''} style="padding-left:{20 + item.depth * 20 - (showLockBorders && lockStyles[idx] ? 2 : 0)}px;">
             {#if item.isGroup}
               <button class="tree-group" on:click={() => toggle(item.path)} title={item.path}>
               <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -381,7 +394,8 @@
     width: 100%; box-sizing: border-box; text-decoration: none;
     transition: background 0.1s;
   }
-  .tree-group:hover, .tree-volume:hover { background: rgba(255,255,255,0.06); }
+  .tree-row:hover { background: rgba(255,255,255,0.06); border-radius: 8px; }
+  .tree-row[data-lock="middle"]:hover { border-radius: 0; }
   .tree-group .lock-badge { margin-left: auto; }
   .tree-name { font-weight: 500; white-space: nowrap; }
   .folder-icon, .volume-icon { flex-shrink: 0; opacity: 0.7; }
