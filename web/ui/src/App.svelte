@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { slide } from 'svelte/transition';
   import Banner from './components/Banner.svelte';
   import LandingPanel from './components/LandingPanel.svelte';
   import VolumeList from './components/VolumeList.svelte';
@@ -236,28 +237,30 @@
       {#if $activeTab === 'snapshots'}
         <div class="tab-panel">
           {#if $viewerOpen}
-            {#if $currentSnapshot}
-              <SnapshotViewer
-                snapshot={$currentSnapshot}
-                allSnapshots={$allSnapshots}
-                onClose={onCloseViewer}
-                initialDiffTarget={$diffTargetId}
-                onDiffChange={setDiffTarget}
-              />
-            {:else}
-              <div class="panel viewer-skeleton">
-                <div class="row gap" style="margin-bottom:12px;">
-                  <div class="skeleton" style="height:22px;width:200px;border-radius:6px;"></div>
-                  <div class="skeleton" style="height:32px;width:60px;border-radius:8px;margin-left:auto;"></div>
+            <div transition:slide>
+              {#if $currentSnapshot}
+                <SnapshotViewer
+                  snapshot={$currentSnapshot}
+                  allSnapshots={$allSnapshots}
+                  onClose={onCloseViewer}
+                  initialDiffTarget={$diffTargetId}
+                  onDiffChange={setDiffTarget}
+                />
+              {:else}
+                <div class="panel viewer-skeleton">
+                  <div class="row gap" style="margin-bottom:12px;">
+                    <div class="skeleton" style="height:22px;width:200px;border-radius:6px;"></div>
+                    <div class="skeleton" style="height:32px;width:60px;border-radius:8px;margin-left:auto;"></div>
+                  </div>
+                  <div class="skeleton" style="height:32px;width:300px;border-radius:8px;margin-bottom:12px;"></div>
+                  <div style="display:flex;gap:0;height:400px;">
+                    <div class="skeleton" style="flex:0 0 300px;border-radius:12px;"></div>
+                    <div style="width:12px;flex-shrink:0;"></div>
+                    <div class="skeleton" style="flex:1;border-radius:12px;"></div>
+                  </div>
                 </div>
-                <div class="skeleton" style="height:32px;width:300px;border-radius:8px;margin-bottom:12px;"></div>
-                <div style="display:flex;gap:0;height:400px;">
-                  <div class="skeleton" style="flex:0 0 300px;border-radius:12px;"></div>
-                  <div style="width:12px;flex-shrink:0;"></div>
-                  <div class="skeleton" style="flex:1;border-radius:12px;"></div>
-                </div>
-              </div>
-            {/if}
+              {/if}
+            </div>
           {/if}
 
           <SnapshotTable
