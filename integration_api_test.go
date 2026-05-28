@@ -1,0 +1,259 @@
+//go:build integration
+
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/example/blt-volume-manager/store"
+	"github.com/example/blt-volume-manager/testutil"
+	"github.com/example/blt-volume-manager/web"
+)
+
+// setupAPITest starts Garage, creates a driver + web server backed by real S3,
+// and returns the httptest.Server, the Garage ref, and a cleanup function.
+func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
+	t.Helper()
+
+	garage := testutil.StartGarage(t)
+
+	t.Setenv("AWS_ACCESS_KEY_ID", garage.AccessKey)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", garage.SecretKey)
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+	t.Setenv("S3_FORCE_PATH_STYLE", "true")
+
+	dataDir := t.TempDir()
+	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
+
+	mux := http.NewServeMux()
+	web.NewServer(dataDir, resticBase, garage.BucketName, garage.Endpoint, "us-east-1").Register(mux)
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	return ts, garage
+}
+
+func api(t *testing.T, ts *httptest.Server, method, path string, body interface{}) *http.Response {
+	t.Helper()
+	var r io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r = bytes.NewReader(b)
+	}
+	req, err := http.NewRequest(method, ts.URL+path, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+func apiOK(t *testing.T, ts *httptest.Server, method, path string, body interface{}) map[string]interface{} {
+	t.Helper()
+	resp := api(t, ts, method, path, body)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("%s %s: expected 200, got %d: %s", method, path, resp.StatusCode, string(b))
+	}
+	var m map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return m
+}
+
+func apiErr(t *testing.T, ts *httptest.Server, method, path string, body interface{}, wantCode int) map[string]interface{} {
+	t.Helper()
+	resp := api(t, ts, method, path, body)
+	defer resp.Body.Close()
+	if resp.StatusCode != wantCode {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("%s %s: expected %d, got %d: %s", method, path, wantCode, resp.StatusCode, string(b))
+	}
+	var m map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&m)
+	return m
+}
+
+func TestAPI_Volumes(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Empty list initially
+	m := apiOK(t, ts, "GET", "/api/volumes", nil)
+	vols, _ := m["volumes"].([]interface{})
+	if len(vols) != 0 {
+		t.Fatalf("expected 0 volumes, got %d", len(vols))
+	}
+}
+
+func TestAPI_RepoInitAndStatus(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Status before init — repo doesn't exist, should return 200 with status
+	m := apiOK(t, ts, "GET", "/api/repo/status?volume=test-vol", nil)
+	if m["initialized"] != false {
+		t.Fatal("expected uninitialized repo")
+	}
+
+	// Init the repo
+	m = apiOK(t, ts, "POST", "/api/repo/init?volume=test-vol", nil)
+	if m["status"] != "repository initialized" {
+		t.Fatalf("init failed: %v", m)
+	}
+
+	// Status after init
+	m = apiOK(t, ts, "GET", "/api/repo/status?volume=test-vol", nil)
+	if m["initialized"] != true {
+		t.Fatal("expected initialized repo")
+	}
+}
+
+func TestAPI_Snapshots(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Create test volume via the test endpoint (requires "group/name" format)
+	body := map[string]string{"name": "test-group/snap-vol"}
+	m := apiOK(t, ts, "POST", "/api/test/create-volume", body)
+	if m["status"] != "ok" {
+		t.Fatalf("create test volume: %v", m)
+	}
+
+	// List snapshots
+	m = apiOK(t, ts, "GET", "/api/snapshots?volume=test-group/snap-vol", nil)
+	snaps, _ := m["snapshots"].([]interface{})
+	if len(snaps) == 0 {
+		t.Fatal("expected at least 1 snapshot")
+	}
+}
+
+func TestAPI_Stats(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Stats for non-existent volume — should return 200 with empty stats
+	m := apiOK(t, ts, "GET", "/api/stats?volume=nonexistent", nil)
+	if m == nil {
+		t.Fatal("expected stats object")
+	}
+
+	// Create volume + backup via test endpoint
+	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "test-group/stat-vol"})
+
+	m = apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
+	snaps, _ := m["snapshots"].(map[string]interface{})
+	repo, _ := m["repo"].(map[string]interface{})
+	if snaps == nil || snaps["total"] == nil {
+		t.Fatal("expected snapshot stats")
+	}
+	if repo == nil || repo["total_size"] == nil {
+		t.Fatal("expected repo stats")
+	}
+}
+
+func TestAPI_Locks(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Create a lock
+	m := apiOK(t, ts, "POST", "/api/volume/test-vol/locks", nil)
+	if m["volume"] != "test-vol" {
+		t.Fatalf("unexpected lock response: %v", m)
+	}
+
+	// Read lock status
+	m = apiOK(t, ts, "GET", "/api/volume/test-vol/locks", nil)
+	if m["locked"] != true {
+		t.Fatal("expected locked volume")
+	}
+
+	// Delete locks
+	m = apiOK(t, ts, "DELETE", "/api/volume/test-vol/locks", nil)
+	if m["status"] != "locks deleted" {
+		t.Fatalf("delete locks: %v", m)
+	}
+
+	// Verify unlocked
+	m = apiOK(t, ts, "GET", "/api/volume/test-vol/locks", nil)
+	if m["locked"] == true {
+		t.Fatal("expected unlocked after deletion")
+	}
+}
+
+func TestAPI_DeleteVolume(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// Create volume via test endpoint (requires group/name format)
+	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "test-group/del-vol"})
+
+	// Delete volume — the locks handler expects simple names for the URL path
+	// but we delete the volume created under test-group/del-vol
+	m := apiOK(t, ts, "DELETE", "/api/volume/test-group/del-vol", nil)
+	if !strings.Contains(fmt.Sprint(m["status"]), "deleted") {
+		t.Fatalf("delete volume: %v", m)
+	}
+}
+
+func TestAPI_EdgeCases(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	// 404 for unknown paths
+	apiErr(t, ts, "GET", "/api/nonexistent", nil, http.StatusNotFound)
+	apiErr(t, ts, "POST", "/api/nonexistent", nil, http.StatusNotFound)
+
+	// Missing volume param on endpoints that need it
+	apiErr(t, ts, "POST", "/api/repo/init", nil, http.StatusBadRequest)
+	apiErr(t, ts, "GET", "/api/repo/status", nil, http.StatusBadRequest)
+
+	// Test create-volume with invalid name (missing "/")
+	resp := api(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "badname"})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for name without '/', got %d", resp.StatusCode)
+	}
+
+	// Wrong method on /api/volumes
+	resp = api(t, ts, "PUT", "/api/volumes", nil)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed && resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected method-not-allowed for PUT /api/volumes, got %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_S3StoreThroughGarage(t *testing.T) {
+	// Verify that stores created by the API handlers actually persist data in Garage
+	ts, garage := setupAPITest(t)
+
+	// Use the web server's lock endpoint to write data to S3
+	apiOK(t, ts, "POST", "/api/volume/persist-vol/locks", nil)
+
+	// Read it back via a direct AWS SDK call to Garage (bypassing the API)
+	directStore, err := store.NewS3Store(store.S3StoreOpts{
+		AwsBucketName: garage.BucketName,
+		S3Endpoint:    garage.Endpoint,
+		Region:        "us-east-1",
+	})
+	if err != nil {
+		t.Fatalf("create direct store: %v", err)
+	}
+
+	// The lock created above should be visible via a fresh store
+	objects, err := directStore.ListObjects(store.LockPrefix + "persist-vol/")
+	if err != nil {
+		t.Fatalf("list lock objects: %v", err)
+	}
+	if len(objects) == 0 {
+		t.Fatal("expected lock objects in Garage, found none")
+	}
+}

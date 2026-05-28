@@ -10,12 +10,25 @@ echo "========================================"
 echo
 
 # ---- Go tests ----
-echo "--- Go tests ---"
+echo "--- Go unit tests ---"
 if go test ./... -count=1 "$@"; then
-    echo -e "\n✓ Go tests passed"
+    echo -e "\n✓ Go unit tests passed"
 else
-    echo -e "\n✗ Go tests failed" >&2
+    echo -e "\n✗ Go unit tests failed" >&2
     EXIT_CODE=1
+fi
+
+echo
+echo "--- Go integration tests (requires Docker) ---"
+if docker info &>/dev/null; then
+    if go test -tags=integration -count=1 -v "$@" .; then
+        echo -e "\n✓ Go integration tests passed"
+    else
+        echo -e "\n✗ Go integration tests failed" >&2
+        EXIT_CODE=1
+    fi
+else
+    echo "  (skipped - Docker not available)"
 fi
 
 echo
