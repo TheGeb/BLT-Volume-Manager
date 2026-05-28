@@ -173,6 +173,8 @@ export async function loadAll(volume: string) {
       loadLockStatus(),
       loadStats(volume),
     ]);
+  } else {
+    await loadVolumes();
   }
   syncUrl();
 }

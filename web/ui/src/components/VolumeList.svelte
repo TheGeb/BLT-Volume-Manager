@@ -121,7 +121,7 @@
       for (const node of ns) {
         if (!node.children) continue;
         const leaves = collectLeafVolumes([node]);
-        const locks = leaves.map(l => lockInfo[l]).filter(Boolean);
+        const locks = leaves.map(l => lockInfo[l]).filter(l => l && l.locked);
         if (locks.length > 0 && locks.length === leaves.length) {
           const owners = [...new Set(locks.map(l => l.owner).filter(Boolean))];
           result[node.path] = owners.length === 1 ? { owner: owners[0] } : null;
@@ -156,7 +156,7 @@
     return { path: item.path, owner, status };
   });
 
-  $: bracketStyles = flatItemLocks.map((curr, idx) => {
+  $: lockStyles = flatItemLocks.map((curr, idx) => {
     if (!curr.owner) return null;
     
     const prev = idx > 0 ? flatItemLocks[idx - 1] : null;
@@ -173,14 +173,14 @@
 
   $: labelAtIdx = (() => {
     const map: Record<number, boolean> = {};
-    for (let i = 0; i < bracketStyles.length; i++) {
-      const style = bracketStyles[i];
+    for (let i = 0; i < lockStyles.length; i++) {
+      const style = lockStyles[i];
       if (!style) continue;
       if (style === 'single') { map[i] = true; continue; }
       if (style === 'start') {
         let len = 1;
-        for (let j = i + 1; j < bracketStyles.length; j++) {
-          if (!bracketStyles[j] || bracketStyles[j] === 'start') break;
+        for (let j = i + 1; j < lockStyles.length; j++) {
+          if (!lockStyles[j] || lockStyles[j] === 'start') break;
           len++;
         }
         const mid = i + Math.floor((len - 1) / 2);
@@ -192,13 +192,13 @@
 
   $: labelOffset = (() => {
     const map: Record<number, string> = {};
-    for (let i = 0; i < bracketStyles.length; i++) {
-      const style = bracketStyles[i];
+    for (let i = 0; i < lockStyles.length; i++) {
+      const style = lockStyles[i];
       if (!style) continue;
       if (style === 'start') {
         let len = 1;
-        for (let j = i + 1; j < bracketStyles.length; j++) {
-          if (!bracketStyles[j] || bracketStyles[j] === 'start') break;
+        for (let j = i + 1; j < lockStyles.length; j++) {
+          if (!lockStyles[j] || lockStyles[j] === 'start') break;
           len++;
         }
         if (len > 1 && len % 2 === 0) {
@@ -259,7 +259,7 @@
     <div class="tree">
       {#each flatItems as item, idx (item.path)}
         <div transition:slide|local>
-          <div class="tree-row" class:in-bracket={!!bracketStyles[idx]} data-bracket={bracketStyles[idx] || ''} style="padding-left:{20 + item.depth * 20}px;">
+          <div class="tree-row" class:in-lock={!!lockStyles[idx]} data-lock={lockStyles[idx] || ''} style="padding-left:{20 + item.depth * 20 - (lockStyles[idx] ? 2 : 0)}px;">
             {#if item.isGroup}
               <button class="tree-group" on:click={() => toggle(item.path)} title={item.path}>
               <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -293,7 +293,7 @@
                 <span class="tree-name">{item.name}</span>
                 <span class="lock-info" style:transform={labelOffset[idx] || ''}>
                   {#if volumeLockInfo[item.path]}
-                    {#if !bracketStyles[idx] || labelAtIdx[idx]}
+                    {#if !lockStyles[idx] || labelAtIdx[idx]}
                       <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
                         <span class="lock-text">{volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
                       </span>
@@ -301,7 +301,7 @@
                         <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
                       {/if}
                     {/if}
-                  {:else if !loading && !bracketStyles[idx]}
+                  {:else if !loading && !lockStyles[idx]}
                     <span class="lock-badge">—</span>
                   {/if}
                 </span>
@@ -349,26 +349,26 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; }
   .tree-row { display: flex; align-items: center; min-height: 36px; position: relative; box-sizing: border-box; }
-  .tree-row.in-bracket {
+  .tree-row.in-lock {
     background: color-mix(in srgb, var(--green) 8%, transparent);
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
   }
-  .tree-row[data-bracket="start"] {
+  .tree-row[data-lock="start"] {
     border-top: 2px solid var(--green);
     border-radius: 8px 8px 0 0;
   }
-  .tree-row[data-bracket="end"] {
+  .tree-row[data-lock="end"] {
     border-bottom: 2px solid var(--green);
     border-radius: 0 0 8px 8px;
   }
-  .tree-row[data-bracket="single"] {
+  .tree-row[data-lock="single"] {
     border-top: 2px solid var(--green);
     border-bottom: 2px solid var(--green);
     border-radius: 8px;
   }
-  .tree-row[data-bracket="end"],
-  .tree-row[data-bracket="single"] {
+  .tree-row[data-lock="end"],
+  .tree-row[data-lock="single"] {
     margin-bottom: -2px;
   }
   .tree-row > * { flex-shrink: 0; }
@@ -396,7 +396,7 @@
   }
   .lock-locked { color: var(--green); }
   .lock-unlocked { color: var(--muted); }
-  .lock-owner { font-size: 0.8rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lock-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
 
