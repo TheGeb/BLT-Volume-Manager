@@ -272,7 +272,7 @@
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
                 <span class="tree-name">{item.name}</span>
-                <span class="lock-info" style={labelOffset[idx] ? `transform:${labelOffset[idx]}` : ''}>
+                <span class="lock-info" style:transform={labelOffset[idx] || ''}>
                   {#if folderLocks[item.path] && labelAtIdx[idx]}
                     <span class="lock-badge lock-locked">
                       <span class="lock-text">Locked:</span>
@@ -291,7 +291,7 @@
                   <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                 </svg>
                 <span class="tree-name">{item.name}</span>
-                <span class="lock-info" style={labelOffset[idx] ? `transform:${labelOffset[idx]}` : ''}>
+                <span class="lock-info" style:transform={labelOffset[idx] || ''}>
                   {#if volumeLockInfo[item.path]}
                     {#if !bracketStyles[idx] || labelAtIdx[idx]}
                       <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
@@ -307,9 +307,7 @@
                 </span>
               </a>
             {/if}
-            {#if bracketStyles[idx]}
-              <span class="lock-bracket" class:bracket-start={bracketStyles[idx] === 'start'} class:bracket-middle={bracketStyles[idx] === 'middle'} class:bracket-end={bracketStyles[idx] === 'end'} class:bracket-single={bracketStyles[idx] === 'single'}></span>
-            {/if}
+
           </div>
         </div>
       {/each}
@@ -350,20 +348,28 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; }
-  .tree-row { display: flex; align-items: center; min-height: 36px; position: relative; }
+  .tree-row { display: flex; align-items: center; min-height: 36px; position: relative; box-sizing: border-box; }
   .tree-row.in-bracket {
     background: color-mix(in srgb, var(--green) 8%, transparent);
+    border-left: 2px solid var(--green);
+    border-right: 2px solid var(--green);
   }
   .tree-row[data-bracket="start"] {
-    border-radius: 8px 0 0 0;
+    border-top: 2px solid var(--green);
+    border-radius: 8px 8px 0 0;
   }
   .tree-row[data-bracket="end"] {
-    border-radius: 0 0 0 8px;
-    border-bottom: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
+    border-bottom: 2px solid var(--green);
+    border-radius: 0 0 8px 8px;
   }
   .tree-row[data-bracket="single"] {
-    border-radius: 8px 0 0 8px;
-    border-bottom: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
+    border-top: 2px solid var(--green);
+    border-bottom: 2px solid var(--green);
+    border-radius: 8px;
+  }
+  .tree-row[data-bracket="end"],
+  .tree-row[data-bracket="single"] {
+    margin-bottom: -2px;
   }
   .tree-row > * { flex-shrink: 0; }
 
@@ -393,55 +399,5 @@
   .lock-owner { font-size: 0.8rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
-  .lock-bracket {
-    position: absolute;
-    right: 4px;
-    top: 0;
-    height: 100%;
-    width: 10px;
-    pointer-events: none;
-  }
-  .lock-bracket::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    border-right: 2px solid var(--green);
-  }
-  .lock-bracket.bracket-start::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 6px;
-    height: 50%;
-    border-top: 2px solid var(--green);
-    border-right: 2px solid var(--green);
-    border-top-right-radius: 4px;
-  }
-  .lock-bracket.bracket-end::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 6px;
-    height: 50%;
-    border-bottom: 2px solid var(--green);
-    border-right: 2px solid var(--green);
-    border-bottom-right-radius: 4px;
-  }
-  .lock-bracket.bracket-single::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    width: 6px;
-    border-top: 2px solid var(--green);
-    border-bottom: 2px solid var(--green);
-    border-right: 2px solid var(--green);
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
+
 </style>
