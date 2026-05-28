@@ -203,7 +203,7 @@
         }
         if (len > 1 && len % 2 === 0) {
           const mid = i + len / 2 - 1;
-          map[mid] = 'translateY(50%)';
+          map[mid] = 'translateY(18px)';
         }
       }
     }
@@ -378,7 +378,7 @@
     padding: 6px 10px; border: none; border-radius: 8px;
     background: none; color: var(--text); font-size: 0.9rem;
     font-family: inherit; cursor: pointer; text-align: left;
-    width: 100%; text-decoration: none;
+    width: 100%; box-sizing: border-box; text-decoration: none;
     transition: background 0.1s;
   }
   .tree-group:hover, .tree-volume:hover { background: rgba(255,255,255,0.06); }
@@ -392,7 +392,7 @@
   }
   .lock-badge {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 0.78rem; font-weight: 600; color: var(--muted);
+    font-size: 0.9rem; font-weight: 600; color: var(--muted);
   }
   .lock-locked { color: var(--green); }
   .lock-unlocked { color: var(--muted); }
