@@ -7,7 +7,7 @@ type LockOwner struct {
 	ExpiryTime int64  `json:"expiry_time"`
 }
 
-func (l *LockOwner) GetRemainingTimeinSeconds() int64 {
+func (l *LockOwner) GetRemainingTimeInSeconds() int64 {
 	return l.ExpiryTime - time.Now().Unix()
 }
 

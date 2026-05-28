@@ -22,11 +22,11 @@
 
   $: filtered = volumes.filter(v => {
     if (filter && !v.toLowerCase().includes(filter.toLowerCase())) return false;
-    const li = volumeLockInfo[v];
-    if (!li) return true;
-    if (statusFilter === 'locked' && !li.locked) return false;
-    if (statusFilter === 'unlocked' && li.locked) return false;
-    if (hostFilterVal && li.owner !== hostFilterVal) return false;
+    const lockInfo = volumeLockInfo[v];
+    if (!lockInfo) return true;
+    if (statusFilter === 'locked' && !lockInfo.locked) return false;
+    if (statusFilter === 'unlocked' && lockInfo.locked) return false;
+    if (hostFilterVal && lockInfo.owner !== hostFilterVal) return false;
     return true;
   });
 
@@ -110,7 +110,7 @@
 
   function collectLeafVolumes(nodes: TreeNode[]): string[] {
     const leaves: string[] = [];
-    function walk(ns: TreeNode[]) { for (const n of ns) { if (n.children) walk(n.children!); else leaves.push(n.path); } }
+    function walk(items: TreeNode[]) { for (const n of items) { if (n.children) walk(n.children!); else leaves.push(n.path); } }
     walk(nodes);
     return leaves;
   }

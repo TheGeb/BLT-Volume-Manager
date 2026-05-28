@@ -70,7 +70,7 @@ func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint str
 
 	if lockBucket != "" {
 		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName: lockBucket,
+			AWSBucketName: lockBucket,
 			S3Endpoint:    s3Endpoint,
 			Region:        s3Region,
 		}); err == nil {

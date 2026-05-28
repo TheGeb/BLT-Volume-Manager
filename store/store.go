@@ -49,16 +49,16 @@ type S3rw struct {
 }
 
 type S3StoreOpts struct {
-	AwsBucketName   string
-	AwsLockFolder   string
-	AwsVolumePrefix string
+	AWSBucketName   string
+	AWSLockFolder   string
+	AWSVolumePrefix string
 	S3Endpoint      string
 	Region          string
 }
 
 func (opts S3StoreOpts) validate() error {
-	if opts.AwsBucketName == "" {
-		return fmt.Errorf("AwsBucketName required")
+	if opts.AWSBucketName == "" {
+		return fmt.Errorf("AWSBucketName required")
 	}
 	return nil
 }
@@ -116,12 +116,12 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 func (s *S3rw) PutObject(key string, data []byte) error {
 	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
+		Bucket: aws.String(s.opts.AWSBucketName),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
 	if LogS3 != nil {
-		LogS3("PutObject", s.opts.AwsBucketName, key, time.Since(start), err)
+		LogS3("PutObject", s.opts.AWSBucketName, key, time.Since(start), err)
 	}
 	return err
 }
@@ -129,11 +129,11 @@ func (s *S3rw) PutObject(key string, data []byte) error {
 func (s *S3rw) ReadObject(key string) ([]byte, error) {
 	start := time.Now()
 	output, err := s.s3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
+		Bucket: aws.String(s.opts.AWSBucketName),
 		Key:    aws.String(key),
 	})
 	if LogS3 != nil {
-		LogS3("GetObject", s.opts.AwsBucketName, key, time.Since(start), err)
+		LogS3("GetObject", s.opts.AWSBucketName, key, time.Since(start), err)
 	}
 	if err != nil {
 		var nsk *types.NoSuchKey
@@ -149,11 +149,11 @@ func (s *S3rw) ReadObject(key string) ([]byte, error) {
 func (s *S3rw) DeleteObject(key string) error {
 	start := time.Now()
 	_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
+		Bucket: aws.String(s.opts.AWSBucketName),
 		Key:    aws.String(key),
 	})
 	if LogS3 != nil {
-		LogS3("DeleteObject", s.opts.AwsBucketName, key, time.Since(start), err)
+		LogS3("DeleteObject", s.opts.AWSBucketName, key, time.Since(start), err)
 	}
 	return err
 }
@@ -162,21 +162,21 @@ func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
 	start := time.Now()
 	var objects []types.Object
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.opts.AwsBucketName),
+		Bucket: aws.String(s.opts.AWSBucketName),
 		Prefix: aws.String(prefix),
 	})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), err)
+				LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), err)
 			}
 			return nil, err
 		}
 		objects = append(objects, page.Contents...)
 	}
 	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), nil)
+		LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), nil)
 	}
 	return objects, nil
 }
@@ -185,7 +185,7 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	start := time.Now()
 	var prefixes []string
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.opts.AwsBucketName),
+		Bucket:    aws.String(s.opts.AWSBucketName),
 		Prefix:    aws.String(prefix),
 		Delimiter: aws.String(delimiter),
 	})
@@ -193,7 +193,7 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), err)
+				LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), err)
 			}
 			return nil, err
 		}
@@ -204,7 +204,7 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 		}
 	}
 	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.AwsBucketName, prefix, time.Since(start), nil)
+		LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), nil)
 	}
 	return prefixes, nil
 }
@@ -224,29 +224,29 @@ func (s *S3rw) DeleteObjectsWithPrefix(prefix string) error {
 		}
 	}
 	_, err = s.s3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-		Bucket: aws.String(s.opts.AwsBucketName),
+		Bucket: aws.String(s.opts.AWSBucketName),
 		Delete: &types.Delete{Objects: idents},
 	})
 	if err != nil {
-		return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.AwsBucketName, prefix, err)
+		return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.AWSBucketName, prefix, err)
 	}
 	return nil
 }
 
 func (s *S3rw) WriteVolumeMarker(name string) error {
-	return s.PutObject(s.opts.AwsVolumePrefix+name+".json", nil)
+	return s.PutObject(s.opts.AWSVolumePrefix+name+".json", nil)
 }
 
 func (s *S3rw) DeleteVolumeMarker(name string) error {
-	return s.DeleteObject(s.opts.AwsVolumePrefix + name + ".json")
+	return s.DeleteObject(s.opts.AWSVolumePrefix + name + ".json")
 }
 
 func (s *S3rw) ListVolumeMarkers() ([]string, error) {
-	objects, err := s.ListObjects(s.opts.AwsVolumePrefix)
+	objects, err := s.ListObjects(s.opts.AWSVolumePrefix)
 	if err != nil {
 		return nil, err
 	}
-	prefix := s.opts.AwsVolumePrefix
+	prefix := s.opts.AWSVolumePrefix
 	var names []string
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -262,7 +262,7 @@ func (s *S3rw) ListVolumeMarkers() ([]string, error) {
 }
 
 func (s *S3rw) DeleteLockObjects() error {
-	return s.DeleteObjectsWithPrefix(s.opts.AwsLockFolder)
+	return s.DeleteObjectsWithPrefix(s.opts.AWSLockFolder)
 }
 
 func (s *S3rw) WriteRestorePoint(volumeName string, rp RestorePoint) error {

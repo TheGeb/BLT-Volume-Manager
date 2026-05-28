@@ -52,7 +52,7 @@ func NewS3Locker(bucket string, endpoint string, region string) (Locker, error) 
 
 func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 	folder := s.lockFolder(name)
-	opts := store.S3StoreOpts{AwsBucketName: s.bucket, AwsLockFolder: folder, S3Endpoint: s.endpoint, Region: s.region}
+	opts := store.S3StoreOpts{AWSBucketName: s.bucket, AWSLockFolder: folder, S3Endpoint: s.endpoint, Region: s.region}
 	rw, err := store.NewS3Store(opts)
 	if err != nil {
 		return nil, fmt.Errorf("create s3 store: %w", err)
@@ -98,7 +98,7 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 		if err := json.Unmarshal(raw, &o); err != nil {
 			continue
 		}
-		if o.GetRemainingTimeinSeconds() <= 0 {
+		if o.GetRemainingTimeInSeconds() <= 0 {
 			rw.DeleteObject(*obj.Key)
 			continue
 		}
@@ -148,7 +148,7 @@ func (l *s3Lock) IsValid() (bool, error) {
 		if err := json.Unmarshal(raw, &o); err != nil {
 			continue
 		}
-		if o.GetRemainingTimeinSeconds() <= 0 {
+		if o.GetRemainingTimeInSeconds() <= 0 {
 			l.rw.DeleteObject(*obj.Key)
 			continue
 		}

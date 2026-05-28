@@ -10,7 +10,7 @@
   export let hostFilter = '';
   export let hosts: string[] = [];
   export let loading = false;
-  export let rpLoading: Record<string, boolean> = {};
+  export let restorePointLoading: Record<string, boolean> = {};
   export let sizeLoading: Record<string, boolean> = {};
   export let onSearch: (q: string) => void = () => {};
   export let onToggleSort: () => void = () => {};
@@ -118,13 +118,13 @@
         {#each snapshots as sn (sn.id)}
           <tr>
              <td style="text-align:center">
-               {#if rpLoading[sn.id]}
+               {#if restorePointLoading[sn.id]}
                  <svg width="20" height="20" viewBox="0 0 20 20" class="spin" style="vertical-align:middle;">
                    <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
                    <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
                  </svg>
                {:else}
-                  <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={rpLoading[sn.id]}>
+                  <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
                     <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
                       <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
                         stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />

@@ -13,7 +13,7 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
-const CTX = 3;
+const CONTEXT_LINES = 3;
 
 function lcsTable(a: string[], b: string[]): number[][] {
   const m = a.length, n = b.length;
@@ -47,11 +47,11 @@ function groupHunks(lines: DiffLine[]): DiffHunk[] {
   for (const line of lines) {
     if (line.type === 'ctx') {
       ctxCount++;
-      if (ctxCount > CTX) {
-        if (cur.length >= CTX) {
-          const ctxBefore = cur.slice(-CTX);
+      if (ctxCount > CONTEXT_LINES) {
+        if (cur.length >= CONTEXT_LINES) {
+          const ctxBefore = cur.slice(-CONTEXT_LINES);
           let firstNonCtx = ctxBefore.findIndex(l => l.type !== 'ctx');
-          const keepCtx = firstNonCtx === -1 ? CTX : CTX - firstNonCtx;
+          const keepCtx = firstNonCtx === -1 ? CONTEXT_LINES : CONTEXT_LINES - firstNonCtx;
           const hunkLines = cur.slice(0, -keepCtx);
           if (hunkLines.length > 0) {
             hunks.push(buildHunk(hunkLines));

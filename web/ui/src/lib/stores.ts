@@ -39,7 +39,7 @@ export const themeDark = writable(true);
 export const volumesLoading = writable(false);
 export const snapsLoading = writable(false);
 export const landingShown = writable(true);
-export const rpLoading = writable<Record<string, boolean>>({});
+export const restorePointLoading = writable<Record<string, boolean>>({});
 export const restorePointID = writable('');
 export const sizeLoading = writable<Record<string, boolean>>({});
 export const diffTargetId = writable('');
@@ -335,7 +335,7 @@ export async function setDiffTarget(id: string) {
 }
 
 export async function onAddTag(id: string, tag: string, vol: string) {
-	rpLoading.update(r => ({ ...r, [id]: true }));
+	restorePointLoading.update(r => ({ ...r, [id]: true }));
 	try {
 		const result = await api.addTag(id, tag, vol);
 		snapshots.set(result.snapshots);
@@ -345,12 +345,12 @@ export async function onAddTag(id: string, tag: string, vol: string) {
 		setBanner(`Failed to add tag: ${e}`, true);
 		await loadSnapshots(vol);
 	} finally {
-		rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+		restorePointLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
 	}
 }
 
 export async function onRemoveTag(id: string, tag: string, vol: string) {
-	rpLoading.update(r => ({ ...r, [id]: true }));
+	restorePointLoading.update(r => ({ ...r, [id]: true }));
 	try {
 		const result = await api.removeTag(id, tag, vol);
 		snapshots.set(result.snapshots);
@@ -360,7 +360,7 @@ export async function onRemoveTag(id: string, tag: string, vol: string) {
 		setBanner(`Failed to remove tag: ${e}`, true);
 		await loadSnapshots(vol);
 	} finally {
-		rpLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
+		restorePointLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
 	}
 }
 

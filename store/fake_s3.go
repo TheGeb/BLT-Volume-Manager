@@ -128,19 +128,19 @@ func (f *FakeS3) DeleteObjectsWithPrefix(prefix string) error {
 }
 
 func (f *FakeS3) WriteVolumeMarker(name string) error {
-	return f.PutObject(f.opts.AwsVolumePrefix+name+".json", nil)
+	return f.PutObject(f.opts.AWSVolumePrefix+name+".json", nil)
 }
 
 func (f *FakeS3) DeleteVolumeMarker(name string) error {
-	return f.DeleteObject(f.opts.AwsVolumePrefix + name + ".json")
+	return f.DeleteObject(f.opts.AWSVolumePrefix + name + ".json")
 }
 
 func (f *FakeS3) ListVolumeMarkers() ([]string, error) {
-	objects, err := f.ListObjects(f.opts.AwsVolumePrefix)
+	objects, err := f.ListObjects(f.opts.AWSVolumePrefix)
 	if err != nil {
 		return nil, err
 	}
-	prefix := f.opts.AwsVolumePrefix
+	prefix := f.opts.AWSVolumePrefix
 	var names []string
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -156,7 +156,7 @@ func (f *FakeS3) ListVolumeMarkers() ([]string, error) {
 }
 
 func (f *FakeS3) DeleteLockObjects() error {
-	return f.DeleteObjectsWithPrefix(f.opts.AwsLockFolder)
+	return f.DeleteObjectsWithPrefix(f.opts.AWSLockFolder)
 }
 
 func (f *FakeS3) WriteRestorePoint(volumeName string, rp RestorePoint) error {

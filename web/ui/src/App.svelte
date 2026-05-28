@@ -18,7 +18,7 @@
     stats, statsLoading, sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
     deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
     deleteVolLoading, creatingTest, testStatus, volumesLoading, snapsLoading, 
-    landingShown, rpLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
+    landingShown, restorePointLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
     diffTargetId, volumeLockInfo, restorePointID,
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
     onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
@@ -273,7 +273,7 @@
               hostFilter={$hostFilter}
               hosts={$hosts}
               loading={$snapsLoading}
-              rpLoading={$rpLoading}
+              restorePointLoading={$restorePointLoading}
               sizeLoading={$sizeLoading}
               restorePointID={$restorePointID}
               onSearch={onSearch}

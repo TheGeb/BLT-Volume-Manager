@@ -34,7 +34,7 @@ func (s *Server) volumeManager(volName string) *restic.Manager {
 	m := restic.NewManager(s.resticBase + "/restic/" + volName)
 	if s.s3Bucket != "" {
 		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName: s.s3Bucket,
+			AWSBucketName: s.s3Bucket,
 			S3Endpoint:    s.s3Endpoint,
 			Region:        s.s3Region,
 		}); err == nil {
@@ -47,8 +47,8 @@ func (s *Server) volumeManager(volName string) *restic.Manager {
 func (s *Server) volumeNames() []string {
 	if s.s3Bucket != "" {
 		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName:   s.s3Bucket,
-			AwsVolumePrefix: store.VolumePrefix,
+			AWSBucketName:   s.s3Bucket,
+			AWSVolumePrefix: store.VolumePrefix,
 			S3Endpoint:      s.s3Endpoint,
 			Region:          s.s3Region,
 		}); err == nil {

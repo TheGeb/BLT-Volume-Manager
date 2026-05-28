@@ -81,8 +81,8 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 			return
 		}
 		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName:   s.s3Bucket,
-			AwsVolumePrefix: store.VolumePrefix,
+			AWSBucketName:   s.s3Bucket,
+			AWSVolumePrefix: store.VolumePrefix,
 			S3Endpoint:      s.s3Endpoint,
 			Region:          s.s3Region,
 		})
@@ -95,7 +95,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 	// 2. Delete S3 restic repo data (if repo is S3-based)
 	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
 		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AwsBucketName: s.s3Bucket,
+			AWSBucketName: s.s3Bucket,
 			S3Endpoint:    s.s3Endpoint,
 			Region:        s.s3Region,
 		})
@@ -178,13 +178,13 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error
 		if err := json.Unmarshal(raw, &owner); err != nil {
 			continue
 		}
-		if owner.GetRemainingTimeinSeconds() <= 0 {
+		if owner.GetRemainingTimeInSeconds() <= 0 {
 			rw.DeleteObject(*obj.Key)
 			continue
 		}
 		result["locked"] = true
 		result["owner"] = owner.Name
-		result["expires_in"] = owner.GetRemainingTimeinSeconds()
+		result["expires_in"] = owner.GetRemainingTimeInSeconds()
 		break
 	}
 
@@ -258,7 +258,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 		if err := json.Unmarshal(raw, &o); err != nil {
 			continue
 		}
-		if o.GetRemainingTimeinSeconds() <= 0 {
+		if o.GetRemainingTimeInSeconds() <= 0 {
 			rw.DeleteObject(*obj.Key)
 			continue
 		}
@@ -279,9 +279,9 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 
 func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 	opts := store.S3StoreOpts{
-		AwsBucketName:   s.s3Bucket,
-		AwsLockFolder:   store.LockPrefix + volumeName + "/",
-		AwsVolumePrefix: store.VolumePrefix,
+		AWSBucketName:   s.s3Bucket,
+		AWSLockFolder:   store.LockPrefix + volumeName + "/",
+		AWSVolumePrefix: store.VolumePrefix,
 		S3Endpoint:      s.s3Endpoint,
 		Region:          s.s3Region,
 	}
