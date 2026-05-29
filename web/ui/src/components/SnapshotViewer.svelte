@@ -3,6 +3,7 @@
   import type { Snapshot, FileNode, DiffResult } from '../lib/types';
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
+  import { formatBytes } from '../lib/util';
   import * as api from '../lib/api';
   import { getSnapshotHash } from '../lib/stores';
   import FileTreeNode from './FileTreeNode.svelte';
@@ -27,12 +28,40 @@
   let compareLoading = true;
   let diffLoading = false;
 
+  let snapSizes: Record<string, string> = {};
+  let snapSizeLoading: Record<string, boolean> = {};
+
+  async function loadSnapSize(id: string) {
+    if (snapSizes[id] || snapSizeLoading[id]) return;
+    snapSizeLoading = { ...snapSizeLoading, [id]: true };
+    try {
+      const data = await api.fetchSnapshotSizes(snapshot.volume || '', [id]);
+      if (data[id] != null) {
+        snapSizes = { ...snapSizes, [id]: formatBytes(data[id]) };
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      snapSizeLoading = { ...snapSizeLoading, [id]: false };
+    }
+  }
+
   let treeEl: HTMLDivElement;
   let treePanelEl: HTMLDivElement;
   let contentEl: HTMLDivElement;
 
   $: diffMap = currentDiffResult ? buildDiffMap(currentDiffResult) : null;
   $: rootNode = buildTree(nodes, currentDiffResult);
+  $: diffOtherSnapshot = diffOtherId ? allSnapshots.find(s => s.id === diffOtherId || s.short_id === diffOtherId) : null;
+  $: fileContentDiffType = fileContentPath && diffMap
+    ? (diffMap.get(fileContentPath) ?? diffMap.get(fileContentPath.replace(/^\//, '')) ?? '')
+    : '';
+  $: fileContentDiffColor = !fileContentDiffType ? ''
+    : fileContentDiffType === 'added' ? 'var(--green)'
+    : fileContentDiffType === 'removed' ? 'var(--red)'
+    : fileContentDiffType === 'modified' ? 'var(--yellow)' : '';
+  $: if (snapshot) loadSnapSize(snapshot.id);
+  $: if (diffOtherId) loadSnapSize(diffOtherId);
 
   function buildDiffMap(diff: DiffResult): Map<string, string> {
     const m = new Map<string, string>();
@@ -145,6 +174,9 @@
     } finally {
       loading = false;
     }
+    if (initialDiffTarget && selectedCompareId) {
+      await doDiff(true);
+    }
   }
 
   $: compareSnaps = allSnapshots.filter(s => s.id !== snapshot.id);
@@ -212,6 +244,7 @@
   }
 
   async function viewFile(path: string) {
+    fileContent = '';
     fileContentLoading = true;
     fileContentPath = path;
     currentDiffHunks = [];
@@ -226,6 +259,7 @@
   }
 
   async function viewFileFromId(path: string, id: string) {
+    fileContent = '';
     fileContentLoading = true;
     fileContentPath = path;
     currentDiffHunks = [];
@@ -418,12 +452,48 @@
   });
 </script>
 
-<section class="panel" style="margin-bottom:16px;" bind:this={panelEl}>
-  <div class="row gap" style="margin-bottom:12px;">
-    <h2 class="eyebrow" style="margin:0;flex:1;">
-      Snapshot <span>{snapshot.short_id}</span>
-    </h2>
-    <button class="button button-secondary button-xs" on:click={onClose}>Close</button>
+<section class="panel" style="margin-bottom:16px;position:relative;" bind:this={panelEl}>
+  <button class="button button-secondary button-xs" on:click={onClose} style="position:absolute;top:24px;right:24px;">Close</button>
+
+  <div style="display:flex;gap:12px;margin-bottom:20px;padding-right:70px;">
+    <div style="flex:1;min-width:0;">
+      <h2 class="eyebrow" style="margin:0 0 4px;">
+        Snapshot <span style="text-transform:none;">{snapshot.short_id}</span>
+      </h2>
+      <div class="snap-meta">
+        {#if snapshot.hostname}
+          <span class="snap-meta-item">Host: <strong>{snapshot.hostname}</strong></span>
+        {/if}
+        <span class="snap-meta-item">{new Date(snapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(snapshot.time).toLocaleTimeString()}</span></span>
+        {#if snapshot.tags.length}
+          <span class="snap-meta-item">Tags: <strong>{snapshot.tags.join(', ')}</strong></span>
+        {/if}
+        <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+      </div>
+    </div>
+    {#if currentDiffResult && diffOtherSnapshot}
+      <div style="display:flex;align-items:center;flex-shrink:0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </div>
+      <div class="snap-meta-divider"></div>
+      <div style="flex:1;min-width:0;">
+        <h2 class="eyebrow" style="margin:0 0 4px;">
+          Diff <span style="text-transform:none;">{diffOtherSnapshot.short_id}</span>
+        </h2>
+        <div class="snap-meta">
+          {#if diffOtherSnapshot.hostname}
+            <span class="snap-meta-item">Host: <strong>{diffOtherSnapshot.hostname}</strong></span>
+          {/if}
+          <span class="snap-meta-item">{new Date(diffOtherSnapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(diffOtherSnapshot.time).toLocaleTimeString()}</span></span>
+          {#if diffOtherSnapshot.tags.length}
+            <span class="snap-meta-item">Tags: <strong>{diffOtherSnapshot.tags.join(', ')}</strong></span>
+          {/if}
+          <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+        </div>
+      </div>
+    {/if}
   </div>
 
   {#if compareLoading}
@@ -432,7 +502,7 @@
       <span class="skeleton-btn-bar"></span>
     </div>
   {:else}
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:20px;">
       {#if compareSnaps.length > 0}
         <select bind:value={selectedCompareId}>
           {#each compareSnaps as cs}
@@ -487,7 +557,7 @@
           {:else}
             <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
               onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff}
-              expanded={rootExpanded} expandKey={expandToggle} />
+              expanded={rootExpanded} expandKey={expandToggle} activePath={fileContentPath} />
           {/if}
         </div>
       </div>
@@ -504,7 +574,11 @@
               <path d="M12 2a10 10 0 0 1 10 10" />
             </svg>
           </div>
-        {:else if currentDiffHunks.length > 0}
+        {:else if fileContentPath}
+          <div style="font-size:0.82rem;color:{fileContentDiffColor || 'var(--accent)'};font-weight:600;padding:0 0 8px;margin-bottom:8px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:system-ui,sans-serif;">
+            {fileContentPath.replace(/^\//, '')}
+          </div>
+          {#if currentDiffHunks.length > 0}
             <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
               <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
               <button class="button button-secondary button-xs" style="margin-left:auto;" on:click={toggleDiffLayout}>
@@ -568,7 +642,7 @@
               {/each}
             {/if}
           {:else if fileContent}
-            {fileContent}
+            {fileContent.trimStart()}
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
@@ -581,6 +655,7 @@
               Select a file to view its contents
             </div>
           {/if}
+        {/if}
         </div>
       </div>
       <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -602,6 +677,28 @@
 
   .skeleton-select-bar { height: 32px; width: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
   .skeleton-btn-bar { height: 32px; width: 60px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+  .snap-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .snap-meta-item {
+    white-space: nowrap;
+  }
+  .snap-meta-item strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .snap-meta-muted {
+    color: var(--muted);
+  }
+  .snap-meta-divider {
+    width: 1px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
   .spin {
     animation: spin 1s linear infinite;
     vertical-align: middle;

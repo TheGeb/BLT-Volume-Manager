@@ -13,6 +13,7 @@
   export let onShowFileDiff: (path: string, otherId: string) => void = () => {};
   export let expanded = true;
   export let expandKey = 0;
+  export let activePath = '';
 
   let localExpanded = expanded;
   let fromBulk = true;
@@ -32,10 +33,17 @@
   $: chevronStyle = `transform:rotate(${localExpanded ? 0 : -90}deg);opacity:0.5;${fromBulk ? '' : 'transition:transform 0.15s;'}`;
 
   $: diffType = diffMap?.get(node.full_path ?? '') ?? diffMap?.get((node.path ?? '').replace(/^\//, '')) ?? diffMap?.get(node.name ?? '') ?? '';
+  $: isActive = activePath && (node.path === activePath || node.full_path === activePath);
+
   $: diffColor = !diffType ? ''
     : diffType === 'added' ? 'var(--green)'
     : diffType === 'removed' ? 'var(--red)'
     : diffType === 'modified' ? 'var(--yellow)' : '';
+
+  $: activeColor = isActive ? (diffColor || 'var(--accent)') : '';
+  $: fileColor = activeColor || (diffColor || 'var(--text)');
+  $: fileWeight = isActive ? 700 : 400;
+  $: fileBg = isActive ? `color-mix(in srgb, ${activeColor} 12%, transparent)` : '';
 
   $: dirDiffColor = node.dirDiffType
     ? ({ added: 'var(--green)', removed: 'var(--red)', modified: 'var(--yellow)' } as Record<string, string>)[node.dirDiffType] || ''
@@ -64,10 +72,12 @@
   }
 
   function handleMouseEnter(e: MouseEvent) {
+    if (isActive) return;
     (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
   }
 
   function handleMouseLeave(e: MouseEvent) {
+    if (isActive) return;
     (e.currentTarget as HTMLElement).style.background = '';
   }
 </script>
@@ -75,7 +85,7 @@
   {#if node.name === '/' && depth === 0}
   {#each children as child (child.path || child.name)}
     <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} />
+      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} />
   {/each}
   {:else if node.type === 'dir' || node.children}
 <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;"
@@ -104,14 +114,14 @@
     <div class="slide-inner">
       {#each children as child (child.path || child.name)}
         <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} />
+          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} />
       {/each}
     </div>
   </div>
   {/if}
 {:else}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor || 'var(--text)'};white-space:nowrap;"
+  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};background:{fileBg};white-space:nowrap;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
