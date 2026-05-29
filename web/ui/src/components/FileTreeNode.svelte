@@ -14,6 +14,8 @@
   export let expanded = true;
   export let expandKey = 0;
   export let activePath = '';
+  export let searchResults: string[] = [];
+  export let searchActivePath = '';
 
   let localExpanded = expanded;
   let fromBulk = true;
@@ -34,6 +36,9 @@
 
   $: diffType = diffMap?.get(node.full_path ?? '') ?? diffMap?.get((node.path ?? '').replace(/^\//, '')) ?? diffMap?.get(node.name ?? '') ?? '';
   $: isActive = activePath && (node.path === activePath || node.full_path === activePath);
+  $: nodePath = node.full_path || node.path;
+  $: isSearchMatch = searchResults.length > 0 && nodePath && searchResults.includes(nodePath);
+  $: isSearchActive = searchActivePath && (node.path === searchActivePath || node.full_path === searchActivePath);
 
   $: diffColor = !diffType ? ''
     : diffType === 'added' ? 'var(--green)'
@@ -42,12 +47,27 @@
 
   $: activeColor = isActive ? (diffColor || 'var(--accent)') : '';
   $: fileColor = activeColor || (diffColor || 'var(--text)');
-  $: fileWeight = isActive ? 700 : 400;
-  $: fileBg = isActive ? `color-mix(in srgb, ${activeColor} 12%, transparent)` : '';
+  $: fileWeight = isActive ? 700 : (isSearchActive ? 600 : 400);
+  $: fileBg = isActive
+    ? `color-mix(in srgb, ${activeColor} 12%, transparent)`
+    : isSearchActive
+      ? 'color-mix(in srgb, var(--accent) 14%, transparent)'
+      : isSearchMatch
+        ? 'color-mix(in srgb, var(--accent) 5%, transparent)'
+        : '';
+  $: fileBorder = isSearchActive ? '2px solid var(--accent)' : '2px solid transparent';
+
+  $: hlIndent = 8 + Math.max(0, depth - 1) * 18;
 
   $: dirDiffColor = node.dirDiffType
     ? ({ added: 'var(--green)', removed: 'var(--red)', modified: 'var(--yellow)' } as Record<string, string>)[node.dirDiffType] || ''
     : '';
+  $: dirBg = isSearchActive
+    ? 'color-mix(in srgb, var(--accent) 14%, transparent)'
+    : isSearchMatch
+      ? 'color-mix(in srgb, var(--accent) 5%, transparent)'
+      : '';
+  $: dirBorder = isSearchActive ? '2px solid var(--accent)' : '2px solid transparent';
 
   $: children = node.children ? Object.values(node.children).sort((a: any, b: any) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
@@ -70,29 +90,20 @@
       localExpanded = !localExpanded;
     }
   }
-
-  function handleMouseEnter(e: MouseEvent) {
-    if (isActive) return;
-    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
-  }
-
-  function handleMouseLeave(e: MouseEvent) {
-    if (isActive) return;
-    (e.currentTarget as HTMLElement).style.background = '';
-  }
 </script>
 
   {#if node.name === '/' && depth === 0}
   {#each children as child (child.path || child.name)}
     <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} />
+      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} />
   {/each}
-  {:else if node.type === 'dir' || node.children}
-<div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;"
+   {:else if node.type === 'dir' || node.children}
+<div role="button" tabindex="0" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;--hl-indent:{hlIndent}px;"
     on:click={handleClick}
-    on:keydown={(e) => e.key === 'Enter' && handleClick()}
-    on:mouseenter={handleMouseEnter}
-    on:mouseleave={handleMouseLeave}>
+    on:keydown={(e) => e.key === 'Enter' && handleClick()}>
+    {#if dirBg}
+    <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{dirBg};border:{dirBorder};border-radius:4px;pointer-events:none;"></div>
+    {/if}
     <div style="width:22px; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
         style={chevronStyle}>
@@ -114,18 +125,19 @@
     <div class="slide-inner">
       {#each children as child (child.path || child.name)}
         <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} />
+          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} />
       {/each}
     </div>
   </div>
   {/if}
 {:else}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};background:{fileBg};white-space:nowrap;"
+  <div role="button" tabindex="0" data-tree-path={node.full_path || node.path} class="tree-row" class:highlighted={!!fileBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};white-space:nowrap;position:relative;--hl-indent:{hlIndent}px;"
     on:click={handleClick}
-    on:keydown={(e) => e.key === 'Enter' && handleClick()}
-    on:mouseenter={handleMouseEnter}
-    on:mouseleave={handleMouseLeave}>
+    on:keydown={(e) => e.key === 'Enter' && handleClick()}>
+    {#if fileBg}
+    <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{fileBg};border:{fileBorder};border-radius:4px;pointer-events:none;"></div>
+    {/if}
     <div style="width:16px; flex-shrink:0;"></div>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
@@ -134,19 +146,7 @@
     {#if node.size != null}
       <span style="color:var(--muted);font-size:0.75rem;margin-left:auto;">{formatBytes(node.size)}</span>
     {/if}
-    {#if diffType && otherId}
-      {#if diffType === 'modified'}
-        <!-- svelte-ignore a11y-invalid-attribute -->
-        <a href="#" style="color:var(--accent);font-size:0.75rem;text-decoration:none;margin-left:auto;"
-          on:click|preventDefault|stopPropagation={() => onShowFileDiff(node.full_path || node.path, otherId)}>view diff</a>
-      {:else}
-        <!-- svelte-ignore a11y-invalid-attribute -->
-        <a href="#" style="color:var(--accent);font-size:0.75rem;text-decoration:none;margin-left:auto;"
-          on:click|preventDefault|stopPropagation={() => onViewFileFromId(node.full_path || node.path, diffType === 'added' ? otherId : currentSnapId)}>
-          view {diffType === 'added' ? 'new' : 'old'}
-        </a>
-      {/if}
-    {/if}
+
   </div>
 {/if}
 
@@ -154,20 +154,39 @@
   .slide-grid {
     display: grid;
     grid-template-rows: 0fr;
-    overflow: hidden;
-    transition: grid-template-rows 0.3s ease;
-    contain: layout style paint;
+    transition: grid-template-rows 0.3s ease, clip-path 0.3s ease;
+    contain: layout style;
     transform: translateZ(0);
+    clip-path: inset(0 -9999px 100% -9999px);
   }
   .slide-grid.expanded {
     grid-template-rows: 1fr;
+    clip-path: inset(0 -9999px 0 -9999px);
   }
   .slide-grid.no-anim {
     transition: none !important;
   }
   .slide-inner {
     min-height: 0;
-    overflow: hidden;
-    contain: layout style paint;
+  }
+  .tree-row::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin-left: calc(-1 * var(--hl-indent, 0px));
+    width: calc(100% + var(--hl-indent, 0px));
+    border-radius: 4px;
+    pointer-events: none;
+    background: rgba(255,255,255,0.06);
+    opacity: 0;
+  }
+  .tree-row:hover::before {
+    opacity: 1;
+  }
+  .tree-row.highlighted::before {
+    opacity: 0;
+  }
+  .tree-row.highlighted:hover::before {
+    opacity: 1;
   }
 </style>

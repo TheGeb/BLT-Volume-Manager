@@ -50,6 +50,88 @@
   let treePanelEl: HTMLDivElement;
   let contentEl: HTMLDivElement;
 
+  let treeSearchQuery = '';
+  let treeSearchResults: string[] = [];
+  let treeSearchIndex = -1;
+  let treeSearchExpanded = false;
+
+  function collectAllPaths(node: any): string[] {
+    const paths: string[] = [];
+    const p = node.full_path || node.path;
+    if (p) paths.push(p);
+    if (node.children) {
+      const sorted = Object.values(node.children).sort((a: any, b: any) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      for (const child of sorted) {
+        paths.push(...collectAllPaths(child));
+      }
+    }
+    return paths;
+  }
+
+  $: allTreePaths = rootNode ? collectAllPaths(rootNode) : [];
+  $: treeSearchResults = treeSearchQuery
+    ? allTreePaths.filter(p => p.toLowerCase().includes(treeSearchQuery.toLowerCase()))
+    : [];
+
+  $: if (treeSearchQuery && !treeSearchExpanded) {
+    rootExpanded = true;
+    expandToggle++;
+    treeSearchExpanded = true;
+  }
+  $: if (!treeSearchQuery && treeSearchExpanded) {
+    treeSearchExpanded = false;
+  }
+
+  $: if (treeSearchResults.length > 0) {
+    const activeIdx = fileContentPath ? treeSearchResults.indexOf(fileContentPath) : -1;
+    if (activeIdx >= 0) {
+      treeSearchIndex = activeIdx;
+    } else if (treeSearchIndex < 0 || treeSearchIndex >= treeSearchResults.length) {
+      treeSearchIndex = 0;
+    }
+  } else if (treeSearchQuery) {
+    treeSearchIndex = -1;
+  } else {
+    treeSearchIndex = -1;
+  }
+
+  $: if (treeSearchIndex >= 0 && treeSearchResults.length > 0) {
+    tick().then(() => scrollToSearchResult(treeSearchIndex));
+  }
+
+  $: searchActivePath = treeSearchResults.length > 0 && treeSearchIndex >= 0
+    ? treeSearchResults[treeSearchIndex]
+    : '';
+
+  function scrollToSearchResult(index: number) {
+    const path = treeSearchResults[index];
+    if (!path || !treeEl) return;
+    const items = treeEl.querySelectorAll('[data-tree-path]');
+    for (const item of items) {
+      if (item.getAttribute('data-tree-path') === path) {
+        const el = item as HTMLElement;
+        const elRect = el.getBoundingClientRect();
+        const treeRect = treeEl.getBoundingClientRect();
+        const elTop = elRect.top - treeRect.top + treeEl.scrollTop;
+        treeEl.scrollTop = elTop - treeEl.clientHeight / 2 + el.offsetHeight / 2;
+        break;
+      }
+    }
+  }
+
+  function nextSearchResult() {
+    if (treeSearchResults.length === 0) return;
+    treeSearchIndex = (treeSearchIndex + 1) % treeSearchResults.length;
+  }
+
+  function prevSearchResult() {
+    if (treeSearchResults.length === 0) return;
+    treeSearchIndex = (treeSearchIndex - 1 + treeSearchResults.length) % treeSearchResults.length;
+  }
+
   $: diffMap = currentDiffResult ? buildDiffMap(currentDiffResult) : null;
   $: rootNode = buildTree(nodes, currentDiffResult);
   $: diffOtherSnapshot = diffOtherId ? allSnapshots.find(s => s.id === diffOtherId || s.short_id === diffOtherId) : null;
@@ -524,6 +606,17 @@
    <div id="viewerContent" style="display:flex;flex-direction:column;gap:8px;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
     <div style="display:flex;flex:1;min-height:0;">
       <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
+            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" />
+          {#if treeSearchQuery}
+            <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;">
+              {treeSearchResults.length > 0 ? treeSearchIndex + 1 : 0}/{treeSearchResults.length}
+            </span>
+            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} on:click={prevSearchResult}>▲</button>
+            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} on:click={nextSearchResult}>▼</button>
+          {/if}
+        </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(true)}>
             <span style="position:absolute;left:8px;">
@@ -557,7 +650,8 @@
           {:else}
             <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
               onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff}
-              expanded={rootExpanded} expandKey={expandToggle} activePath={fileContentPath} />
+              expanded={rootExpanded} expandKey={expandToggle} activePath={fileContentPath}
+              searchResults={treeSearchResults} searchActivePath={searchActivePath} />
           {/if}
         </div>
       </div>
@@ -641,8 +735,7 @@
                 {/each}
               {/each}
             {/if}
-          {:else if fileContent}
-            {fileContent.trimStart()}
+          {:else if fileContent}{fileContent.trimStart()}
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
