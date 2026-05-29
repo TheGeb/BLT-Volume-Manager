@@ -54,6 +54,7 @@
   let treeSearchResults: string[] = [];
   let treeSearchIndex = -1;
   let searchNavCount = 0;
+  let treeSearchFullPath = false;
 
   function collectAllPaths(node: any): string[] {
     const paths: string[] = [];
@@ -73,7 +74,10 @@
 
   $: allTreePaths = rootNode ? collectAllPaths(rootNode) : [];
   $: treeSearchResults = treeSearchQuery
-    ? allTreePaths.filter(p => p.toLowerCase().includes(treeSearchQuery.toLowerCase()))
+    ? allTreePaths.filter(p => {
+        const target = treeSearchFullPath ? p : (p.split('/').pop() || p);
+        return target.toLowerCase().includes(treeSearchQuery.toLowerCase());
+      })
     : [];
 
   $: if (treeSearchResults.length > 0) {
@@ -629,6 +633,9 @@
             <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} on:click={nextSearchResult}>▼</button>
           {/if}
         </div>
+        <label style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+          <input type="checkbox" bind:checked={treeSearchFullPath} style="cursor:pointer;"> Full path search
+        </label>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(true)}>
             <span style="position:absolute;left:8px;">
