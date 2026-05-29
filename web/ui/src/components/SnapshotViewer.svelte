@@ -53,7 +53,7 @@
   let treeSearchQuery = '';
   let treeSearchResults: string[] = [];
   let treeSearchIndex = -1;
-  let treeSearchExpanded = false;
+  let searchNavCount = 0;
 
   function collectAllPaths(node: any): string[] {
     const paths: string[] = [];
@@ -76,15 +76,6 @@
     ? allTreePaths.filter(p => p.toLowerCase().includes(treeSearchQuery.toLowerCase()))
     : [];
 
-  $: if (treeSearchQuery && !treeSearchExpanded) {
-    rootExpanded = true;
-    expandToggle++;
-    treeSearchExpanded = true;
-  }
-  $: if (!treeSearchQuery && treeSearchExpanded) {
-    treeSearchExpanded = false;
-  }
-
   $: if (treeSearchResults.length > 0) {
     const activeIdx = fileContentPath ? treeSearchResults.indexOf(fileContentPath) : -1;
     if (activeIdx >= 0) {
@@ -98,8 +89,27 @@
     treeSearchIndex = -1;
   }
 
-  $: if (treeSearchIndex >= 0 && treeSearchResults.length > 0) {
-    tick().then(() => scrollToSearchResult(treeSearchIndex));
+  let searchAncestorPaths: Set<string> = new Set();
+
+  $: if (treeSearchResults.length > 0) {
+    const paths = new Set<string>();
+    for (const p of treeSearchResults) {
+      const parts = p.replace(/^\//, '').split('/');
+      let current = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        current += '/' + parts[i];
+        paths.add(current);
+      }
+    }
+    searchAncestorPaths = paths;
+  } else {
+    searchAncestorPaths = new Set<string>();
+  }
+
+  $: if (searchNavCount || (treeSearchIndex >= 0 && treeSearchResults.length > 0)) {
+    tick().then(() => {
+      requestAnimationFrame(() => scrollToSearchResult(treeSearchIndex));
+    });
   }
 
   $: searchActivePath = treeSearchResults.length > 0 && treeSearchIndex >= 0
@@ -125,11 +135,13 @@
   function nextSearchResult() {
     if (treeSearchResults.length === 0) return;
     treeSearchIndex = (treeSearchIndex + 1) % treeSearchResults.length;
+    searchNavCount++;
   }
 
   function prevSearchResult() {
     if (treeSearchResults.length === 0) return;
     treeSearchIndex = (treeSearchIndex - 1 + treeSearchResults.length) % treeSearchResults.length;
+    searchNavCount++;
   }
 
   $: diffMap = currentDiffResult ? buildDiffMap(currentDiffResult) : null;
@@ -196,7 +208,7 @@
           cur.children[p] = n;
         } else {
           if (!cur.children[p]) {
-            cur.children[p] = { name: p, type: 'dir', children: {} };
+            cur.children[p] = { name: p, type: 'dir', path: '/' + parts.slice(0, i + 1).join('/'), children: {} };
           } else if (!cur.children[p].children) {
             cur.children[p].children = {};
           }
@@ -608,7 +620,7 @@
       <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
-            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" />
+            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
           {#if treeSearchQuery}
             <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;">
               {treeSearchResults.length > 0 ? treeSearchIndex + 1 : 0}/{treeSearchResults.length}
@@ -651,7 +663,7 @@
             <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
               onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff}
               expanded={rootExpanded} expandKey={expandToggle} activePath={fileContentPath}
-              searchResults={treeSearchResults} searchActivePath={searchActivePath} />
+              searchResults={treeSearchResults} searchActivePath={searchActivePath} searchAncestorPaths={searchAncestorPaths} />
           {/if}
         </div>
       </div>
@@ -660,7 +672,7 @@
         on:mousedown={startColDrag}>
         <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
       </div>
-      <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;font-family:monospace;">
+      <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;font-family:monospace;">
         {#if loading}
           <div style="text-align:center;padding:40px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
@@ -735,7 +747,7 @@
                 {/each}
               {/each}
             {/if}
-          {:else if fileContent}{fileContent.trimStart()}
+          {:else if fileContent}<div style="white-space:pre-wrap;">{fileContent.trimStart()}</div>
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">

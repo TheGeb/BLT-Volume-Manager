@@ -16,14 +16,19 @@
   export let activePath = '';
   export let searchResults: string[] = [];
   export let searchActivePath = '';
+  export let searchAncestorPaths: Set<string> = new Set();
 
   let localExpanded = expanded;
   let fromBulk = true;
   let everExpanded = expanded;
+  let forceNoAnim = false;
+  let prevSearchAncestorPaths: Set<string> = new Set();
+  let prevActivePath = '';
+  let prevSearchActivePath = '';
 
   $: if (localExpanded) everExpanded = true;
 
-  $: noAnim = fromBulk && depth > 1;
+  $: noAnim = (fromBulk && depth > 1) || forceNoAnim;
 
   $: {
     expanded;
@@ -32,11 +37,38 @@
     fromBulk = true;
   }
 
+  $: nodePath = node.full_path || node.path;
+
+  $: if (searchAncestorPaths !== prevSearchAncestorPaths) {
+    prevSearchAncestorPaths = searchAncestorPaths;
+    if (searchAncestorPaths.size > 0 && nodePath && searchAncestorPaths.has(nodePath) && !localExpanded) {
+      forceNoAnim = true;
+      localExpanded = true;
+    }
+  }
+
+  $: if (activePath !== prevActivePath) {
+    prevActivePath = activePath;
+    if (activePath && nodePath && activePath.startsWith(nodePath + '/') && !localExpanded) {
+      localExpanded = true;
+    }
+  }
+
+  $: if (searchActivePath !== prevSearchActivePath) {
+    prevSearchActivePath = searchActivePath;
+    if (searchActivePath && nodePath && searchActivePath.startsWith(nodePath + '/') && !localExpanded) {
+      localExpanded = true;
+    }
+  }
+
+  $: if (searchAncestorPaths.size === 0) {
+    forceNoAnim = false;
+  }
+
   $: chevronStyle = `transform:rotate(${localExpanded ? 0 : -90}deg);opacity:0.5;${fromBulk ? '' : 'transition:transform 0.15s;'}`;
 
   $: diffType = diffMap?.get(node.full_path ?? '') ?? diffMap?.get((node.path ?? '').replace(/^\//, '')) ?? diffMap?.get(node.name ?? '') ?? '';
   $: isActive = activePath && (node.path === activePath || node.full_path === activePath);
-  $: nodePath = node.full_path || node.path;
   $: isSearchMatch = searchResults.length > 0 && nodePath && searchResults.includes(nodePath);
   $: isSearchActive = searchActivePath && (node.path === searchActivePath || node.full_path === searchActivePath);
 
@@ -86,6 +118,7 @@
         onViewFile(node.full_path || node.path);
       }
     } else {
+      forceNoAnim = false;
       fromBulk = false;
       localExpanded = !localExpanded;
     }
@@ -95,9 +128,9 @@
   {#if node.name === '/' && depth === 0}
   {#each children as child (child.path || child.name)}
     <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} />
+      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} {searchAncestorPaths} />
   {/each}
-   {:else if node.type === 'dir' || node.children}
+    {:else if node.type === 'dir' || node.children}
 <div role="button" tabindex="0" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;--hl-indent:{hlIndent}px;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}>
@@ -125,7 +158,7 @@
     <div class="slide-inner">
       {#each children as child (child.path || child.name)}
         <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} />
+          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} {searchAncestorPaths} />
       {/each}
     </div>
   </div>
