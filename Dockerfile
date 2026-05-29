@@ -6,7 +6,12 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags='-s -w' -o /bin/s3vol
 
-FROM scratch
+FROM scratch AS plugin
 COPY --from=build /bin/s3vol /usr/local/bin/s3vol
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENTRYPOINT ["/usr/local/bin/s3vol"]
+
+FROM scratch AS web
+COPY --from=build /bin/s3vol /usr/local/bin/s3vol
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+ENTRYPOINT ["/usr/local/bin/s3vol", "--http-only"]
