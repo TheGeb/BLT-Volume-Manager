@@ -292,7 +292,7 @@
                     <span class="lock-badge lock-locked">
                       <span class="lock-text">Locked:</span>
                     </span>
-                    <span class="lock-owner">{folderLocks[item.path].owner}</span>
+                    <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
                   {/if}
                 </span>
               </button>

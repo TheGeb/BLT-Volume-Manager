@@ -101,7 +101,7 @@
       : '';
   $: dirBorder = isSearchActive ? '2px solid var(--accent)' : '2px solid transparent';
 
-  $: children = node.children ? Object.values(node.children).sort((a: any, b: any) => {
+  $: children = node.children ? (Object.values(node.children) as any[]).sort((a: any, b: any) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
     return a.name.localeCompare(b.name);
   }) : [];

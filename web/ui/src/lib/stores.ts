@@ -187,7 +187,7 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
   testStatus.set('');
   landingShown.set(false);
 
-  const tab = opts?.tab || 'snapshots';
+  const tab = (opts?.tab ?? 'snapshots') as 'snapshots' | 'repo';
   activeTab.set(tab);
 
   if (tab === 'snapshots' && opts?.snapshotId) {

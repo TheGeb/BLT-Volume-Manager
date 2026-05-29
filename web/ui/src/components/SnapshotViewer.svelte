@@ -266,7 +266,7 @@
         const target = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
         selectedCompareId = target ? target.id : initialDiffTarget;
       }
-      const fetchedNodes = await api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash);
+      const fetchedNodes = await api.fetchFileTree(snapshot.id, snapshot.volume!, undefined, snapshot.fallbackHash);
       nodes = fetchedNodes;
     } catch (e: any) {
       error = e.message;
@@ -316,7 +316,7 @@
         getSnapshotHash(snapA),
         getSnapshotHash(snapB)
       ]);
-      const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume, hashA, hashB);
+      const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume!, hashA, hashB);
       if (diffOtherId !== targetId) return;
       currentDiffResult = result;
       sideBySide = false;
@@ -356,7 +356,7 @@
     currentDiffHunks = [];
     error = '';
     try {
-      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume, path, await getSnapshotHash(snapshot));
+      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, await getSnapshotHash(snapshot));
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -372,7 +372,7 @@
     error = '';
     try {
       const snap = allSnapshots.find(s => s.id === id)!;
-      fileContent = await api.fetchFileContent(id, snapshot.volume, path, await getSnapshotHash(snap));
+      fileContent = await api.fetchFileContent(id, snapshot.volume!, path, await getSnapshotHash(snap));
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -394,8 +394,8 @@
         getSnapshotHash(snapB)
       ]);
       const [oldContent, newContent] = await Promise.all([
-        api.fetchFileContent(snapshot.id, snapshot.volume, path, hashA),
-        api.fetchFileContent(otherId, snapshot.volume, path, hashB),
+        api.fetchFileContent(snapshot.id, snapshot.volume!, path, hashA),
+        api.fetchFileContent(otherId, snapshot.volume!, path, hashB),
       ]);
       currentDiffHunks = computeDiff(oldContent.split('\n'), newContent.split('\n'));
       sideBySide = false;

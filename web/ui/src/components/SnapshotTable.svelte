@@ -68,7 +68,7 @@
           <th>
             <div class="filter-wrap">
               <span class="th-label">Type</span>
-              <button class="filter-btn" class:active={openFilter === 'type' || typeFilter !== 'all'} on:click|stopPropagation={() => toggleFilter('type')}>
+              <button aria-label="Filter by type" class="filter-btn" class:active={openFilter === 'type' || typeFilter !== 'all'} on:click|stopPropagation={() => toggleFilter('type')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                 </svg>
@@ -90,7 +90,7 @@
           <th>
             <div class="filter-wrap">
               <span class="th-label">Host</span>
-              <button class="filter-btn" class:active={openFilter === 'host' || hostFilter !== ''} on:click|stopPropagation={() => toggleFilter('host')}>
+              <button aria-label="Filter by host" class="filter-btn" class:active={openFilter === 'host' || hostFilter !== ''} on:click|stopPropagation={() => toggleFilter('host')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                 </svg>
