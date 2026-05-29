@@ -13,6 +13,7 @@
   export let onClose: () => void = () => {};
   export let initialDiffTarget: string = '';
   export let onDiffChange: (otherId: string) => void = () => {};
+  export let onSwapDiff: (newSnapshotId: string, newDiffId: string, newSnapshotHash?: string, newDiffHash?: string) => void = () => {};
 
   let nodes: FileNode[] = [];
   let loading = true;
@@ -341,6 +342,13 @@
     onDiffChange('');
   }
 
+  function handleSwapDiff() {
+    if (!diffOtherId) return;
+    const otherSnap = compareSnaps.find(s => s.id === diffOtherId || s.short_id === diffOtherId);
+    if (!otherSnap) return;
+    onSwapDiff(otherSnap.id, snapshot.id, otherSnap.fallbackHash, snapshot.fallbackHash);
+  }
+
   async function viewFile(path: string) {
     fileContent = '';
     fileContentLoading = true;
@@ -611,6 +619,7 @@
       {/if}
       {#if currentDiffResult}
         <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={clearDiff}>Clear diff</button>
+        <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={handleSwapDiff}>Swap diff</button>
       {/if}
     </div>
   {/if}

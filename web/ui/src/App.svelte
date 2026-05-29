@@ -15,11 +15,11 @@
   import { 
     snapshots, volumes, selectedVolume, volumeFilter, query, sortNewestFirst, hostname, prevStats, 
     typeFilter, hostFilter, themeDark, loading, activeTab, bannerText, bannerError, lockStatus, 
-    stats, statsLoading, sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
+    stats, statsLoading,     sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
     deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
     deleteVolLoading, creatingTest, testStatus, volumesLoading, snapsLoading, 
     landingShown, restorePointLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
-    diffTargetId, volumeLockInfo, restorePointID,
+    diffTargetId, diffTargetFallbackHash, volumeLockInfo, restorePointID,
     onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
     onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
     openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
@@ -245,6 +245,15 @@
                   onClose={onCloseViewer}
                   initialDiffTarget={$diffTargetId}
                   onDiffChange={setDiffTarget}
+                  onSwapDiff={(newSnapshotId, newDiffId, newSnapshotHash, newDiffHash) => {
+                    const newSnap = $allSnapshots.find(s => s.id === newSnapshotId);
+                    if (!newSnap) return;
+                    if (newSnapshotHash) newSnap.fallbackHash = newSnapshotHash;
+                    currentSnapshot.set(newSnap);
+                    diffTargetId.set(newDiffId);
+                    if (newDiffHash) diffTargetFallbackHash.set(newDiffHash);
+                    syncUrl();
+                  }}
                 />
               {:else}
                 <div class="panel viewer-skeleton">
