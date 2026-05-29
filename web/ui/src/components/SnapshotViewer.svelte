@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import type { Snapshot, FileNode, DiffResult } from '../lib/types';
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
@@ -134,15 +134,11 @@
     diffOtherId = '';
     sideBySide = false;
     try {
-      const shouldDiff = initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
-      if (shouldDiff) {
+      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget)) {
         const target = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
         selectedCompareId = target ? target.id : initialDiffTarget;
       }
-      const [fetchedNodes] = await Promise.all([
-        api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash),
-        shouldDiff ? doDiff() : Promise.resolve(),
-      ]);
+      const fetchedNodes = await api.fetchFileTree(snapshot.id, snapshot.volume, undefined, snapshot.fallbackHash);
       nodes = fetchedNodes;
     } catch (e: any) {
       error = e.message;
@@ -162,12 +158,6 @@
       if (found.id !== selectedCompareId) {
         selectedCompareId = found.id;
       }
-      if (lastInitialDiffTarget && lastInitialDiffTarget !== initialDiffTarget) {
-        const prevStale = !compareSnaps.some(s => s.id === lastInitialDiffTarget || s.short_id === lastInitialDiffTarget);
-        if (prevStale) {
-          doDiff(true);
-        }
-      }
       lastInitialDiffTarget = initialDiffTarget;
     } else {
       lastInitialDiffTarget = initialDiffTarget;
@@ -177,6 +167,10 @@
   }
   $: if (allSnapshots.length > 0) {
     compareLoading = false;
+  }
+  $: if (!loading && !diffLoading && !warmupDone && nodes.length > 0) {
+    warmupDone = true;
+    warmupAnimations();
   }
 
   async function doDiff(skipCallback = false) {
@@ -280,8 +274,27 @@
   }
 
   let rootExpanded = true;
+  let expandToggle = 0;
+  let treeOpacity = 1;
+  let warmupDone = false;
+
+  async function warmupAnimations() {
+    treeOpacity = 0;
+    await tick();
+    for (let i = 0; i < 2; i++) {
+      toggleAll(false);
+      await tick();
+      await new Promise(r => requestAnimationFrame(r));
+      toggleAll(true);
+      await tick();
+      await new Promise(r => requestAnimationFrame(r));
+    }
+    treeOpacity = 1;
+  }
+
   function toggleAll(open: boolean) {
     rootExpanded = open;
+    expandToggle++;
   }
 
   let colDragging = false;
@@ -385,7 +398,11 @@
     }
   }
 
-  $: if (snapshot) open();
+  $: if (snapshot) {
+    currentDiffResult = null;
+    warmupDone = false;
+    open();
+  }
 
   onMount(() => {
     document.addEventListener('mousemove', onMouseMove);
@@ -451,7 +468,7 @@
             <span style="flex:1;text-align:center;">Collapse</span>
           </button>
         </div>
-        <div id="viewerTree" style="overflow:auto;scrollbar-gutter:stable;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;" bind:this={treeEl}>
+        <div id="viewerTree" style="overflow:auto;scrollbar-gutter:stable;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;opacity:{treeOpacity};will-change:transform;" bind:this={treeEl}>
           {#if loading}
             <div style="text-align:center;padding:40px;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
@@ -469,7 +486,8 @@
             </div>
           {:else}
             <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
-              onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff} expanded={rootExpanded} />
+              onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff}
+              expanded={rootExpanded} expandKey={expandToggle} />
           {/if}
         </div>
       </div>

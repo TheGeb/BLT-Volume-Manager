@@ -44,8 +44,10 @@
   interface FlatItem { name: string; path: string; depth: number; isGroup: boolean; }
 
   $: tree = buildTree(filtered);
-  $: if (Object.keys(expanded).length === 0 && tree.length > 0) {
+  let autoExpanded = false;
+  $: if (!autoExpanded && Object.keys(expanded).length === 0 && tree.length > 0) {
     expanded = allExpanded(tree);
+    autoExpanded = true;
   }
   $: flatItems = flatten(tree, expanded, 0);
 

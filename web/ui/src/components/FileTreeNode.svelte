@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { slide } from 'svelte/transition';
   import type { FileNode, DiffResult } from '../lib/types';
   import { formatBytes } from '../lib/util';
   import FileTreeNode from './FileTreeNode.svelte';
@@ -13,17 +12,24 @@
   export let onViewFileFromId: (path: string, id: string) => void = () => {};
   export let onShowFileDiff: (path: string, otherId: string) => void = () => {};
   export let expanded = true;
+  export let expandKey = 0;
 
   let localExpanded = expanded;
-  
-  // Use a key to force re-render when 'expanded' prop changes from parent
+  let fromBulk = true;
+  let everExpanded = expanded;
+
+  $: if (localExpanded) everExpanded = true;
+
+  $: noAnim = fromBulk && depth > 1;
+
   $: {
     expanded;
+    expandKey;
     localExpanded = expanded;
+    fromBulk = true;
   }
 
-
-
+  $: chevronStyle = `transform:rotate(${localExpanded ? 0 : -90}deg);opacity:0.5;${fromBulk ? '' : 'transition:transform 0.15s;'}`;
 
   $: diffType = diffMap?.get(node.full_path ?? '') ?? diffMap?.get((node.path ?? '').replace(/^\//, '')) ?? diffMap?.get(node.name ?? '') ?? '';
   $: diffColor = !diffType ? ''
@@ -52,6 +58,7 @@
         onViewFile(node.full_path || node.path);
       }
     } else {
+      fromBulk = false;
       localExpanded = !localExpanded;
     }
   }
@@ -65,12 +72,12 @@
   }
 </script>
 
-{#if node.name === '/' && depth === 0}
+  {#if node.name === '/' && depth === 0}
   {#each children as child (child.path || child.name)}
     <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} />
+      {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} />
   {/each}
-{:else if node.type === 'dir' || node.children}
+  {:else if node.type === 'dir' || node.children}
 <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}
@@ -78,7 +85,7 @@
     on:mouseleave={handleMouseLeave}>
     <div style="width:22px; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
-        style="transform:rotate({localExpanded ? 0 : -90}deg);opacity:0.5;transition:transform 0.15s;">
+        style={chevronStyle}>
         <path d="M7 10l5 5 5-5H7z"/>
       </svg>
     </div>
@@ -87,17 +94,24 @@
     </svg>
     {node.name}
   </div>
-  {#if localExpanded}
-    <div style="margin-left:18px" transition:slide>
+  {#if localExpanded || everExpanded}
+  <div
+    class="slide-grid"
+    class:expanded={localExpanded}
+    class:no-anim={noAnim}
+    style="margin-left:18px"
+  >
+    <div class="slide-inner">
       {#each children as child (child.path || child.name)}
         <FileTreeNode node={child} depth={depth + 1} {diffMap} {otherId} {currentSnapId}
-          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} />
+          {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} />
       {/each}
     </div>
+  </div>
   {/if}
 {:else}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor};white-space:nowrap;"
+  <div role="button" tabindex="0" style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{diffColor || 'var(--text)'};white-space:nowrap;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}
     on:mouseenter={handleMouseEnter}
@@ -125,3 +139,25 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  .slide-grid {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: hidden;
+    transition: grid-template-rows 0.3s ease;
+    contain: layout style paint;
+    transform: translateZ(0);
+  }
+  .slide-grid.expanded {
+    grid-template-rows: 1fr;
+  }
+  .slide-grid.no-anim {
+    transition: none !important;
+  }
+  .slide-inner {
+    min-height: 0;
+    overflow: hidden;
+    contain: layout style paint;
+  }
+</style>
