@@ -634,7 +634,7 @@
          <div style="display:flex;gap:4px;align-items:center;">
           <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
             style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
-          <button class="button button-secondary button-xs mode-toggle" style="padding:4px 6px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
+          <button class="button button-secondary button-xs mode-toggle" style="padding:7px 6px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
             {#if treeSearchFullPath}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                 <line x1="17" y1="4" x2="7" y2="20"/>
