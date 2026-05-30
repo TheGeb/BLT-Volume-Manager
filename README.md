@@ -17,11 +17,8 @@ Restore selection (hot vs cold)
 S3 locker (optional)
 
 - To enable an S3-based cross-host locker, provide `S3_LOCK_BUCKET` (and optional `S3_LOCK_PREFIX`) environment variables.
-- A stub is provided in `locker/s3_stub.go`. You can either build the project with a real S3 locker implementation behind the `s3` build tag, or implement `NewS3Locker` to wrap `github.com/Cool-fire/aws-s3-lock`.
-
-- To enable an S3-based cross-host locker, provide `S3_LOCK_BUCKET` (and optional `S3_LOCK_PREFIX`) environment variables.
 - This project includes an S3-compatible locker implementation in `locker/s3_locker.go` which uses the AWS SDK v2 but supports any S3 provider by setting `S3_ENDPOINT` and `S3_FORCE_PATH_STYLE` as needed.
-- Lock keys are now stored under `volumes/<volume>/host-locks/` within the configured bucket/prefix, so you can share the same S3 bucket for both restic and lock metadata.
+- Lock keys are stored under `blt-volume-manager/locks/<volume>/` within the configured bucket.
 
 Environment variables used by the S3 locker:
 

@@ -50,7 +50,7 @@ function groupHunks(lines: DiffLine[]): DiffHunk[] {
       if (ctxCount > CONTEXT_LINES) {
         if (cur.length >= CONTEXT_LINES) {
           const ctxBefore = cur.slice(-CONTEXT_LINES);
-          let firstNonCtx = ctxBefore.findIndex(l => l.type !== 'ctx');
+          const firstNonCtx = ctxBefore.findIndex(l => l.type !== 'ctx');
           const keepCtx = firstNonCtx === -1 ? CONTEXT_LINES : CONTEXT_LINES - firstNonCtx;
           const hunkLines = cur.slice(0, -keepCtx);
           if (hunkLines.length > 0) {

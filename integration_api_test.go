@@ -238,9 +238,9 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 	// Use the web server's lock endpoint to write data to S3
 	apiOK(t, ts, "POST", "/api/volume/persist-vol/locks", nil)
 
-	// Read it back via a direct AWS SDK call to Garage (bypassing the API)
+	// Read it back via a direct S3 SDK call to Garage (bypassing the API)
 	directStore, err := store.NewS3Store(store.S3StoreOpts{
-		AwsBucketName: garage.BucketName,
+		S3Bucket:    garage.BucketName,
 		S3Endpoint:    garage.Endpoint,
 		Region:        "us-east-1",
 	})

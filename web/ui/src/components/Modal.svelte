@@ -28,9 +28,10 @@
 <style>
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0,0,0,0.6);
+    background: rgb(0 0 0 / 60%);
     display: flex; align-items: center; justify-content: center;
   }
+
   .modal {
     background: var(--surface);
     border: 1px solid var(--border);

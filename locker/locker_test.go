@@ -30,7 +30,9 @@ func TestFileLockerAcquire(t *testing.T) {
 		t.Error("lock file is empty")
 	}
 
-	lock.Release()
+	if err := lock.Release(); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
 }
 
 func TestFileLockIsValid(t *testing.T) {
@@ -50,7 +52,9 @@ func TestFileLockIsValid(t *testing.T) {
 		t.Error("expected valid lock")
 	}
 
-	lock.Release()
+	if err := lock.Release(); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
 
 	valid, err = lock.IsValid()
 	if err != nil {
@@ -105,7 +109,11 @@ func TestNewFileLockerCreatesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to acquire lock: %v", err)
 	}
-	defer lock.Release()
+	defer func() {
+		if err := lock.Release(); err != nil {
+			t.Errorf("Release: %v", err)
+		}
+	}()
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		t.Error("Acquire should create directory")

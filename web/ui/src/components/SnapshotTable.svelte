@@ -76,7 +76,7 @@
               {#if openFilter === 'type'}
                 <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
                 <div class="filter-dropdown" on:click|stopPropagation>
-                  {#each ['all', 'hot', 'cold'] as opt}
+                  {#each ['all', 'hot', 'cold'] as opt (opt)}
                     <button class="filter-opt" class:selected={typeFilter === opt}
                       on:click={() => { onTypeFilter(opt); openFilter = null; }}>
                       {opt === 'all' ? 'All' : opt}
@@ -100,7 +100,7 @@
                 <div class="filter-dropdown" on:click|stopPropagation>
                   <button class="filter-opt" class:selected={hostFilter === ''}
                     on:click={() => { onHostFilter(''); openFilter = null; }}>All</button>
-                  {#each hosts as h}
+                  {#each hosts as h (h)}
                     <button class="filter-opt" class:selected={hostFilter === h}
                       on:click={() => { onHostFilter(h); openFilter = null; }}>{h}</button>
                   {/each}
@@ -140,7 +140,7 @@
               {sn.short_id.slice(0, 8)}…
             </td>
             <td style="color:var(--muted);font-size:0.9rem;">
-              {#each ['hot', 'cold'] as t}
+              {#each ['hot', 'cold'] as t (t)}
                 {#if sn.tags.includes(t)}{t}{#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}{/if}
               {:else}—
               {/each}
@@ -212,7 +212,7 @@
   }
 
   .data-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(255 255 255 / 4%);
   }
 
   .copy-id {
@@ -231,9 +231,11 @@
     align-items: center;
     gap: 4px;
   }
+
   .th-label {
     white-space: nowrap;
   }
+
   .filter-btn {
     display: inline-flex;
     align-items: center;
@@ -248,10 +250,12 @@
     padding: 0;
     line-height: 0;
   }
+
   .filter-btn:hover, .filter-btn.active {
     background: var(--hover-bg);
     color: var(--text);
   }
+
   .filter-dropdown {
     position: absolute;
     top: 100%;
@@ -261,10 +265,11 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     min-width: 100px;
     margin-top: 4px;
   }
+
   .filter-opt {
     display: block;
     width: 100%;
@@ -278,19 +283,23 @@
     cursor: pointer;
     white-space: nowrap;
   }
+
   .filter-opt:hover {
     background: var(--hover-bg);
   }
+
   .filter-opt.selected {
     color: var(--accent);
     font-weight: 600;
   }
+
   .rp-btn, .size-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
     line-height: 0;
   }
   .rp-btn:disabled { cursor: default; }
+
   .size-btn {
     width: 22px; height: 22px; border-radius: 4px; opacity: 0.5;
     color: var(--muted);
@@ -304,10 +313,12 @@
     font-size: 11px; font-weight: 700; cursor: help; font-style: normal;
     margin-left: 6px; vertical-align: middle;
   }
+
   .spin {
     animation: spin 1s linear infinite;
     vertical-align: middle;
   }
+
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -319,11 +330,11 @@
     background: var(--surface-strong); color: var(--text);
     padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 400;
     white-space: normal; width: 260px; z-index: 10; pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     margin-top: 6px; text-align: center;
   }
 
-  @media (max-width: 900px) {
+  @media (width <= 900px) {
     .data-table {
       min-width: 0;
     }

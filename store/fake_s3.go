@@ -1,8 +1,6 @@
 package store
 
 import (
-	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -128,65 +126,31 @@ func (f *FakeS3) DeleteObjectsWithPrefix(prefix string) error {
 }
 
 func (f *FakeS3) WriteVolumeMarker(name string) error {
-	return f.PutObject(f.opts.AWSVolumePrefix+name+".json", nil)
+	return f.PutObject(f.opts.S3VolumePrefix+name+".json", nil)
 }
 
 func (f *FakeS3) DeleteVolumeMarker(name string) error {
-	return f.DeleteObject(f.opts.AWSVolumePrefix + name + ".json")
+	return f.DeleteObject(f.opts.S3VolumePrefix + name + ".json")
 }
 
 func (f *FakeS3) ListVolumeMarkers() ([]string, error) {
-	objects, err := f.ListObjects(f.opts.AWSVolumePrefix)
-	if err != nil {
-		return nil, err
-	}
-	prefix := f.opts.AWSVolumePrefix
-	var names []string
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		name := strings.TrimPrefix(*obj.Key, prefix)
-		name = strings.TrimSuffix(name, ".json")
-		if name != "" {
-			names = append(names, name)
-		}
-	}
-	return names, nil
+	return ListVolumeMarkers(f, f.opts.S3VolumePrefix)
 }
 
 func (f *FakeS3) DeleteLockObjects() error {
-	return f.DeleteObjectsWithPrefix(f.opts.AWSLockFolder)
+	return f.DeleteObjectsWithPrefix(f.opts.S3LockFolder)
 }
 
 func (f *FakeS3) WriteRestorePoint(volumeName string, rp RestorePoint) error {
-	data, err := json.Marshal(rp)
-	if err != nil {
-		return fmt.Errorf("marshal restore point: %w", err)
-	}
-	key := RestorePointPrefix + volumeName + ".json"
-	return f.PutObject(key, data)
+	return WriteRestorePoint(f, volumeName, rp)
 }
 
 func (f *FakeS3) ReadRestorePoint(volumeName string) (*RestorePoint, error) {
-	key := RestorePointPrefix + volumeName + ".json"
-	data, err := f.ReadObject(key)
-	if err != nil {
-		return nil, err
-	}
-	if data == nil {
-		return nil, nil
-	}
-	var rp RestorePoint
-	if err := json.Unmarshal(data, &rp); err != nil {
-		return nil, fmt.Errorf("parse restore point: %w", err)
-	}
-	return &rp, nil
+	return ReadRestorePoint(f, volumeName)
 }
 
 func (f *FakeS3) DeleteRestorePoint(volumeName string) error {
-	key := RestorePointPrefix + volumeName + ".json"
-	return f.DeleteObject(key)
+	return DeleteRestorePoint(f, volumeName)
 }
 
 func timePtr(t time.Time) *time.Time { return &t }

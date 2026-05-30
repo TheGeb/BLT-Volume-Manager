@@ -35,7 +35,7 @@
 
   .volume-filter-input {
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(255 255 255 / 4%);
     color: var(--text);
     padding: 8px 16px;
     border-radius: 999px;

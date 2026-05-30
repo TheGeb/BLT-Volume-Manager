@@ -103,14 +103,14 @@
     height: 44px;
     border: 1px solid var(--border);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(255 255 255 / 4%);
     color: var(--muted);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
   }
 
   .button-icon:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgb(255 255 255 / 8%);
     color: var(--text);
   }
 
@@ -142,7 +142,6 @@
     margin-bottom: -2px;
     transition: color 0.15s, border-color 0.15s;
     letter-spacing: 0.02em;
-    -webkit-appearance: none;
     appearance: none;
     outline: none;
   }
@@ -164,7 +163,7 @@
     display: block;
   }
 
-  @media (max-width: 900px) {
+  @media (width <= 900px) {
     .topbar {
       flex-direction: column;
       align-items: flex-start;

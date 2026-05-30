@@ -131,7 +131,9 @@
       {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} {searchAncestorPaths} />
   {/each}
     {:else if node.type === 'dir' || node.children}
-<div role="button" tabindex="0" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;--hl-indent:{hlIndent}px;"
+<div role="button" tabindex="0" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;
+
+--hl-indent:{hlIndent}px;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}>
     {#if dirBg}
@@ -164,8 +166,9 @@
   </div>
   {/if}
 {:else}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div role="button" tabindex="0" data-tree-path={node.full_path || node.path} class="tree-row" class:highlighted={!!fileBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};white-space:nowrap;position:relative;--hl-indent:{hlIndent}px;"
+  <div role="button" tabindex="0" data-tree-path={node.full_path || node.path} class="tree-row" class:highlighted={!!fileBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};white-space:nowrap;position:relative;
+
+--hl-indent:{hlIndent}px;"
     on:click={handleClick}
     on:keydown={(e) => e.key === 'Enter' && handleClick()}>
     {#if fileBg}
@@ -192,16 +195,20 @@
     transform: translateZ(0);
     clip-path: inset(0 -9999px 100% -9999px);
   }
+
   .slide-grid.expanded {
     grid-template-rows: 1fr;
     clip-path: inset(0 -9999px 0 -9999px);
   }
+
   .slide-grid.no-anim {
     transition: none !important;
   }
+
   .slide-inner {
     min-height: 0;
   }
+
   .tree-row::before {
     content: '';
     position: absolute;
@@ -210,15 +217,18 @@
     width: calc(100% + var(--hl-indent, 0px));
     border-radius: 4px;
     pointer-events: none;
-    background: rgba(255,255,255,0.06);
+    background: rgb(255 255 255 / 6%);
     opacity: 0;
   }
+
   .tree-row:hover::before {
     opacity: 1;
   }
+
   .tree-row.highlighted::before {
     opacity: 0;
   }
+
   .tree-row.highlighted:hover::before {
     opacity: 1;
   }

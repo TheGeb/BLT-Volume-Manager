@@ -31,18 +31,21 @@
     border: 1px solid transparent;
   }
   .banner-slot.visible .banner { opacity: 1; }
+
   .banner.error {
-    background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.3);
+    background: rgb(239 68 68 / 8%); border-color: rgb(239 68 68 / 30%);
     color: var(--red);
   }
+
   .banner.info {
-    background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.3);
+    background: rgb(251 191 36 / 10%); border-color: rgb(251 191 36 / 30%);
     color: #fbbf24;
   }
+
   .banner-close {
     background: none; border: none; padding: 4px;
     cursor: pointer; color: inherit; opacity: 0.7;
     display: flex; align-items: center; flex-shrink: 0; border-radius: 6px;
   }
-  .banner-close:hover { opacity: 1; background: rgba(0,0,0,0.1); }
+  .banner-close:hover { opacity: 1; background: rgb(0 0 0 / 10%); }
 </style>

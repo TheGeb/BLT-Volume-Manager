@@ -51,11 +51,11 @@ func (m *Manager) generateHash(s Snapshot) string {
 // Manager wraps restic operations for a single repository.
 type Manager struct {
 	repo string
-	s3rw store.S3Store
+	s3Store store.S3Store
 }
 
-func (m *Manager) SetS3Store(s3rw store.S3Store) {
-	m.s3rw = s3rw
+func (m *Manager) SetS3Store(s3Store store.S3Store) {
+	m.s3Store = s3Store
 }
 
 type Snapshot struct {
@@ -75,41 +75,55 @@ func NewManager(repo string) *Manager { return &Manager{repo: repo} }
 func (m *Manager) Repo() string { return m.repo }
 
 func (m *Manager) Backup(path, tag string) error {
-	args := []string{"backup", path}
-	if tag != "" {
-		args = append(args, "--tag", tag)
+	return m.BackupInDir(path, tag, "")
+}
+
+func (m *Manager) BackupInDir(path, tag, workDir string) error {
+	args := m.backupArgs(path, tag, "")
+	if workDir != "" {
+		cmd, err := m.resticCommand(context.Background(), args...)
+		if err != nil {
+			return err
+		}
+		cmd.Dir = workDir
+		return m.runCommand(cmd)
 	}
-	compression := os.Getenv("RESTIC_COMPRESSION")
-	if compression == "" {
-		compression = "auto"
-	}
-	args = append(args, "--compression", compression)
-	cmd, err := m.resticCommand(context.Background(), args...)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(context.Background(), args...)
 }
 
 func (m *Manager) BackupAt(path, tag string, t time.Time) error {
+	args := m.backupArgs(path, tag, "")
+	if !t.IsZero() {
+		args = append(args, "--time", t.Format(time.RFC3339))
+	}
+	return m.runSimple(context.Background(), args...)
+}
+
+func (m *Manager) backupArgs(path, tag, extra string) []string {
 	args := []string{"backup", path}
 	if tag != "" {
 		args = append(args, "--tag", tag)
-	}
-	if !t.IsZero() {
-		args = append(args, "--time", t.Format(time.RFC3339))
 	}
 	compression := os.Getenv("RESTIC_COMPRESSION")
 	if compression == "" {
 		compression = "auto"
 	}
 	args = append(args, "--compression", compression)
-	cmd, err := m.resticCommand(context.Background(), args...)
+	if extra != "" {
+		args = append(args, extra)
+	}
+	return args
+}
+
+func (m *Manager) runSimple(ctx context.Context, args ...string) error {
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
+	return m.runCommand(cmd)
+}
+
+func (m *Manager) runCommand(cmd *exec.Cmd) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -146,40 +160,21 @@ func (m *Manager) ForgetSnapshot(snapshotID string) error {
 	if snapshotID == "" {
 		return errors.New("snapshot ID is required")
 	}
-	// restic forget deletes the snapshot and removes the associated data
-	cmd, err := m.resticCommand(context.Background(), "forget", snapshotID)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(context.Background(), "forget", snapshotID)
 }
 
 func (m *Manager) TagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	cmd, err := m.resticCommand(context.Background(), "tag", "--add", tag, snapshotID)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(context.Background(), "tag", "--add", tag, snapshotID)
 }
 
 func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	cmd, err := m.resticCommand(context.Background(), "tag", "--remove", tag, snapshotID)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(context.Background(), "tag", "--remove", tag, snapshotID)
 }
 
 func (m *Manager) RestoreIfExists(path, preferred string) error {
@@ -243,31 +238,6 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 	r.Stdout = os.Stdout
 	r.Stderr = os.Stderr
 	return r.Run()
-}
-
-func (m *Manager) StartSchedule(ctx context.Context, name, path string, hotInterval, coldInterval time.Duration) {
-	hotTicker := time.NewTicker(hotInterval)
-	coldTicker := time.NewTicker(coldInterval)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				hotTicker.Stop()
-				coldTicker.Stop()
-				return
-			case <-hotTicker.C:
-				log.Printf("restic hot backup for %s", name)
-				if err := m.Backup(path, "hot"); err != nil {
-					log.Printf("hot backup error: %v", err)
-				}
-			case <-coldTicker.C:
-				log.Printf("restic cold backup for %s", name)
-				if err := m.Backup(path, "cold"); err != nil {
-					log.Printf("cold backup error: %v", err)
-				}
-			}
-		}
-	}()
 }
 
 func (m *Manager) RepoExists() (bool, error) {
@@ -338,51 +308,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	cmd, err := m.resticCommand(ctx, "restore", snapshotID, "--target", target)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// volumeNameFromPath extracts the volume name from a path.
-func volumeNameFromPath(path string) string {
-	marker := "/volumes/"
-	if idx := strings.Index(path, marker); idx >= 0 {
-		rest := strings.TrimPrefix(path[idx+len(marker):], "/")
-		if parts := strings.SplitN(rest, "/", 2); len(parts) > 0 && parts[0] != "" {
-			return parts[0]
-		}
-	}
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	last := parts[len(parts)-1]
-	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
-		if strings.HasSuffix(last, suffix) {
-			return strings.TrimSuffix(last, suffix)
-		}
-	}
-	return ""
-}
-
-// pathBelongsToVolume checks whether a snapshot path belongs to the given volume.
-// Unlike volumeNameFromPath, this handles nested volume names containing "/" because
-// it uses the volume name as context rather than trying to extract an unknown name.
-func pathBelongsToVolume(snapPath, volume string) bool {
-	marker := "/volumes/"
-	if idx := strings.Index(snapPath, marker); idx >= 0 {
-		rest := strings.TrimPrefix(snapPath[idx+len(marker):], "/")
-		if rest == volume || strings.HasPrefix(rest, volume+"/") {
-			return true
-		}
-	}
-	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
-		if strings.HasSuffix(snapPath, "/"+volume+suffix) {
-			return true
-		}
-	}
-	return false
+	return m.runSimple(ctx, "restore", snapshotID, "--target", target)
 }
 
 // SetRestorePoint stores the snapshot as the restore-point for its volume in S3.
@@ -390,7 +316,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 	if snapshotID == "" {
 		return errors.New("snapshot ID is required")
 	}
-	if m.s3rw == nil {
+	if m.s3Store == nil {
 		return errors.New("S3 store not configured for restore points")
 	}
 
@@ -404,7 +330,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 		SnapshotID:   snapshotID,
 		FallbackHash: fallbackHash,
 	}
-	if err := m.s3rw.WriteRestorePoint(volume, rp); err != nil {
+	if err := m.s3Store.WriteRestorePoint(volume, rp); err != nil {
 		return fmt.Errorf("write restore point: %w", err)
 	}
 
@@ -414,7 +340,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 // FindRestorePoint reads the restore-point from S3 for the given volume path.
 // Returns the snapshot ID string, or empty string if none found.
 func (m *Manager) FindRestorePoint(volPath string) (string, error) {
-	if m.s3rw == nil {
+	if m.s3Store == nil {
 		return "", nil
 	}
 
@@ -428,7 +354,7 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", nil
 	}
 
-	rp, err := m.s3rw.ReadRestorePoint(targetVolume)
+	rp, err := m.s3Store.ReadRestorePoint(targetVolume)
 	if err != nil {
 		return "", fmt.Errorf("read restore point: %w", err)
 	}
@@ -440,10 +366,10 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 
 // DeleteRestorePoint removes the restore-point from S3 for the given volume.
 func (m *Manager) DeleteRestorePoint(volume string) error {
-	if m.s3rw == nil {
+	if m.s3Store == nil {
 		return nil
 	}
-	return m.s3rw.DeleteRestorePoint(volume)
+	return m.s3Store.DeleteRestorePoint(volume)
 }
 
 func (m *Manager) findSnapshotByID(snapshotID string) (*Snapshot, error) {
@@ -688,13 +614,7 @@ func isRepositoryMissing(output string) bool {
 }
 
 func (m *Manager) initRepository() error {
-	cmd, err := m.resticCommand(context.Background(), "init")
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(context.Background(), "init")
 }
 
 func (m *Manager) Check(noLock bool) error {
@@ -704,13 +624,7 @@ func (m *Manager) Check(noLock bool) error {
 	if noLock {
 		args = append(args, "--no-lock")
 	}
-	cmd, err := m.resticCommand(ctx, args...)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(ctx, args...)
 }
 
 func (m *Manager) Repair() error {
@@ -719,25 +633,13 @@ func (m *Manager) Repair() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	cmd, err := m.resticCommand(ctx, "repair", "index")
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(ctx, "repair", "index")
 }
 
 func (m *Manager) Unlock() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd, err := m.resticCommand(ctx, "unlock")
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return m.runSimple(ctx, "unlock")
 }
 
 func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {

@@ -2,9 +2,15 @@ package locker
 
 import (
 	"errors"
-	"os"
 	"testing"
+
+	"github.com/example/blt-volume-manager/store"
 )
+
+func IsLockOwned(err error) bool {
+	var le *LockError
+	return errors.As(err, &le) && le.Code == LockHeldByAnother
+}
 
 func TestIsLockOwned(t *testing.T) {
 	tests := []struct {
@@ -12,7 +18,7 @@ func TestIsLockOwned(t *testing.T) {
 		err      error
 		expected bool
 	}{
-		{"LockAlreadyOwned", &LockError{Code: LockAlreadyOwned, Msg: "held"}, true},
+		{"LockHeldByAnother", &LockError{Code: LockHeldByAnother, Msg: "held"}, true},
 		{"NoLockAcquired", &LockError{Code: NoLockAcquired, Msg: "failed"}, false},
 		{"nil", nil, false},
 		{"random error", errors.New("random"), false},
@@ -36,23 +42,21 @@ func TestGetHostname(t *testing.T) {
 }
 
 func TestLockFolder(t *testing.T) {
-	s := &s3Locker{}
-	got := s.lockFolder("my-volume")
+	got := store.LockFolder("my-volume")
 	want := "blt-volume-manager/locks/my-volume/"
 	if got != want {
-		t.Errorf("lockFolder() = %q, want %q", got, want)
+		t.Errorf("LockFolder() = %q, want %q", got, want)
 	}
 
-	got2 := s.lockFolder("group/sub-vol")
+	got2 := store.LockFolder("group/sub-vol")
 	want2 := "blt-volume-manager/locks/group/sub-vol/"
 	if got2 != want2 {
-		t.Errorf("lockFolder() = %q, want %q", got2, want2)
+		t.Errorf("LockFolder() = %q, want %q", got2, want2)
 	}
 }
 
 func TestNewS3Locker(t *testing.T) {
-	os.Setenv("S3_LOCK_MAX_MINS", "30")
-	defer os.Unsetenv("S3_LOCK_MAX_MINS")
+	t.Setenv("S3_LOCK_MAX_MINS", "30")
 
 	l, err := NewS3Locker("my-bucket", "http://localhost:9000", "us-east-1")
 	if err != nil {
@@ -78,7 +82,7 @@ func TestNewS3Locker(t *testing.T) {
 }
 
 func TestNewS3LockerDefaultMaxMins(t *testing.T) {
-	os.Unsetenv("S3_LOCK_MAX_MINS")
+	t.Setenv("S3_LOCK_MAX_MINS", "")
 
 	l, err := NewS3Locker("bucket", "", "")
 	if err != nil {
@@ -92,8 +96,7 @@ func TestNewS3LockerDefaultMaxMins(t *testing.T) {
 }
 
 func TestNewS3LockerInvalidEnv(t *testing.T) {
-	os.Setenv("S3_LOCK_MAX_MINS", "invalid")
-	defer os.Unsetenv("S3_LOCK_MAX_MINS")
+	t.Setenv("S3_LOCK_MAX_MINS", "invalid")
 
 	l, err := NewS3Locker("bucket", "", "")
 	if err != nil {
@@ -107,8 +110,7 @@ func TestNewS3LockerInvalidEnv(t *testing.T) {
 }
 
 func TestNewS3LockerZeroMaxMins(t *testing.T) {
-	os.Setenv("S3_LOCK_MAX_MINS", "0")
-	defer os.Unsetenv("S3_LOCK_MAX_MINS")
+	t.Setenv("S3_LOCK_MAX_MINS", "0")
 
 	l, err := NewS3Locker("bucket", "", "")
 	if err != nil {
@@ -122,7 +124,7 @@ func TestNewS3LockerZeroMaxMins(t *testing.T) {
 }
 
 func TestLockError(t *testing.T) {
-	err := &LockError{Code: LockAlreadyOwned, Msg: "lock held by another host"}
+	err := &LockError{Code: LockHeldByAnother, Msg: "lock held by another host"}
 	if err.Error() != "lock held by another host" {
 		t.Errorf("unexpected error message: %q", err.Error())
 	}

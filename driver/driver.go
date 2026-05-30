@@ -39,7 +39,7 @@ type Driver struct {
 	vols       map[string]*VolumeInfo
 	mu         sync.Mutex
 	zfsParent  string
-	s3rw       store.S3Store
+	s3Store    store.S3Store
 }
 
 func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint string, s3Region string) *Driver {
@@ -69,12 +69,12 @@ func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint str
 	}
 
 	if lockBucket != "" {
-		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName: lockBucket,
+		if s3, err := store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:    lockBucket,
 			S3Endpoint:    s3Endpoint,
 			Region:        s3Region,
 		}); err == nil {
-			drv.s3rw = rw
+			drv.s3Store = s3
 		} else {
 			log.Printf("failed to init s3 store for restore points: %v", err)
 		}
@@ -86,8 +86,8 @@ func NewDriver(root string, resticBase string, lockBucket string, s3Endpoint str
 
 func (d *Driver) ResticManager(volName string) *restic.Manager {
 	m := restic.NewManager(d.resticBase + "/restic/" + volName)
-	if d.s3rw != nil {
-		m.SetS3Store(d.s3rw)
+	if d.s3Store != nil {
+		m.SetS3Store(d.s3Store)
 	}
 	return m
 }
@@ -111,7 +111,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 
 	ctx := context.Background()
 	lock, err := d.locker.Acquire(ctx, name)
-	if err == nil { 
+	if err == nil {
 		//FIXME: Should it take latest even if it's a hot backup? Maybe send an alert
 		restoreMode := "latest"
 		if r.Options != nil {
@@ -123,8 +123,10 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		rm := d.ResticManager(name)
 		if err := rm.RestoreIfExists(volPath, restoreMode); err != nil {
 			log.Printf("restore failed: %v", err)
+			if rerr := lock.Release(); rerr != nil {
+				log.Printf("release lock: %v", rerr)
+			}
 		}
-		lock.Release() // FIXME: This doesn't seem right - should retain lock on success?
 	} else {
 		log.Printf("create: couldn't acquire lock for %s: %v", name, err)
 	}
@@ -204,17 +206,25 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	switch fsType {
 	case "btrfs":
 		log.Printf("btrfs subvolume delete %s", volPath)
-		exec.Command("btrfs", "subvolume", "delete", volPath).Run()
+		if err := exec.Command("btrfs", "subvolume", "delete", volPath).Run(); err != nil {
+			log.Printf("btrfs subvolume delete failed: %v", err)
+		}
 	case "zfs":
 		if ds, err := snapshot.ParentDataset(volPath); err == nil {
 			log.Printf("zfs destroy -r %s", ds)
-			exec.Command("zfs", "destroy", "-r", ds).Run()
+			if err := exec.Command("zfs", "destroy", "-r", ds).Run(); err != nil {
+				log.Printf("zfs destroy failed: %v", err)
+			}
 		}
 	default:
-		os.RemoveAll(volPath)
+		if err := os.RemoveAll(volPath); err != nil {
+			log.Printf("remove volume dir: %v", err)
+		}
 	}
 	if ok && vi.Lock != nil {
-		vi.Lock.Release()
+		if err := vi.Lock.Release(); err != nil {
+			log.Printf("release lock: %v", err)
+		}
 	}
 	return nil
 }
@@ -222,7 +232,9 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	name := r.Name
 	volPath := filepath.Join(d.root, "volumes", name)
-	os.MkdirAll(volPath, 0755)
+	if err := os.MkdirAll(volPath, 0755); err != nil {
+		return nil, fmt.Errorf("create volume dir: %w", err)
+	}
 
 	d.mu.Lock()
 	vi, ok := d.vols[name]
@@ -327,18 +339,18 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 	d.mu.Unlock()
 	state := "unlocked"
 	attached := 0
-	status := map[string]interface{}{
-		"state":    state,
-		"attached": fmt.Sprintf("%d", attached),
-	}
 	if ok {
 		attached = vi.attached
 		if vi.Lock != nil {
 			state = "locked"
 		}
-		if vi.FsType != "" {
-			status["fs_type"] = vi.FsType
-		}
+	}
+	status := map[string]interface{}{
+		"state":    state,
+		"attached": fmt.Sprintf("%d", attached),
+	}
+	if ok && vi.FsType != "" {
+		status["fs_type"] = vi.FsType
 	}
 	return &volume.GetResponse{Volume: &volume.Volume{Name: r.Name, Mountpoint: volPath, Status: status}}, nil
 }
@@ -402,10 +414,15 @@ func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {
 	data, err := os.ReadFile(filepath.Join(volPath, "volume.json"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		log.Printf("read volume config: %v", err)
 		return nil
 	}
 	var cfg volumeConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
+		log.Printf("parse volume config: %v", err)
 		return nil
 	}
 	return &cfg

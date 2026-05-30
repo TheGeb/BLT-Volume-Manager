@@ -380,7 +380,7 @@ export async function confirmDeleteSnapshot() {
     deletingSnap.set(null);
     setBanner('Snapshot deleted');
     await loadSnapshots(vol);
-  } catch (e: any) { setBanner(e.message, true); }
+  } catch (e: unknown) { setBanner((e as Error).message, true); }
 }
 
 export function openDeleteVolModal() {
@@ -408,9 +408,9 @@ export async function confirmDeleteVolume() {
       api.refreshStats().catch(() => {}),
       loadVolumes(),
     ]);
-  } catch (e: any) {
+  } catch (e: unknown) {
     deleteVolLoading.set(false);
-    setBanner(e.message, true);
+    setBanner((e as Error).message, true);
   }
 }
 
@@ -422,7 +422,7 @@ export async function handleCheck() {
   try {
     const msg = await api.checkRepo(vol);
     setBanner(msg);
-  } catch (e: any) { setBanner(e.message, true); }
+  } catch (e: unknown) { setBanner((e as Error).message, true); }
   finally { checking.set(false); }
 }
 
@@ -434,7 +434,7 @@ export async function handleRepair() {
   try {
     const msg = await api.repairRepo(vol);
     setBanner(msg);
-  } catch (e: any) { setBanner(e.message, true); }
+  } catch (e: unknown) { setBanner((e as Error).message, true); }
   finally { repairing.set(false); }
 }
 
@@ -447,7 +447,7 @@ export async function handleCreateTestVolume(name: string) {
     await api.refreshStats().catch(() => {});
     await loadVolumes();
     await loadAll(name);
-  } catch (e: any) { testStatus.set(e.message); }
+  } catch (e: unknown) { testStatus.set((e as Error).message); }
   finally { creatingTest.set(false); }
 }
 

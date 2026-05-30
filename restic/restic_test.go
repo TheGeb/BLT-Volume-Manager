@@ -3,6 +3,8 @@ package restic
 import (
 	"testing"
 	"time"
+
+	"github.com/example/blt-volume-manager/volumepath"
 )
 
 func TestHasTag(t *testing.T) {
@@ -67,9 +69,9 @@ func TestVolumeNameFromPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := volumeNameFromPath(tt.path)
+		got := volumepath.VolumeNameFromPath(tt.path)
 		if got != tt.expected {
-			t.Errorf("volumeNameFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
+			t.Errorf("VolumeNameFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
 		}
 	}
 }
@@ -223,9 +225,9 @@ func TestPathBelongsToVolume(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := pathBelongsToVolume(tt.path, tt.volume)
+		got := volumepath.PathBelongsToVolume(tt.path, tt.volume)
 		if got != tt.want {
-			t.Errorf("pathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
+			t.Errorf("PathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
 		}
 	}
 }
@@ -242,9 +244,9 @@ func TestPathBelongsToVolumeColdSnapEdgeCases(t *testing.T) {
 		{"/snaps/other-vol-cold-snap", "vol", false},
 	}
 	for _, tt := range tests {
-		got := pathBelongsToVolume(tt.path, tt.volume)
+		got := volumepath.PathBelongsToVolume(tt.path, tt.volume)
 		if got != tt.want {
-			t.Errorf("pathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
+			t.Errorf("PathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
 		}
 	}
 }

@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -43,29 +42,33 @@ type S3Store interface {
 	DeleteRestorePoint(vol string) error
 }
 
-type S3rw struct {
+type S3Client struct {
 	s3Client *s3.Client
 	opts     S3StoreOpts
 }
 
 type S3StoreOpts struct {
-	AWSBucketName   string
-	AWSLockFolder   string
-	AWSVolumePrefix string
+	S3Bucket    string
+	S3LockFolder   string
+	S3VolumePrefix string
 	S3Endpoint      string
 	Region          string
 }
 
 func (opts S3StoreOpts) validate() error {
-	if opts.AWSBucketName == "" {
-		return fmt.Errorf("AWSBucketName required")
+	if opts.S3Bucket == "" {
+		return fmt.Errorf("S3Bucket required")
 	}
 	return nil
 }
 
-var _ S3Store = (*S3rw)(nil)
+var _ S3Store = (*S3Client)(nil)
 
 func NewS3Store(opts S3StoreOpts) (S3Store, error) {
+	if err := opts.validate(); err != nil {
+		return nil, fmt.Errorf("invalid S3 store options: %w", err)
+	}
+
 	loadOpts := []func(*config.LoadOptions) error{}
 	if opts.Region != "" {
 		loadOpts = append(loadOpts, config.WithRegion(opts.Region))
@@ -103,37 +106,33 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 
 	client := s3.NewFromConfig(cfg, clientOpts...)
 
-	if err := opts.validate(); err != nil {
-		return nil, fmt.Errorf("invalid S3 store options: %w", err)
-	}
-
-	return &S3rw{
+	return &S3Client{
 		s3Client: client,
 		opts:     opts,
 	}, nil
 }
 
-func (s *S3rw) PutObject(key string, data []byte) error {
+func (s *S3Client) PutObject(key string, data []byte) error {
 	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket: aws.String(s.opts.AWSBucketName),
+		Bucket: aws.String(s.opts.S3Bucket),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
 	if LogS3 != nil {
-		LogS3("PutObject", s.opts.AWSBucketName, key, time.Since(start), err)
+		LogS3("PutObject", s.opts.S3Bucket, key, time.Since(start), err)
 	}
 	return err
 }
 
-func (s *S3rw) ReadObject(key string) ([]byte, error) {
+func (s *S3Client) ReadObject(key string) ([]byte, error) {
 	start := time.Now()
 	output, err := s.s3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(s.opts.AWSBucketName),
+		Bucket: aws.String(s.opts.S3Bucket),
 		Key:    aws.String(key),
 	})
 	if LogS3 != nil {
-		LogS3("GetObject", s.opts.AWSBucketName, key, time.Since(start), err)
+		LogS3("GetObject", s.opts.S3Bucket, key, time.Since(start), err)
 	}
 	if err != nil {
 		var nsk *types.NoSuchKey
@@ -142,50 +141,50 @@ func (s *S3rw) ReadObject(key string) ([]byte, error) {
 		}
 		return nil, err
 	}
-	defer output.Body.Close()
+	defer func() { _ = output.Body.Close() }()
 	return io.ReadAll(output.Body)
 }
 
-func (s *S3rw) DeleteObject(key string) error {
+func (s *S3Client) DeleteObject(key string) error {
 	start := time.Now()
 	_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-		Bucket: aws.String(s.opts.AWSBucketName),
+		Bucket: aws.String(s.opts.S3Bucket),
 		Key:    aws.String(key),
 	})
 	if LogS3 != nil {
-		LogS3("DeleteObject", s.opts.AWSBucketName, key, time.Since(start), err)
+		LogS3("DeleteObject", s.opts.S3Bucket, key, time.Since(start), err)
 	}
 	return err
 }
 
-func (s *S3rw) ListObjects(prefix string) ([]types.Object, error) {
+func (s *S3Client) ListObjects(prefix string) ([]types.Object, error) {
 	start := time.Now()
 	var objects []types.Object
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.opts.AWSBucketName),
+		Bucket: aws.String(s.opts.S3Bucket),
 		Prefix: aws.String(prefix),
 	})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), err)
+				LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
 			}
 			return nil, err
 		}
 		objects = append(objects, page.Contents...)
 	}
 	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), nil)
+		LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
 	}
 	return objects, nil
 }
 
-func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
+func (s *S3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	start := time.Now()
 	var prefixes []string
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.opts.AWSBucketName),
+		Bucket:    aws.String(s.opts.S3Bucket),
 		Prefix:    aws.String(prefix),
 		Delimiter: aws.String(delimiter),
 	})
@@ -193,7 +192,7 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), err)
+				LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
 			}
 			return nil, err
 		}
@@ -204,12 +203,12 @@ func (s *S3rw) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 		}
 	}
 	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.AWSBucketName, prefix, time.Since(start), nil)
+		LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
 	}
 	return prefixes, nil
 }
 
-func (s *S3rw) DeleteObjectsWithPrefix(prefix string) error {
+func (s *S3Client) DeleteObjectsWithPrefix(prefix string) error {
 	objects, err := s.ListObjects(prefix)
 	if err != nil {
 		return fmt.Errorf("listing objects (prefix=%s): %w", prefix, err)
@@ -223,74 +222,47 @@ func (s *S3rw) DeleteObjectsWithPrefix(prefix string) error {
 			idents = append(idents, types.ObjectIdentifier{Key: obj.Key})
 		}
 	}
-	_, err = s.s3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-		Bucket: aws.String(s.opts.AWSBucketName),
-		Delete: &types.Delete{Objects: idents},
-	})
-	if err != nil {
-		return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.AWSBucketName, prefix, err)
+	const maxBatch = 1000
+	for i := 0; i < len(idents); i += maxBatch {
+		end := i + maxBatch
+		if end > len(idents) {
+			end = len(idents)
+		}
+		_, err = s.s3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.opts.S3Bucket),
+			Delete: &types.Delete{Objects: idents[i:end]},
+		})
+		if err != nil {
+			return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.S3Bucket, prefix, err)
+		}
 	}
 	return nil
 }
 
-func (s *S3rw) WriteVolumeMarker(name string) error {
-	return s.PutObject(s.opts.AWSVolumePrefix+name+".json", nil)
+func (s *S3Client) WriteVolumeMarker(name string) error {
+	return s.PutObject(s.opts.S3VolumePrefix+name+".json", nil)
 }
 
-func (s *S3rw) DeleteVolumeMarker(name string) error {
-	return s.DeleteObject(s.opts.AWSVolumePrefix + name + ".json")
+func (s *S3Client) DeleteVolumeMarker(name string) error {
+	return s.DeleteObject(s.opts.S3VolumePrefix + name + ".json")
 }
 
-func (s *S3rw) ListVolumeMarkers() ([]string, error) {
-	objects, err := s.ListObjects(s.opts.AWSVolumePrefix)
-	if err != nil {
-		return nil, err
-	}
-	prefix := s.opts.AWSVolumePrefix
-	var names []string
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		name := strings.TrimPrefix(*obj.Key, prefix)
-		name = strings.TrimSuffix(name, ".json")
-		if name != "" {
-			names = append(names, name)
-		}
-	}
-	return names, nil
+func (s *S3Client) ListVolumeMarkers() ([]string, error) {
+	return ListVolumeMarkers(s, s.opts.S3VolumePrefix)
 }
 
-func (s *S3rw) DeleteLockObjects() error {
-	return s.DeleteObjectsWithPrefix(s.opts.AWSLockFolder)
+func (s *S3Client) DeleteLockObjects() error {
+	return s.DeleteObjectsWithPrefix(s.opts.S3LockFolder)
 }
 
-func (s *S3rw) WriteRestorePoint(volumeName string, rp RestorePoint) error {
-	data, err := json.Marshal(rp)
-	if err != nil {
-		return fmt.Errorf("marshal restore point: %w", err)
-	}
-	key := RestorePointPrefix + volumeName + ".json"
-	return s.PutObject(key, data)
+func (s *S3Client) WriteRestorePoint(volumeName string, rp RestorePoint) error {
+	return WriteRestorePoint(s, volumeName, rp)
 }
 
-func (s *S3rw) ReadRestorePoint(volumeName string) (*RestorePoint, error) {
-	key := RestorePointPrefix + volumeName + ".json"
-	data, err := s.ReadObject(key)
-	if err != nil {
-		return nil, err
-	}
-	if data == nil {
-		return nil, nil
-	}
-	var rp RestorePoint
-	if err := json.Unmarshal(data, &rp); err != nil {
-		return nil, fmt.Errorf("parse restore point: %w", err)
-	}
-	return &rp, nil
+func (s *S3Client) ReadRestorePoint(volumeName string) (*RestorePoint, error) {
+	return ReadRestorePoint(s, volumeName)
 }
 
-func (s *S3rw) DeleteRestorePoint(volumeName string) error {
-	key := RestorePointPrefix + volumeName + ".json"
-	return s.DeleteObject(key)
+func (s *S3Client) DeleteRestorePoint(volumeName string) error {
+	return DeleteRestorePoint(s, volumeName)
 }

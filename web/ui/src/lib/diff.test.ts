@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { computeDiff } from './diff';
-import type { DiffHunk } from './diff';
 
 describe('computeDiff', () => {
   it('returns empty for identical content', () => {

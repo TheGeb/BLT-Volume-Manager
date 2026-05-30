@@ -235,7 +235,7 @@
     {#if hosts.length > 0}
       <select class="vol-filter-select" bind:value={hostFilterVal}>
         <option value="">All hosts</option>
-        {#each hosts as h}
+        {#each hosts as h (h)}
           <option value={h}>{h}</option>
         {/each}
       </select>
@@ -260,7 +260,7 @@
 
   {#if loading && volumes.length === 0}
     <div class="tree">
-      {#each { length: 6 } as _}
+      {#each { length: 6 } as _, i (i)}
         <div class="tree-row" style="padding-left: 20px;">
           <div class="skeleton" style="width: 100%; height: 24px; border-radius: 6px;"></div>
         </div>
@@ -334,18 +334,20 @@
   .filter-row {
     display: flex; gap: 10px; flex-wrap: wrap; padding: 0 0 16px;
   }
+
   .volume-filter-input {
     flex: 1 1 240px; min-width: 160px;
-    border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); background: rgb(255 255 255 / 4%);
     color: var(--text); padding: 10px 16px; border-radius: 999px;
     font-size: 0.9rem; font-weight: 500; outline: none;
     transition: border-color 0.15s;
   }
   .volume-filter-input:focus { border-color: var(--accent); }
   .volume-filter-input::placeholder { color: var(--muted); }
+
   .vol-filter-select {
     padding: 8px 12px; border-radius: 10px;
-    border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); background: rgb(255 255 255 / 4%);
     color: var(--text); font-size: 0.85rem; cursor: pointer; outline: none;
     transition: border-color 0.15s;
   }
@@ -364,24 +366,29 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; }
   .tree-row { display: flex; align-items: center; min-height: 36px; position: relative; box-sizing: border-box; }
+
   .tree-row.in-lock {
     background: color-mix(in srgb, var(--green) 8%, transparent);
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
   }
+
   .tree-row[data-lock="start"] {
     border-top: 2px solid var(--green);
     border-radius: 8px 8px 0 0;
   }
+
   .tree-row[data-lock="end"] {
     border-bottom: 2px solid var(--green);
     border-radius: 0 0 8px 8px;
   }
+
   .tree-row[data-lock="single"] {
     border-top: 2px solid var(--green);
     border-bottom: 2px solid var(--green);
     border-radius: 8px;
   }
+
   .tree-row[data-lock="end"],
   .tree-row[data-lock="single"] {
     margin-bottom: -2px;
@@ -396,7 +403,7 @@
     width: 100%; box-sizing: border-box; text-decoration: none;
     transition: background 0.1s;
   }
-  .tree-row:hover { background: rgba(255,255,255,0.06); border-radius: 8px; }
+  .tree-row:hover { background: rgb(255 255 255 / 6%); border-radius: 8px; }
   .tree-row[data-lock="middle"]:hover { border-radius: 0; }
   .tree-group .lock-badge { margin-left: auto; }
   .tree-name { font-weight: 500; white-space: nowrap; }
@@ -406,6 +413,7 @@
   .lock-info {
     display: flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0; padding-right: 18px;
   }
+
   .lock-badge {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 0.9rem; font-weight: 600; color: var(--muted);

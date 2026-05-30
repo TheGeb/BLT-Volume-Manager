@@ -41,8 +41,15 @@ func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err == nil {
-			f.WriteString(fmt.Sprintf("pid:%d\n", os.Getpid()))
-			f.Close()
+			if _, werr := fmt.Fprintf(f, "pid:%d\n", os.Getpid()); werr != nil {
+				_ = f.Close()
+				_ = os.Remove(path)
+				return nil, fmt.Errorf("write lock file: %w", werr)
+			}
+			if cerr := f.Close(); cerr != nil {
+				_ = os.Remove(path)
+				return nil, fmt.Errorf("close lock file: %w", cerr)
+			}
 			return &fileLock{path: path}, nil
 		}
 		if time.Now().After(deadline) {

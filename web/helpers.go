@@ -3,63 +3,54 @@ package web
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"strings"
+	"path/filepath"
 
-	"github.com/example/blt-volume-manager/restic"
+	"github.com/example/blt-volume-manager/store"
 )
 
 func mustHostname() string {
-	h, err := os.Hostname()
-	if err != nil || h == "" {
-		return "unknown"
-	}
-	return h
+	return store.Hostname()
 }
 
-func volumeNameFromPath(path string) string {
-	marker := "/volumes/"
-	idx := strings.Index(path, marker)
-	if idx >= 0 {
-		subpath := strings.TrimPrefix(path[idx+len(marker):], "/")
-		parts := strings.Split(subpath, "/")
-		if len(parts) > 0 {
-			return parts[0]
-		}
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return false
 	}
-
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[len(parts)-1]
+	return true
 }
 
-// pathBelongsToVolume checks whether a snapshot path belongs to the given volume.
-// Unlike volumeNameFromPath, this handles nested volume names containing "/".
-func pathBelongsToVolume(snapPath, volume string) bool {
-	marker := "/volumes/"
-	if idx := strings.Index(snapPath, marker); idx >= 0 {
-		rest := strings.TrimPrefix(snapPath[idx+len(marker):], "/")
-		if rest == volume || strings.HasPrefix(rest, volume+"/") {
-			return true
-		}
+func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
+	vol := r.URL.Query().Get("volume")
+	if vol == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return "", false
 	}
-	for _, suffix := range []string{"-cold-snap", "-pre-restore"} {
-		if strings.HasSuffix(snapPath, "/"+volume+suffix) {
-			return true
-		}
-	}
-	return false
+	return vol, true
 }
 
-func snapshotMatchesVolume(snapshot restic.Snapshot, volume string) bool {
-	for _, path := range snapshot.Paths {
-		if pathBelongsToVolume(path, volume) {
-			return true
-		}
+func (s *Server) snapshotListResponse(volName string) (map[string]interface{}, error) {
+	rm := s.volumeManager(volName)
+	snaps, err := rm.ListSnapshots()
+	if err != nil {
+		return nil, err
 	}
-	return false
+
+	restorePointID := ""
+	volPath := filepath.Join(s.dataDir, "volumes", volName)
+	if id, err := rm.FindRestorePoint(volPath); err == nil {
+		restorePointID = id
+	}
+
+	result := make([]SnapshotWithVolume, 0, len(snaps))
+	for _, snap := range snaps {
+		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
+	}
+
+	return map[string]interface{}{
+		"snapshots":      result,
+		"restorePointID": restorePointID,
+	}, nil
 }
 
 func respondError(w http.ResponseWriter, err error, status int) {

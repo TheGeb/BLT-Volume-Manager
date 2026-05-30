@@ -33,15 +33,15 @@ func zfsCreateSnapshot(fullSnap, mountPath string) error {
 	}
 
 	if err := os.MkdirAll(mountPath, 0755); err != nil {
-		zfsDestroy(fullSnap)
+		_ = zfsDestroy(fullSnap)
 		return fmt.Errorf("create mount dir: %w", err)
 	}
 
 	log.Printf("mount -t zfs %s %s", fullSnap, mountPath)
 	cmd = exec.Command("mount", "-t", "zfs", fullSnap, mountPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		zfsDestroy(fullSnap)
-		os.Remove(mountPath)
+		_ = zfsDestroy(fullSnap)
+		_ = os.Remove(mountPath)
 		return fmt.Errorf("mount zfs snapshot: %w\n%s", err, string(out))
 	}
 
@@ -55,7 +55,7 @@ func zfsRemoveSnapshot(fullSnap, mountPath string) error {
 		return fmt.Errorf("umount zfs snapshot: %w\n%s", err, string(out))
 	}
 
-	os.Remove(mountPath)
+	_ = os.Remove(mountPath)
 	return zfsDestroy(fullSnap)
 }
 

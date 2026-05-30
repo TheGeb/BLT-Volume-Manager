@@ -39,7 +39,7 @@ func StartGarage(t *testing.T) *GarageServer {
 	if err := os.MkdirAll(buildDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(buildDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(buildDir) })
 	rpcSecret := randomHex(64)
 	config := fmt.Sprintf(`
 metadata_dir = "/tmp/garage/meta"
@@ -90,7 +90,7 @@ api_bind_addr = "0.0.0.0:3903"
 	containerID := strings.TrimSpace(string(out))
 
 	t.Cleanup(func() {
-		exec.Command("docker", "rm", "-f", containerID).Run()
+		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
 	// Wait for the port to be published
@@ -107,7 +107,7 @@ api_bind_addr = "0.0.0.0:3903"
 	}
 	if hostPort == "" {
 		logs, _ := exec.Command("docker", "logs", containerID).CombinedOutput()
-		exec.Command("docker", "rm", "-f", containerID).Run()
+		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 		t.Fatalf("garage container did not publish port 3900\nlogs:\n%s", logs)
 	}
 
@@ -139,7 +139,7 @@ func (g *GarageServer) waitReady(t *testing.T) {
 		default:
 			resp, err := http.Get(checkURL)
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return
 			}
 			time.Sleep(200 * time.Millisecond)

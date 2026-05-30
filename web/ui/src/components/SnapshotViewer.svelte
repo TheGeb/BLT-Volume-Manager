@@ -97,6 +97,7 @@
   let searchAncestorPaths: Set<string> = new Set();
 
   $: if (treeSearchResults.length > 0) {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const paths = new Set<string>();
     for (const p of treeSearchResults) {
       const parts = p.replace(/^\//, '').split('/');
@@ -163,6 +164,7 @@
   $: if (diffOtherId) loadSnapSize(diffOtherId);
 
   function buildDiffMap(diff: DiffResult): Map<string, string> {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const m = new Map<string, string>();
     for (const cs of diff.change_sets || []) {
       for (const p of cs.paths || []) {
@@ -181,6 +183,7 @@
   function buildTree(allNodes: FileNode[], diff: DiffResult | null): any {
     let nodes = allNodes;
     if (diff) {
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const existingPaths = new Set<string>();
       for (const n of nodes) {
         if (n.path) existingPaths.add(n.path.replace(/^\//, ''));
@@ -274,6 +277,7 @@
       loading = false;
     }
     if (initialDiffTarget && selectedCompareId) {
+      // eslint-disable-next-line svelte/infinite-reactive-loop
       await doDiff(true);
     }
   }
@@ -318,6 +322,7 @@
       ]);
       const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume!, hashA, hashB);
       if (diffOtherId !== targetId) return;
+      // eslint-disable-next-line svelte/infinite-reactive-loop
       currentDiffResult = result;
       sideBySide = false;
       fileContent = '';
@@ -541,6 +546,7 @@
   $: if (snapshot) {
     currentDiffResult = null;
     warmupDone = false;
+    // eslint-disable-next-line svelte/infinite-reactive-loop
     open();
   }
 
@@ -611,7 +617,7 @@
     <div style="margin-bottom:20px;">
       {#if compareSnaps.length > 0}
         <select bind:value={selectedCompareId}>
-          {#each compareSnaps as cs}
+          {#each compareSnaps as cs (cs.id)}
             <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()})</option>
           {/each}
         </select>
@@ -633,7 +639,7 @@
       <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
          <div style="display:flex;gap:4px;align-items:center;">
           <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
-            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
+            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgb(255 255 255 / 4%);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
           <button class="button button-secondary button-xs mode-toggle" style="padding:7px 6px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
             {#if treeSearchFullPath}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
@@ -718,12 +724,12 @@
             {#if sideBySide}
               <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
                 <div style="flex:1;overflow-x:auto;border-right:1px solid var(--border);">
-                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">Old ({diffOtherId.slice(0, 8)})</div>
-                  {#each currentDiffHunks as hunk}
-                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
+                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">Old ({diffOtherId.slice(0, 8)})</div>
+                  {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
+                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--border);font-family:monospace;">
                       @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
                     </div>
-                    {#each hunk.lines as entry}
+                    {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
                       {#if entry.type === 'add'}
                         <div style="padding:0 4px;font-size:0.85rem;background:var(--green-bg);">&nbsp;</div>
                       {:else}
@@ -737,12 +743,12 @@
                   {/each}
                 </div>
                 <div style="flex:1;overflow-x:auto;">
-                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">New ({snapshot.short_id.slice(0, 8)})</div>
-                  {#each currentDiffHunks as hunk}
-                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-family:monospace;">
+                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">New ({snapshot.short_id.slice(0, 8)})</div>
+                  {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
+                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--border);font-family:monospace;">
                       @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
                     </div>
-                    {#each hunk.lines as entry}
+                    {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
                       {#if entry.type === 'del'}
                         <div style="padding:0 4px;font-size:0.85rem;background:var(--red-bg);">&nbsp;</div>
                       {:else}
@@ -757,11 +763,11 @@
                 </div>
               </div>
             {:else}
-              {#each currentDiffHunks as hunk}
-                <div style="padding:2px 8px;margin:4px 0;font-size:0.8rem;color:var(--muted);background:rgba(255,255,255,0.03);border-radius:4px;font-family:monospace;">
+              {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
+                <div style="padding:2px 8px;margin:4px 0;font-size:0.8rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-radius:4px;font-family:monospace;">
                   @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
                 </div>
-                {#each hunk.lines as entry}
+                {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
                   <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
                     <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
                     <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
@@ -806,6 +812,7 @@
 
   .skeleton-select-bar { height: 32px; width: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
   .skeleton-btn-bar { height: 32px; width: 60px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
+
   .snap-meta {
     display: flex;
     flex-wrap: wrap;
@@ -813,32 +820,40 @@
     font-size: 0.82rem;
     color: var(--muted);
   }
+
   .snap-meta-item {
     white-space: nowrap;
   }
+
   .snap-meta-item strong {
     color: var(--text);
     font-weight: 600;
   }
+
   .snap-meta-muted {
     color: var(--muted);
   }
+
   .snap-meta-divider {
     width: 1px;
     background: var(--border);
     flex-shrink: 0;
   }
+
   .spin {
     animation: spin 1s linear infinite;
     vertical-align: middle;
   }
+
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
   .mode-toggle {
     position: relative;
   }
+
   .mode-toggle:hover::after {
     content: attr(data-tip);
     position: absolute;
@@ -854,7 +869,7 @@
     white-space: nowrap;
     z-index: 10;
     pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     margin-bottom: 6px;
   }
 </style>

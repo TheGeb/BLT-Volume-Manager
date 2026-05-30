@@ -63,9 +63,13 @@ func TestVolumeConfigReadNonExistent(t *testing.T) {
 func TestVolumeConfigDefaultFsType(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
 	volPath := filepath.Join(d.root, "volumes", "plain-vol")
-	os.MkdirAll(volPath, 0755)
+	if err := os.MkdirAll(volPath, 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	d.writeVolumeConfig(volPath, &volumeConfig{FsType: ""})
+	if err := d.writeVolumeConfig(volPath, &volumeConfig{FsType: ""}); err != nil {
+		t.Fatal(err)
+	}
 	read := d.readVolumeConfig(volPath)
 	if read == nil {
 		t.Fatal("expected non-nil config")
@@ -122,16 +126,30 @@ func TestCollectVolumeNames(t *testing.T) {
 	volumesDir := filepath.Join(root, "volumes")
 
 	vol1 := filepath.Join(volumesDir, "my-vol")
-	os.MkdirAll(vol1, 0755)
-	os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), 0644)
+	if err := os.MkdirAll(vol1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	vol2 := filepath.Join(volumesDir, "group", "nested-vol")
-	os.MkdirAll(vol2, 0755)
-	os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), 0644)
+	if err := os.MkdirAll(vol2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
-	os.MkdirAll(filepath.Join(volumesDir, "no-config"), 0755)
-	os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), 0755)
-	os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), 0644)
+	if err := os.MkdirAll(filepath.Join(volumesDir, "no-config"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	var names []string
 	d.collectVolumeNames(volumesDir, "", &names)
@@ -172,8 +190,12 @@ func TestVolumeNames(t *testing.T) {
 
 	for _, name := range []string{"vol-a", "vol-b"} {
 		p := filepath.Join(root, "volumes", name)
-		os.MkdirAll(p, 0755)
-		os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0644)
+		if err := os.MkdirAll(p, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	names := d.VolumeNames()

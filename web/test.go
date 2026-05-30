@@ -44,7 +44,10 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Write volume config so the driver can discover it
-	os.WriteFile(filepath.Join(volPath, "volume.json"), []byte(`{"fs_type":""}`), 0644)
+	if err := os.WriteFile(filepath.Join(volPath, "volume.json"), []byte(`{"fs_type":""}`), 0644); err != nil {
+		respondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
+		return
+	}
 
 	// Create dummy files and folders
 	dummyContent := map[string]string{
@@ -83,30 +86,20 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Run backup from within the volume dir so restic stores relative paths
-	cwd, err := os.Getwd()
-	if err != nil {
-		respondError(w, fmt.Errorf("getwd: %w", err), http.StatusInternalServerError)
-		return
-	}
-	if err := os.Chdir(volPath); err != nil {
-		respondError(w, fmt.Errorf("chdir: %w", err), http.StatusInternalServerError)
-		return
-	}
-	defer os.Chdir(cwd)
-	if err := rm.Backup(".", "cold"); err != nil {
+	if err := rm.BackupInDir(".", "cold", volPath); err != nil {
 		respondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}
 
 	if s.s3Bucket != "" {
-		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName:   s.s3Bucket,
-			AWSVolumePrefix: store.VolumePrefix,
+		s3, err := store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:        s.s3Bucket,
+			S3VolumePrefix: store.VolumePrefix,
 			S3Endpoint:      s.s3Endpoint,
 			Region:          s.s3Region,
 		})
 		if err == nil {
-			rw.WriteVolumeMarker(req.Name)
+			_ = s3.WriteVolumeMarker(req.Name)
 		}
 	}
 

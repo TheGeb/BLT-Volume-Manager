@@ -21,6 +21,9 @@ type Server struct {
 	s3Bucket     string
 	s3Endpoint   string
 	s3Region     string
+	s3Store      store.S3Store
+	s3StoreOnce  sync.Once
+	s3StoreErr   error
 	statsMu      sync.RWMutex
 	statsCache   map[string]interface{}
 	statsCacheAt time.Time
@@ -30,32 +33,47 @@ func NewServer(dataDir string, resticBase string, s3Bucket string, s3Endpoint st
 	return &Server{dataDir: dataDir, resticBase: resticBase, s3Bucket: s3Bucket, s3Endpoint: s3Endpoint, s3Region: s3Region}
 }
 
-func (s *Server) volumeManager(volName string) *restic.Manager {
-	m := restic.NewManager(s.resticBase + "/restic/" + volName)
-	if s.s3Bucket != "" {
-		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName: s.s3Bucket,
+func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
+	if s.s3Bucket == "" {
+		return nil, nil
+	}
+	s.s3StoreOnce.Do(func() {
+		s.s3Store, s.s3StoreErr = store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:    s.s3Bucket,
 			S3Endpoint:    s.s3Endpoint,
 			Region:        s.s3Region,
-		}); err == nil {
-			m.SetS3Store(rw)
-		}
+		})
+	})
+	return s.s3Store, s.s3StoreErr
+}
+
+func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, error) {
+	if s.s3Bucket == "" {
+		return nil, nil
+	}
+	return store.NewS3Store(store.S3StoreOpts{
+		S3Bucket:        s.s3Bucket,
+		S3VolumePrefix: prefix,
+		S3Endpoint:      s.s3Endpoint,
+		Region:          s.s3Region,
+	})
+}
+
+func (s *Server) volumeManager(volName string) *restic.Manager {
+	m := restic.NewManager(s.resticBase + "/restic/" + volName)
+	if s3, err := s.getOrCreateS3Store(); err == nil && s3 != nil {
+		m.SetS3Store(s3)
 	}
 	return m
 }
 
 func (s *Server) volumeNames() []string {
-	if s.s3Bucket != "" {
-		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName:   s.s3Bucket,
-			AWSVolumePrefix: store.VolumePrefix,
-			S3Endpoint:      s.s3Endpoint,
-			Region:          s.s3Region,
-		}); err == nil {
-			if names, err := rw.ListVolumeMarkers(); err == nil {
-				return names
-			}
-		}
+	s3, err := s.getOrCreateS3StoreWithPrefix(store.VolumePrefix)
+	if err != nil || s3 == nil {
+		return nil
+	}
+	if names, err := s3.ListVolumeMarkers(); err == nil {
+		return names
 	}
 	return nil
 }
@@ -109,7 +127,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	})
 	inner.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)

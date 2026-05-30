@@ -1,31 +1,33 @@
 package web
 
 import (
-	"encoding/json"
+	"io"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 )
 
 func captureLogOutput(t *testing.T, fn func()) string {
+	t.Helper()
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("pipe: %v", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	old := os.Stdout
 	os.Stdout = w
 
 	fn()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
-	var buf strings.Builder
-	json.NewDecoder(r).Decode(&buf)
-	return buf.String()
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read log output: %v", err)
+	}
+	return string(data)
 }
 
 func TestLogLevelInit(t *testing.T) {

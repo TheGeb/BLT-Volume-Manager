@@ -6,7 +6,7 @@
 
 <div class="bar-wrapper">
   <div class="bar-legend">
-    {#each parts as p}
+    {#each parts as p (p.label)}
       <div class="bar-legend-item">
         <span class="bar-legend-dot" style="background:{p.color}"></span>
         {p.label}
@@ -14,7 +14,7 @@
     {/each}
   </div>
   <div class="bar-stacked">
-    {#each parts as p}
+    {#each parts as p (p.label)}
       {@const pct = (p.value / total) * 100}
       <div class="bar-segment" style="flex:{pct} 1 0;background:{p.color};"
         title={p.names?.join('\n') ?? ''}>
@@ -46,7 +46,7 @@
     justify-content: center;
     font-size: 0.75rem;
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.7);
+    color: rgb(0 0 0 / 70%);
     transition: flex 0.3s ease;
     min-width: 0;
   }

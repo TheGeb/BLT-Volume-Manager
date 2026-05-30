@@ -1,10 +1,12 @@
 <script lang="ts">
   import { escapeHtml } from '../lib/util';
 
-  export let diff: { t: string; line: string }[] = [];
-  export let path = '';
-  export let sideBySide = false;
-  export let onToggleLayout: () => void = () => {};
+  let { diff = [], path = '', sideBySide = false, onToggleLayout = () => {} }: {
+    diff?: { t: string; line: string }[];
+    path?: string;
+    sideBySide?: boolean;
+    onToggleLayout?: () => void;
+  } = $props();
 
   function renderUnified() {
     let ctxCount = 0;
@@ -83,28 +85,28 @@
     return pairs;
   }
 
-  $: unifiedParts = renderUnified();
-  $: sideBySidePairs = renderSideBySide();
+  let unifiedParts = $derived(renderUnified());
+  let sideBySidePairs = $derived(renderSideBySide());
 </script>
 
 <div style="margin-bottom:8px;font-weight:700;display:flex;align-items:center;gap:8px;">
   <span>Diff: {escapeHtml(path)}</span>
-  <button style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" on:click={onToggleLayout}>
+  <button style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onclick={onToggleLayout}>
     {sideBySide ? 'Side by side' : 'Inline'}
   </button>
 </div>
 
 {#if sideBySide}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-size:0.85rem;font-family:monospace;">
-    <div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">Old</div>
-    <div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03);">New</div>
-    {#each sideBySidePairs as pair}
+    <div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">Old</div>
+    <div style="padding:2px 4px;font-weight:600;border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">New</div>
+    {#each sideBySidePairs as pair (pair.left + pair.right)}
       <div style="padding:1px 4px;white-space:pre-wrap;background:{pair.ltype === 'del' ? 'rgba(248,113,113,0.1)' : pair.ltype === 'ctx-hidden' ? 'transparent' : 'rgba(255,255,255,0.02)'};color:{pair.ltype === 'ctx-hidden' ? 'var(--muted)' : 'inherit'};font-size:{pair.ltype === 'ctx-hidden' ? '0.75rem' : 'inherit'}">{escapeHtml(pair.left)}</div>
       <div style="padding:1px 4px;white-space:pre-wrap;background:{pair.rtype === 'add' ? 'rgba(52,211,153,0.1)' : pair.rtype === 'ctx-hidden' ? 'transparent' : 'rgba(255,255,255,0.02)'};color:{pair.rtype === 'ctx-hidden' ? 'var(--muted)' : 'inherit'};font-size:{pair.rtype === 'ctx-hidden' ? '0.75rem' : 'inherit'}">{escapeHtml(pair.right)}</div>
     {/each}
   </div>
 {:else}
-  {#each unifiedParts as part}
+  {#each unifiedParts as part (part.line)}
     {#if part.type === 'ctx-hidden'}
       <div style="color:var(--muted);font-size:0.8rem;padding:2px 0;">{escapeHtml(part.line)}</div>
     {:else}

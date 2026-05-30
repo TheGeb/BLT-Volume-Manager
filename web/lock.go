@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -54,7 +53,7 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 			Owner string `json:"owner"`
 		}
 		if r.Body != nil {
-			json.NewDecoder(r.Body).Decode(&reqBody)
+			_ = json.NewDecoder(r.Body).Decode(&reqBody)
 		}
 		lock, err := s.createVolumeLock(volumeName, reqBody.Owner)
 		if err != nil {
@@ -76,38 +75,34 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
 	// 1. Delete S3 locks, volume marker, and restore point
 	if s.s3Bucket != "" {
-		if err := s.deleteVolumeLocks(volumeName); err != nil {
-			respondError(w, fmt.Errorf("delete locks: %w", err), http.StatusInternalServerError)
-			return
-		}
-		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName:   s.s3Bucket,
-			AWSVolumePrefix: store.VolumePrefix,
+		s3, err := store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:        s.s3Bucket,
+			S3VolumePrefix:  store.VolumePrefix,
 			S3Endpoint:      s.s3Endpoint,
 			Region:          s.s3Region,
 		})
 		if err == nil {
-			rw.DeleteVolumeMarker(volumeName)
-			rw.DeleteRestorePoint(volumeName)
+			_ = s3.DeleteObjectsWithPrefix(store.LockFolder(volumeName))
+			_ = s3.DeleteVolumeMarker(volumeName)
+			_ = s3.DeleteRestorePoint(volumeName)
 		}
 	}
 
 	// 2. Delete S3 restic repo data (if repo is S3-based)
 	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
-		rw, err := store.NewS3Store(store.S3StoreOpts{
-			AWSBucketName: s.s3Bucket,
+		s3, err := store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:    s.s3Bucket,
 			S3Endpoint:    s.s3Endpoint,
 			Region:        s.s3Region,
 		})
 		if err == nil {
-			prefix := "restic/" + volumeName + "/"
-			rw.DeleteObjectsWithPrefix(prefix)
+			_ = s3.DeleteObjectsWithPrefix("restic/" + volumeName + "/")
 		}
 	}
 
 	// 3. Delete file-based lock
 	lockPath := filepath.Join(s.dataDir, "locks", volumeName+".lock")
-	os.Remove(lockPath)
+	_ = os.Remove(lockPath)
 
 	// 4. Delete local restic repo directory (if resticBase is a local path)
 	if !strings.HasPrefix(s.resticBase, "s3:") {
@@ -136,24 +131,18 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error
 		return nil, errors.New("S3_LOCK_BUCKET, RESTIC_REPOSITORY, or S3_ENDPOINT must be configured")
 	}
 
-	rw, err := s.storeForVolume(volumeName)
+	s3, err := s.storeForVolume(volumeName)
 	if err != nil {
 		return nil, err
 	}
 
-	folder := store.LockPrefix + volumeName + "/"
-	objects, err := rw.ListObjects(folder)
+	folder := store.LockFolder(volumeName)
+	objects, err := s3.ListObjects(folder)
 	if err != nil {
 		return nil, fmt.Errorf("list lock objects: %w", err)
 	}
 
-	sort.Slice(objects, func(i, j int) bool {
-		ti, tj := objects[i].LastModified, objects[j].LastModified
-		if ti != nil && tj != nil && !ti.Equal(*tj) {
-			return ti.Before(*tj)
-		}
-		return *objects[i].Key < *objects[j].Key
-	})
+	store.SortLockObjects(objects)
 
 	result := map[string]interface{}{
 		"volume": volumeName,
@@ -161,31 +150,21 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]interface{}, error
 	}
 
 	lockTTL := 24 * time.Hour
-
+	// Filter out stale objects older than lockTTL
+	validObjects := objects[:0]
 	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
 		if obj.LastModified != nil && time.Since(*obj.LastModified) > lockTTL {
-			rw.DeleteObject(*obj.Key)
+			_ = s3.DeleteObject(*obj.Key)
 			continue
 		}
-		raw, err := rw.ReadObject(*obj.Key)
-		if err != nil || raw == nil {
-			continue
-		}
-		var owner store.LockOwner
-		if err := json.Unmarshal(raw, &owner); err != nil {
-			continue
-		}
-		if owner.GetRemainingTimeInSeconds() <= 0 {
-			rw.DeleteObject(*obj.Key)
-			continue
-		}
+		validObjects = append(validObjects, obj)
+	}
+
+	key, owner := store.FilterValidLocks(s3, validObjects)
+	if key != "" && owner != nil {
 		result["locked"] = true
 		result["owner"] = owner.Name
 		result["expires_in"] = owner.GetRemainingTimeInSeconds()
-		break
 	}
 
 	return result, nil
@@ -196,16 +175,16 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 		return nil, errors.New("S3_LOCK_BUCKET, RESTIC_REPOSITORY, or S3_ENDPOINT must be configured")
 	}
 
-	rw, err := s.storeForVolume(volumeName)
+	s3, err := s.storeForVolume(volumeName)
 	if err != nil {
 		return nil, err
 	}
 
 	if ownerName == "" {
-		ownerName = fmt.Sprintf("webadmin-%s-%d", mustHostname(), os.Getpid())
+		ownerName = fmt.Sprintf("webadmin-%s-%d", store.Hostname(), os.Getpid())
 	}
 	expiry := time.Now().Add(24 * time.Hour).Unix()
-	folder := store.LockPrefix + volumeName + "/"
+	folder := store.LockFolder(volumeName)
 	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, time.Now().UnixNano())
 
 	proposal := store.LockOwner{Name: ownerName, ExpiryTime: expiry}
@@ -213,60 +192,39 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 	if err != nil {
 		return nil, fmt.Errorf("marshal proposal: %w", err)
 	}
-	if err := rw.PutObject(myKey, data); err != nil {
+	if err := s3.PutObject(myKey, data); err != nil {
 		return nil, fmt.Errorf("create proposal: %w", err)
 	}
 
-	objects, err := rw.ListObjects(folder)
+	objects, err := s3.ListObjects(folder)
 	if err != nil {
-		rw.DeleteObject(myKey)
+		_ = s3.DeleteObject(myKey)
 		return nil, fmt.Errorf("list proposals: %w", err)
 	}
 
-	sort.Slice(objects, func(i, j int) bool {
-		ti, tj := objects[i].LastModified, objects[j].LastModified
-		if ti != nil && tj != nil && !ti.Equal(*tj) {
-			return ti.Before(*tj)
-		}
-		return *objects[i].Key < *objects[j].Key
-	})
+	store.SortLockObjects(objects)
 
+	// Delete stale proposals from the same owner
 	for _, obj := range objects {
 		if obj.Key == nil {
 			continue
 		}
 		k := *obj.Key
-		if k == myKey {
+		if k == myKey || !strings.Contains(k, ownerName) {
 			continue
 		}
-		if !strings.Contains(k, ownerName) {
-			continue
-		}
-		rw.DeleteObject(k)
+		_ = s3.DeleteObject(k)
 	}
 
-	first := true
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		raw, err := rw.ReadObject(*obj.Key)
-		if err != nil || raw == nil {
-			continue
-		}
-		var o store.LockOwner
-		if err := json.Unmarshal(raw, &o); err != nil {
-			continue
-		}
-		if o.GetRemainingTimeInSeconds() <= 0 {
-			rw.DeleteObject(*obj.Key)
-			continue
-		}
-		first = *obj.Key == myKey
-		break
+	// Re-list after cleanup
+	objects, err = s3.ListObjects(folder)
+	if err == nil {
+		store.SortLockObjects(objects)
 	}
-	if !first {
-		rw.DeleteObject(myKey)
+
+	key, _ := store.FilterValidLocks(s3, objects)
+	if key != myKey {
+		_ = s3.DeleteObject(myKey)
 		return nil, errors.New("another lock proposal was earlier")
 	}
 
@@ -279,9 +237,9 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]inte
 
 func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 	opts := store.S3StoreOpts{
-		AWSBucketName:   s.s3Bucket,
-		AWSLockFolder:   store.LockPrefix + volumeName + "/",
-		AWSVolumePrefix: store.VolumePrefix,
+		S3Bucket:        s.s3Bucket,
+		S3LockFolder:    store.LockFolder(volumeName),
+		S3VolumePrefix:  store.VolumePrefix,
 		S3Endpoint:      s.s3Endpoint,
 		Region:          s.s3Region,
 	}
@@ -294,10 +252,10 @@ func (s *Server) deleteVolumeLocks(volumeName string) error {
 		return errors.New("S3_LOCK_BUCKET is not configured")
 	}
 
-	rw, err := s.storeForVolume(volumeName)
+	s3, err := s.storeForVolume(volumeName)
 	if err != nil {
 		return fmt.Errorf("create s3 store: %w", err)
 	}
 
-	return rw.DeleteLockObjects()
+	return s3.DeleteLockObjects()
 }

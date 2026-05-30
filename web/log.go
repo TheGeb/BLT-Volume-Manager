@@ -59,7 +59,7 @@ func logJSON(e logEntry) {
 		return
 	}
 	e.Time = time.Now().UTC().Format(time.RFC3339Nano)
-	json.NewEncoder(os.Stdout).Encode(e)
+	_ = json.NewEncoder(os.Stdout).Encode(e)
 }
 
 func logInfo(event string) {

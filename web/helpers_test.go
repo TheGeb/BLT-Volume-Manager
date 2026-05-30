@@ -2,9 +2,8 @@ package web
 
 import (
 	"testing"
-	"time"
 
-	"github.com/example/blt-volume-manager/restic"
+	"github.com/example/blt-volume-manager/volumepath"
 )
 
 func TestVolumeNameFromPath(t *testing.T) {
@@ -16,63 +15,49 @@ func TestVolumeNameFromPath(t *testing.T) {
 		{"/volumes/my-volume/data", "my-volume"},
 		{"/volumes/group/sub/data", "group"},
 		{"/volumes/", ""},
-		{"/some/other/path", "path"},
+		{"/some/other/path", ""},
 		{"", ""},
 		{"/volumes/group/deeply/nested/data.txt", "group"},
 	}
 
 	for _, tt := range tests {
-		got := volumeNameFromPath(tt.path)
+		got := volumepath.VolumeNameFromPath(tt.path)
 		if got != tt.expected {
-			t.Errorf("volumeNameFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
+			t.Errorf("VolumeNameFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
 		}
 	}
 }
 
 func TestSnapshotMatchesVolume(t *testing.T) {
-	snap := restic.Snapshot{
-		ID:       "abc123",
-		ShortID:  "abc",
-		Time:     time.Now(),
-		Paths:    []string{"/volumes/my-vol/data", "/volumes/my-vol/config"},
-		Hostname: "host1",
-	}
+	paths := []string{"/volumes/my-vol/data", "/volumes/my-vol/config"}
 
-	if !snapshotMatchesVolume(snap, "my-vol") {
-		t.Error("expected match for 'my-vol'")
+	for _, path := range paths {
+		if !volumepath.PathBelongsToVolume(path, "my-vol") {
+			t.Errorf("expected match for 'my-vol' in path %q", path)
+		}
 	}
-	if snapshotMatchesVolume(snap, "other-vol") {
+	if volumepath.PathBelongsToVolume("/volumes/other-vol/data", "my-vol") {
 		t.Error("expected no match for 'other-vol'")
 	}
-	if snapshotMatchesVolume(snap, "") {
+	if volumepath.PathBelongsToVolume("", "my-vol") {
 		t.Error("expected no match for empty volume")
 	}
 }
 
 func TestSnapshotMatchesVolumeNoPaths(t *testing.T) {
-	snap := restic.Snapshot{Paths: nil}
-	if snapshotMatchesVolume(snap, "my-vol") {
-		t.Error("expected false for nil paths")
-	}
-
-	snap2 := restic.Snapshot{Paths: []string{}}
-	if snapshotMatchesVolume(snap2, "my-vol") {
-		t.Error("expected false for empty paths")
+	if volumepath.PathBelongsToVolume("", "my-vol") {
+		t.Error("expected false for empty path")
 	}
 }
 
 func TestSnapshotMatchesVolumeNested(t *testing.T) {
-	snap := restic.Snapshot{
-		Paths: []string{"/volumes/group/sub-vol/backup.tar.gz"},
-	}
-
-	if !snapshotMatchesVolume(snap, "group") {
+	if !volumepath.PathBelongsToVolume("/volumes/group/sub-vol/backup.tar.gz", "group") {
 		t.Error("expected match for group volume")
 	}
-	if !snapshotMatchesVolume(snap, "group/sub-vol") {
+	if !volumepath.PathBelongsToVolume("/volumes/group/sub-vol/backup.tar.gz", "group/sub-vol") {
 		t.Error("expected match for nested volume group/sub-vol")
 	}
-	if snapshotMatchesVolume(snap, "other") {
+	if volumepath.PathBelongsToVolume("/volumes/group/sub-vol/backup.tar.gz", "other") {
 		t.Error("expected no match for other volume")
 	}
 }
@@ -86,6 +71,4 @@ func TestMustHostname(t *testing.T) {
 
 func TestRespondError(t *testing.T) {
 	_ = mustHostname
-	_ = volumeNameFromPath
-	_ = snapshotMatchesVolume
 }

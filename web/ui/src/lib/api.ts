@@ -1,4 +1,4 @@
-import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse } from './types';
+import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse, FileNode, DiffResult } from './types';
 
 export async function fetchVolumes(): Promise<string[]> {
 	const resp = await fetch('/api/volumes');
@@ -62,13 +62,13 @@ export async function fetchSnapshotSizes(volume: string, ids: string[]): Promise
   return resp.json() as Promise<Record<string, number>>;
 }
 
-export async function fetchFileTree(snapshotId: string, volume: string, path?: string, fallbackHash?: string): Promise<any[]> {
+export async function fetchFileTree(snapshotId: string, volume: string, path?: string, fallbackHash?: string): Promise<FileNode[]> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/ls?volume=${encodeURIComponent(volume)}`;
   if (path) url += `&path=${encodeURIComponent(path)}`;
   if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to list snapshot');
-  return resp.json() as Promise<any[]>;
+  return resp.json() as Promise<FileNode[]>;
 }
 
 export async function fetchFileContent(snapshotId: string, volume: string, path: string, fallbackHash?: string): Promise<string> {
@@ -85,13 +85,13 @@ export async function fetchFileContent(snapshotId: string, volume: string, path:
   }
 }
 
-export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string, hashA?: string, hashB?: string): Promise<any> {
+export async function fetchDiff(snapshotA: string, snapshotB: string, volume: string, hashA?: string, hashB?: string): Promise<DiffResult> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotA)}/diff/${encodeURIComponent(snapshotB)}?volume=${encodeURIComponent(volume)}`;
   if (hashA) url += `&fallbackHash=${encodeURIComponent(hashA)}`;
   if (hashB) url += `&diffFallbackHash=${encodeURIComponent(hashB)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to get diff');
-  return resp.json() as Promise<any>;
+  return resp.json() as Promise<DiffResult>;
 }
 
 export async function addTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {

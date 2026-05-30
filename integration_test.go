@@ -26,7 +26,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 
 	// Use real S3 via Garage for restore points (not FakeS3)
 	realStore, err := store.NewS3Store(store.S3StoreOpts{
-		AwsBucketName: garage.BucketName,
+		S3Bucket:    garage.BucketName,
 		S3Endpoint:    garage.Endpoint,
 		Region:        "us-east-1",
 	})
@@ -123,8 +123,8 @@ func TestS3LocksWithGarage(t *testing.T) {
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
 	// Create a real S3 store via Garage
-	store, err := store.NewS3Store(store.S3StoreOpts{
-		AwsBucketName: garage.BucketName,
+	s3Store, err := store.NewS3Store(store.S3StoreOpts{
+		S3Bucket:    garage.BucketName,
 		S3Endpoint:    garage.Endpoint,
 		Region:        "us-east-1",
 	})
@@ -135,12 +135,12 @@ func TestS3LocksWithGarage(t *testing.T) {
 	// Write a lock proposal via real S3
 	key := "blt-volume-manager/locks/test-vol/proposal.json"
 	data := []byte(`{"name":"test","expiry_time":9999999999}`)
-	if err := store.PutObject(key, data); err != nil {
+	if err := s3Store.PutObject(key, data); err != nil {
 		t.Fatalf("put lock object: %v", err)
 	}
 
 	// Read it back
-	got, err := store.ReadObject(key)
+	got, err := s3Store.ReadObject(key)
 	if err != nil {
 		t.Fatalf("read lock object: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestS3LocksWithGarage(t *testing.T) {
 	}
 
 	// List with prefix
-	objects, err := store.ListObjects("blt-volume-manager/locks/test-vol/")
+	objects, err := s3Store.ListObjects("blt-volume-manager/locks/test-vol/")
 	if err != nil {
 		t.Fatalf("list objects: %v", err)
 	}
@@ -158,10 +158,10 @@ func TestS3LocksWithGarage(t *testing.T) {
 	}
 
 	// Delete
-	if err := store.DeleteObject(key); err != nil {
+	if err := s3Store.DeleteObject(key); err != nil {
 		t.Fatalf("delete lock object: %v", err)
 	}
-	got, err = store.ReadObject(key)
+	got, err = s3Store.ReadObject(key)
 	if err != nil {
 		t.Fatalf("read after delete: %v", err)
 	}

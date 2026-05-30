@@ -15,7 +15,7 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 	rm := s.volumeManager(volName)
 	err := rm.Check(true)
 	if err != nil {
-		logInfo("check_failed")
+		logError("check_failed", err)
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Server) handleRepair(w http.ResponseWriter, r *http.Request) {
 	rm := s.volumeManager(volName)
 	err := rm.Repair()
 	if err != nil {
-		logInfo("repair_failed")
+		logError("repair_failed", err)
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
