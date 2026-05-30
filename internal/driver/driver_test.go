@@ -35,7 +35,7 @@ func TestTypeFromString(t *testing.T) {
 func TestVolumeConfigReadWrite(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
 	volPath := filepath.Join(d.root, "volumes", "test-vol")
-	if err := os.MkdirAll(volPath, 0755); err != nil {
+	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
@@ -64,7 +64,7 @@ func TestVolumeConfigReadNonExistent(t *testing.T) {
 func TestVolumeConfigDefaultFsType(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
 	volPath := filepath.Join(d.root, "volumes", "plain-vol")
-	if err := os.MkdirAll(volPath, 0755); err != nil {
+	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,28 +127,28 @@ func TestCollectVolumeNames(t *testing.T) {
 	volumesDir := filepath.Join(root, "volumes")
 
 	vol1 := filepath.Join(volumesDir, "my-vol")
-	if err := os.MkdirAll(vol1, 0755); err != nil {
+	if err := os.MkdirAll(vol1, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	vol2 := filepath.Join(volumesDir, "group", "nested-vol")
-	if err := os.MkdirAll(vol2, 0755); err != nil {
+	if err := os.MkdirAll(vol2, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(volumesDir, "no-config"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(volumesDir, "no-config"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -191,10 +191,10 @@ func TestVolumeNames(t *testing.T) {
 
 	for _, name := range []string{"vol-a", "vol-b"} {
 		p := filepath.Join(root, "volumes", name)
-		if err := os.MkdirAll(p, 0755); err != nil {
+		if err := os.MkdirAll(p, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

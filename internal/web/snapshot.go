@@ -201,6 +201,7 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		//nolint:gosec // Intentional dump of restic file contents as text/plain
 		_, _ = w.Write(data)
 
 	case "diff":

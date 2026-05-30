@@ -47,7 +47,7 @@ func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
 	return ts, garage
 }
 
-func api(t *testing.T, ts *httptest.Server, method, path string, body interface{}) *http.Response {
+func api(t *testing.T, ts *httptest.Server, method, path string, body any) *http.Response {
 	t.Helper()
 	var r io.Reader
 	if body != nil {
@@ -68,7 +68,7 @@ func api(t *testing.T, ts *httptest.Server, method, path string, body interface{
 	return resp
 }
 
-func apiOK(t *testing.T, ts *httptest.Server, method, path string, body interface{}) map[string]interface{} {
+func apiOK(t *testing.T, ts *httptest.Server, method, path string, body any) map[string]any {
 	t.Helper()
 	resp := api(t, ts, method, path, body)
 	defer resp.Body.Close()
@@ -76,14 +76,14 @@ func apiOK(t *testing.T, ts *httptest.Server, method, path string, body interfac
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("%s %s: expected 200, got %d: %s", method, path, resp.StatusCode, string(b))
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	return m
 }
 
-func apiErr(t *testing.T, ts *httptest.Server, method, path string, body interface{}, wantCode int) map[string]interface{} {
+func apiErr(t *testing.T, ts *httptest.Server, method, path string, body any, wantCode int) map[string]any {
 	t.Helper()
 	resp := api(t, ts, method, path, body)
 	defer resp.Body.Close()
@@ -91,7 +91,7 @@ func apiErr(t *testing.T, ts *httptest.Server, method, path string, body interfa
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("%s %s: expected %d, got %d: %s", method, path, wantCode, resp.StatusCode, string(b))
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	json.NewDecoder(resp.Body).Decode(&m)
 	return m
 }
@@ -101,7 +101,7 @@ func TestAPI_Volumes(t *testing.T) {
 
 	// Empty list initially
 	m := apiOK(t, ts, "GET", "/api/volumes", nil)
-	vols, _ := m["volumes"].([]interface{})
+	vols, _ := m["volumes"].([]any)
 	if len(vols) != 0 {
 		t.Fatalf("expected 0 volumes, got %d", len(vols))
 	}
@@ -141,7 +141,7 @@ func TestAPI_Snapshots(t *testing.T) {
 
 	// List snapshots
 	m = apiOK(t, ts, "GET", "/api/snapshots?volume=test-group/snap-vol", nil)
-	snaps, _ := m["snapshots"].([]interface{})
+	snaps, _ := m["snapshots"].([]any)
 	if len(snaps) == 0 {
 		t.Fatal("expected at least 1 snapshot")
 	}
@@ -160,8 +160,8 @@ func TestAPI_Stats(t *testing.T) {
 	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "test-group/stat-vol"})
 
 	m = apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
-	snaps, _ := m["snapshots"].(map[string]interface{})
-	repo, _ := m["repo"].(map[string]interface{})
+	snaps, _ := m["snapshots"].(map[string]any)
+	repo, _ := m["repo"].(map[string]any)
 	if snaps == nil || snaps["total"] == nil {
 		t.Fatal("expected snapshot stats")
 	}
@@ -247,9 +247,9 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 
 	// Read it back via a direct S3 SDK call to Garage (bypassing the API)
 	directStore, err := store.NewS3Store(store.S3StoreOpts{
-		S3Bucket:    garage.BucketName,
-		S3Endpoint:    garage.Endpoint,
-		Region:        "us-east-1",
+		S3Bucket:   garage.BucketName,
+		S3Endpoint: garage.Endpoint,
+		Region:     "us-east-1",
 	})
 	if err != nil {
 		t.Fatalf("create direct store: %v", err)

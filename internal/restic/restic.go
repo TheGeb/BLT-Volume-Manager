@@ -17,6 +17,7 @@ import (
 	"github.com/example/blt-volume-manager/internal/applog"
 	"github.com/example/blt-volume-manager/internal/constants"
 	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/example/blt-volume-manager/internal/volumepath"
 )
 
 // FindSnapshotByHash searches for a snapshot matching the criteria derived from host + time + paths.
@@ -51,7 +52,7 @@ func (m *Manager) generateHash(s Snapshot) string {
 
 // Manager wraps restic operations for a single repository.
 type Manager struct {
-	repo string
+	repo    string
 	s3Store store.S3Store
 }
 
@@ -80,7 +81,7 @@ func (m *Manager) Backup(path, tag string) error {
 }
 
 func (m *Manager) BackupInDir(path, tag, workDir string) error {
-	args := m.backupArgs(path, tag, "")
+	args := m.backupArgs(path, tag)
 	if workDir != "" {
 		cmd, err := m.resticCommand(context.Background(), args...)
 		if err != nil {
@@ -93,14 +94,14 @@ func (m *Manager) BackupInDir(path, tag, workDir string) error {
 }
 
 func (m *Manager) BackupAt(path, tag string, t time.Time) error {
-	args := m.backupArgs(path, tag, "")
+	args := m.backupArgs(path, tag)
 	if !t.IsZero() {
 		args = append(args, "--time", t.Format(time.RFC3339))
 	}
 	return m.runSimple(context.Background(), args...)
 }
 
-func (m *Manager) backupArgs(path, tag, extra string) []string {
+func (m *Manager) backupArgs(path, tag string) []string {
 	args := []string{"backup", path}
 	if tag != "" {
 		args = append(args, "--tag", tag)
@@ -110,9 +111,6 @@ func (m *Manager) backupArgs(path, tag, extra string) []string {
 		compression = "auto"
 	}
 	args = append(args, "--compression", compression)
-	if extra != "" {
-		args = append(args, extra)
-	}
 	return args
 }
 
@@ -191,12 +189,21 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		return err
 	}
 	out, err := cmd.Output()
-	if err != nil || len(out) == 0 {
+	if err != nil {
+		if len(out) == 0 {
+			return nil
+		}
+		return err
+	}
+	if len(out) == 0 {
 		return nil
 	}
 
-	var snaps []map[string]interface{}
-	if err := json.Unmarshal(out, &snaps); err != nil || len(snaps) == 0 {
+	var snaps []map[string]any
+	if err := json.Unmarshal(out, &snaps); err != nil {
+		return fmt.Errorf("parse snapshot list: %w", err)
+	}
+	if len(snaps) == 0 {
 		rargs := []string{"restore", "latest", "--target", path}
 		if preferred == constants.BackupTagHot || preferred == constants.BackupTagCold {
 			rargs = append(rargs, "--tag", preferred)
@@ -344,21 +351,19 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", nil
 	}
 
-	marker := "/volumes/"
-	idx := strings.Index(volPath, marker)
-	if idx < 0 {
-		return "", nil
-	}
-	targetVolume := strings.TrimPrefix(volPath[idx+len(marker):], "/")
+	targetVolume := volumepath.VolumeNameFromPath(volPath)
 	if targetVolume == "" {
 		return "", nil
 	}
 
 	rp, err := m.s3Store.ReadRestorePoint(targetVolume)
 	if err != nil {
+		if errors.Is(err, store.ErrRestorePointNotFound) {
+			return "", nil
+		}
 		return "", fmt.Errorf("read restore point: %w", err)
 	}
-	if rp == nil || rp.SnapshotID == "" {
+	if rp.SnapshotID == "" {
 		return "", nil
 	}
 	return rp.SnapshotID, nil
@@ -651,9 +656,9 @@ func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd,
 		global = append(global, "--verbose=1")
 	}
 
-	fullArgs := append(global, args...)
-	applog.Debugf("restic_command", "args=%s", strings.Join(fullArgs, " "))
-	cmd := exec.CommandContext(ctx, "restic", fullArgs...)
+	global = append(global, args...)
+	applog.Debugf("restic_command", "args=%s", strings.Join(global, " "))
+	cmd := exec.CommandContext(ctx, "restic", global...)
 	cmd.Env = os.Environ()
 	return cmd, nil
 }

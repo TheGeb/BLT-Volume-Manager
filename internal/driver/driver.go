@@ -74,9 +74,9 @@ func NewDriver(cfg appconfig.Config) *Driver {
 
 	if cfg.S3Bucket != "" {
 		if rw, err := store.NewS3Store(store.S3StoreOpts{
-			S3Bucket:    cfg.S3Bucket,
-			S3Endpoint:  cfg.S3Endpoint,
-			Region:      cfg.S3Region,
+			S3Bucket:   cfg.S3Bucket,
+			S3Endpoint: cfg.S3Endpoint,
+			Region:     cfg.S3Region,
 		}); err == nil {
 			drv.s3Store = rw
 		} else {
@@ -105,7 +105,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		fsType = d.initFsType(r.Options, name, volPath)
 	}
 	if fsType == "" {
-		if err := os.MkdirAll(volPath, 0755); err != nil {
+		if err := os.MkdirAll(volPath, 0o755); err != nil {
 			return err
 		}
 	}
@@ -116,7 +116,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 	ctx := context.Background()
 	lock, err := d.locker.Acquire(ctx, name)
 	if err == nil {
-		//FIXME: Should it take latest even if it's a hot backup? Maybe send an alert
+		// FIXME: Should it take latest even if it's a hot backup? Maybe send an alert
 		restoreMode := "latest"
 		if r.Options != nil {
 			restoreMode = r.Options["restore"]
@@ -196,6 +196,10 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	name := r.Name
 	d.mu.Lock()
 	vi, ok := d.vols[name]
+	var viLock locker.Lock
+	if ok && vi != nil {
+		viLock = vi.Lock
+	}
 	d.mu.Unlock()
 
 	volPath := volumepath.VolumePath(d.root, name)
@@ -227,8 +231,8 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 			applog.Errorf("remove_volume_dir_failed", err, "path=%s", volPath)
 		}
 	}
-	if ok && vi.Lock != nil {
-		if err := vi.Lock.Release(); err != nil {
+	if viLock != nil {
+		if err := viLock.Release(); err != nil {
 			applog.Errorf("release_lock_failed", err, "volume=%s", name)
 		}
 	}
@@ -238,7 +242,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	name := r.Name
 	volPath := volumepath.VolumePath(d.root, name)
-	if err := os.MkdirAll(volPath, 0755); err != nil {
+	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		return nil, fmt.Errorf("create volume dir: %w", err)
 	}
 
@@ -271,11 +275,12 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 				applog.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
 				valid, verr := vi.Lock.IsValid()
-				if verr != nil {
+				switch {
+				case verr != nil:
 					applog.Errorf("lock_check_failed", verr, "volume=%s", name)
-				} else if !valid {
+				case !valid:
 					applog.Warnf("lock_expired_skipping_restore", "volume=%s", name)
-				} else {
+				default:
 					applog.Infof("restore_point_found", "volume=%s snapshot=%s", name, snapID)
 
 					applog.Infof("rollback_backup", "volume=%s", name)
@@ -307,7 +312,9 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 
 		ctx2, cancel := context.WithCancel(context.Background())
 		vi.cancel = cancel
-		d.startHotSchedule(ctx2, name, volPath)
+		if vi.attached == 1 {
+			d.startHotSchedule(ctx2, name, volPath)
+		}
 	}
 
 	return &volume.MountResponse{Mountpoint: volPath}, nil
@@ -351,7 +358,7 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 			state = "locked"
 		}
 	}
-	status := map[string]interface{}{
+	status := map[string]any{
 		"state":    state,
 		"attached": fmt.Sprintf("%d", attached),
 	}
@@ -394,7 +401,10 @@ func (d *Driver) VolumeNames() []string {
 }
 
 func (d *Driver) collectVolumeNames(base, rel string, names *[]string) {
-	entries, _ := os.ReadDir(filepath.Join(base, rel))
+	entries, err := os.ReadDir(filepath.Join(base, rel))
+	if err != nil {
+		return
+	}
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
@@ -414,7 +424,7 @@ func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(volPath, constants.VolumeConfigFile), data, 0644)
+	return os.WriteFile(filepath.Join(volPath, constants.VolumeConfigFile), data, 0o644)
 }
 
 func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {

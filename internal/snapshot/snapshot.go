@@ -21,6 +21,8 @@ const (
 
 func (t Type) String() string {
 	switch t {
+	case TypeNone:
+		return ""
 	case TypeBtrfs:
 		return "btrfs"
 	case TypeZFS:
@@ -57,7 +59,7 @@ func InitBtrfs(path string) error {
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("remove path: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create parent: %w", err)
 	}
 	applog.Debugf("btrfs_create_subvolume", "path=%s", path)
@@ -108,11 +110,13 @@ func Create(volPath, snapDir, volName string) (*SnapInfo, error) {
 	}
 
 	switch t {
+	case TypeNone:
+		return nil, fmt.Errorf("unsupported filesystem type for %s", volPath)
 	case TypeBtrfs:
 		if !IsSubvolume(volPath) {
 			return nil, fmt.Errorf("%s is not a btrfs subvolume; init with btrfs first", volPath)
 		}
-		if err := os.MkdirAll(snapDir, 0755); err != nil {
+		if err := os.MkdirAll(snapDir, 0o755); err != nil {
 			return nil, fmt.Errorf("create snap dir: %w", err)
 		}
 		if err := btrfsCreate(volPath, accessPath); err != nil {
@@ -136,6 +140,8 @@ func Create(volPath, snapDir, volName string) (*SnapInfo, error) {
 
 func Remove(info *SnapInfo) error {
 	switch info.Subtype {
+	case TypeNone:
+		return nil
 	case TypeBtrfs:
 		return btrfsRemove(info.AccessPath)
 	case TypeZFS:

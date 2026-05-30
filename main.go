@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"time"
 
 	"github.com/docker/go-plugins-helpers/volume"
 	"github.com/example/blt-volume-manager/internal/appconfig"
@@ -14,6 +16,13 @@ import (
 )
 
 func main() {
+	// Exit cleanly on Ctrl+C instead of printing "signal: interrupt"
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		<-c
+		os.Exit(0)
+	}()
 	var dataDir string
 	var socketPath string
 	var httpAddr string
@@ -24,7 +33,7 @@ func main() {
 	flag.BoolVar(&httpOnly, "http-only", false, "start only the HTTP UI and do not launch the Docker volume plugin")
 	flag.Parse()
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		applog.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)
 		os.Exit(1)
 	}
@@ -48,7 +57,12 @@ func main() {
 		web.NewServer(cfg).Register(mux)
 		go func() {
 			applog.Infof("serving_http_ui", "address=%s", httpAddr)
-			if err := http.ListenAndServe(httpAddr, mux); err != nil {
+			srv := &http.Server{
+				Addr:              httpAddr,
+				Handler:           mux,
+				ReadHeaderTimeout: 5 * time.Second,
+			}
+			if err := srv.ListenAndServe(); err != nil {
 				applog.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
 			}
 		}()

@@ -2,7 +2,7 @@
 # Usage: make [target]
 # Override args: make dev ARGS="--http-only --http-addr :9090"
 
-.PHONY: all dev build test lint clean
+.PHONY: all dev build test lint format clean
 
 # Default target
 all: lint build
@@ -10,16 +10,20 @@ all: lint build
 # Configurable run arguments (override from command line)
 ARGS ?=
 
+# Format Go code automatically
+format:
+	golangci-lint fmt ./...
+
 # Development: full lint, build, and run
-dev:
+dev: format
 	cd web/ui && npm install
-	cd web/ui && npx svelte-check
+	cd web/ui && npm run check
 	cd web/ui && npm run lint:fix
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
 	golangci-lint run ./...
-	go run . $(ARGS)
+	-go run . $(ARGS)
 
 # Build the UI only
 ui:
@@ -29,8 +33,8 @@ ui:
 	cp -r web/static/* internal/web/static/
 
 # Build the Go binary (includes UI build)
-build: ui
-	go build -o blt-volume-manager ./...
+build: format ui
+	go build -o blt-volume-manager .
 
 # Run all tests
 test:
@@ -46,7 +50,7 @@ test-ui:
 	cd web/ui && npm test
 
 # Run linting
-lint:
+lint: format
 	golangci-lint run ./...
 	cd web/ui && npm run lint
 

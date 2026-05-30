@@ -63,13 +63,9 @@ func TestSnapshotMatchesVolumeNested(t *testing.T) {
 	}
 }
 
-func TestMustHostname(t *testing.T) {
+func TestHostname(t *testing.T) {
 	h := store.Hostname()
 	if h == "" {
 		t.Error("expected non-empty hostname")
 	}
-}
-
-func TestRespondError(t *testing.T) {
-	_ = store.Hostname
 }

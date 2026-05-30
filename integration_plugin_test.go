@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -53,7 +54,7 @@ func setupPluginTest(t *testing.T) (string, *testutil.GarageServer) {
 	return socketPath, garage
 }
 
-func pluginDo(t *testing.T, socketPath, endpoint string, req, resp interface{}) {
+func pluginDo(t *testing.T, socketPath, endpoint string, req, resp any) {
 	t.Helper()
 	var r io.Reader
 	if req != nil {
@@ -63,12 +64,11 @@ func pluginDo(t *testing.T, socketPath, endpoint string, req, resp interface{}) 
 		}
 		r = bytes.NewReader(b)
 	}
-	dial := func(proto, addr string) (net.Conn, error) {
-		return net.Dial("unix", socketPath)
-	}
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: dial,
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
 		},
 	}
 	httpResp, err := client.Post("http://unix/"+endpoint, "application/json", r)
@@ -84,7 +84,7 @@ func pluginDo(t *testing.T, socketPath, endpoint string, req, resp interface{}) 
 	}
 }
 
-func pluginOK(t *testing.T, socketPath, endpoint string, req interface{}) map[string]interface{} {
+func pluginOK(t *testing.T, socketPath, endpoint string, req any) map[string]any {
 	t.Helper()
 	var r io.Reader
 	if req != nil {
@@ -94,12 +94,11 @@ func pluginOK(t *testing.T, socketPath, endpoint string, req interface{}) map[st
 		}
 		r = bytes.NewReader(b)
 	}
-	dial := func(proto, addr string) (net.Conn, error) {
-		return net.Dial("unix", socketPath)
-	}
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: dial,
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
 		},
 	}
 	httpResp, err := client.Post("http://unix/"+endpoint, "application/json", r)
@@ -108,7 +107,7 @@ func pluginOK(t *testing.T, socketPath, endpoint string, req interface{}) map[st
 	}
 	defer httpResp.Body.Close()
 	body, _ := io.ReadAll(httpResp.Body)
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal(body, &m); err != nil {
 		t.Fatalf("%s: decode: %v\nbody: %s", endpoint, err, string(body))
 	}
@@ -139,14 +138,14 @@ func TestPlugin_CreateDuplicate(t *testing.T) {
 func TestPlugin_ListVolumes(t *testing.T) {
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ := m["Volumes"].([]interface{})
+	vols, _ := m["Volumes"].([]any)
 	initialCount := len(vols)
 
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "list-vol-1"})
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "list-vol-2"})
 
 	m = pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ = m["Volumes"].([]interface{})
+	vols, _ = m["Volumes"].([]any)
 	if got := len(vols); got != initialCount+2 {
 		t.Fatalf("expected %d volumes, got %d", initialCount+2, got)
 	}
@@ -157,7 +156,7 @@ func TestPlugin_GetVolume(t *testing.T) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "get-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "get-vol"})
-	v, ok := m["Volume"].(map[string]interface{})
+	v, ok := m["Volume"].(map[string]any)
 	if !ok {
 		t.Fatalf("get: no Volume in response: %v", m)
 	}
@@ -202,9 +201,9 @@ func TestPlugin_RemoveVolume(t *testing.T) {
 
 	// Should not appear in list
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ := m["Volumes"].([]interface{})
+	vols, _ := m["Volumes"].([]any)
 	for _, v := range vols {
-		if vm, ok := v.(map[string]interface{}); ok && vm["Name"] == "remove-vol" {
+		if vm, ok := v.(map[string]any); ok && vm["Name"] == "remove-vol" {
 			t.Fatal("volume should have been removed")
 		}
 	}
@@ -223,7 +222,7 @@ func TestPlugin_FullLifecycle(t *testing.T) {
 	}
 
 	m = pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "lifecycle-vol"})
-	v, _ := m["Volume"].(map[string]interface{})
+	v, _ := m["Volume"].(map[string]any)
 	if v["Name"] != "lifecycle-vol" {
 		t.Fatal("wrong volume name on get")
 	}
@@ -240,7 +239,7 @@ func TestPlugin_FullLifecycle(t *testing.T) {
 func TestPlugin_Capabilities(t *testing.T) {
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.Capabilities", nil)
-	caps, ok := m["Capabilities"].(map[string]interface{})
+	caps, ok := m["Capabilities"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected Capabilities in response: %v", m)
 	}
@@ -260,7 +259,7 @@ func TestPlugin_EdgeCases(t *testing.T) {
 
 	// Get non-existent volume (returns volume with empty path)
 	m = pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "no-such-vol"})
-	if v, ok := m["Volume"].(map[string]interface{}); ok {
+	if v, ok := m["Volume"].(map[string]any); ok {
 		if v["Name"] != "no-such-vol" {
 			t.Fatalf("expected name no-such-vol, got %v", v["Name"])
 		}

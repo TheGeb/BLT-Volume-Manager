@@ -12,8 +12,8 @@ const (
 
 // Snapshot suffixes
 const (
-	ColdSnapSuffix    = "-cold-snapshot"
-	PreRestoreSuffix  = "-pre-restore"
+	ColdSnapSuffix   = "-cold-snapshot"
+	PreRestoreSuffix = "-pre-restore"
 )
 
 // Directory names
@@ -40,7 +40,7 @@ const (
 
 // Lock durations
 const (
-	DefaultLockMaxHoldMins = 10
-	DefaultLockTTL         = 24 * time.Hour
+	DefaultLockMaxHoldMins    = 10
+	DefaultLockTTL            = 24 * time.Hour
 	DefaultLockAcquireTimeout = 5 * time.Second
 )

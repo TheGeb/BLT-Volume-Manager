@@ -48,11 +48,11 @@ type S3Client struct {
 }
 
 type S3StoreOpts struct {
-	S3Bucket    string
+	S3Bucket       string
 	S3LockFolder   string
 	S3VolumePrefix string
-	S3Endpoint      string
-	Region          string
+	S3Endpoint     string
+	Region         string
 }
 
 func (opts S3StoreOpts) validate() error {
@@ -90,7 +90,7 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 		}
 		scheme := u.Scheme
 		if scheme == "" {
-			scheme = "http" //FIXME default https, ensure that http still works if specified though
+			scheme = "http" // FIXME default https, ensure that http still works if specified though
 		}
 		base := scheme + "://" + u.Host
 		clientOpts = append(clientOpts, func(o *s3.Options) {
@@ -252,6 +252,9 @@ func (s *S3Client) ListVolumeMarkers() ([]string, error) {
 }
 
 func (s *S3Client) DeleteLockObjects() error {
+	if s.opts.S3LockFolder == "" {
+		return nil
+	}
 	return s.DeleteObjectsWithPrefix(s.opts.S3LockFolder)
 }
 

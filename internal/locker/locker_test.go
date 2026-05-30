@@ -79,7 +79,7 @@ func TestFileLockIsValidNoFile(t *testing.T) {
 func TestFileLockerAcquireExistingLock(t *testing.T) {
 	dir := t.TempDir()
 	lockPath := filepath.Join(dir, "existing.lock")
-	if err := os.WriteFile(lockPath, []byte("pid:123"), 0644); err != nil {
+	if err := os.WriteFile(lockPath, []byte("pid:123"), 0o644); err != nil {
 		t.Fatalf("write lock file: %v", err)
 	}
 

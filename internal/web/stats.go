@@ -11,9 +11,9 @@ func (s *Server) refreshStats() {
 	volNames := s.volumeNames()
 
 	s.statsMu.Lock()
-	s.statsCache = map[string]interface{}{
-		"cached_at":     time.Now().UTC().Format(time.RFC3339),
-		"total_volumes": len(volNames),
+	s.statsCache = &statsCache{
+		CachedAt:     time.Now().UTC().Format(time.RFC3339),
+		TotalVolumes: len(volNames),
 	}
 	s.statsCacheAt = time.Now()
 	s.statsMu.Unlock()
@@ -33,18 +33,18 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rm := s.volumeManager(volName)
-	snapshotStats := map[string]interface{}{
+	snapshotStats := map[string]any{
 		"total": 0, "hot": 0, "cold": 0, "excluded": 0, "volumes": 0,
 		"newest": "", "oldest": "",
 	}
-	repoStats := map[string]interface{}{}
+	repoStats := map[string]any{}
 
 	rst, err := rm.Stats()
 	if err != nil {
 		logError("stats_failed", err)
 		repoStats["error"] = err.Error()
 	} else if rst != nil {
-		repoStats = map[string]interface{}{
+		repoStats = map[string]any{
 			"total_size":              rst.TotalSize,
 			"total_file_count":        rst.TotalFileCount,
 			"total_blob_count":        rst.TotalBlobCount,
@@ -83,7 +83,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		if !oldest.IsZero() {
 			oldestStr = oldest.Format(time.RFC3339)
 		}
-		snapshotStats = map[string]interface{}{
+		snapshotStats = map[string]any{
 			"total":    len(snaps),
 			"hot":      hot,
 			"cold":     cold,
@@ -119,7 +119,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"snapshots": snapshotStats,
 		"repo":      repoStats,
 		"volume":    volName,
@@ -127,8 +127,8 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	s.statsMu.RLock()
 	if s.statsCache != nil {
-		resp["cached_at"] = s.statsCache["cached_at"]
-		resp["total_volumes"] = s.statsCache["total_volumes"]
+		resp["cached_at"] = s.statsCache.CachedAt
+		resp["total_volumes"] = s.statsCache.TotalVolumes
 	}
 	s.statsMu.RUnlock()
 
@@ -156,5 +156,5 @@ func (s *Server) handleVolumes(w http.ResponseWriter, r *http.Request) {
 	if volumes == nil {
 		volumes = []string{}
 	}
-	respondJSON(w, map[string]interface{}{"volumes": volumes})
+	respondJSON(w, map[string]any{"volumes": volumes})
 }

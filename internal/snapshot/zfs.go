@@ -33,7 +33,7 @@ func zfsCreateSnapshot(fullSnap, mountPath string) error {
 		return fmt.Errorf("zfs snapshot: %w\n%s", err, string(out))
 	}
 
-	if err := os.MkdirAll(mountPath, 0755); err != nil {
+	if err := os.MkdirAll(mountPath, 0o755); err != nil {
 		_ = zfsDestroy(fullSnap)
 		return fmt.Errorf("create mount dir: %w", err)
 	}
@@ -68,5 +68,3 @@ func zfsDestroy(fullSnap string) error {
 	}
 	return nil
 }
-
-

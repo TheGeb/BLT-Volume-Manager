@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
+
+// ErrRestorePointNotFound is returned when a restore point does not exist.
+var ErrRestorePointNotFound = errors.New("restore point not found")
 
 // LockFolder returns the S3 prefix for a volume's lock objects.
 func LockFolder(volumeName string) string {
@@ -96,7 +100,7 @@ func ReadRestorePoint(s3 S3Store, volumeName string) (*RestorePoint, error) {
 		return nil, err
 	}
 	if data == nil {
-		return nil, nil
+		return nil, ErrRestorePointNotFound
 	}
 	var rp RestorePoint
 	if err := json.Unmarshal(data, &rp); err != nil {

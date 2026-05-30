@@ -4,7 +4,7 @@ set -euo pipefail
 # Build and push multi-arch Docker images for both the plugin and web targets.
 #
 # Usage:
-#   IMAGE=myrepo/blt-volume-manager VERSION=v1.2.3 ./build.sh
+#   IMAGE=myrepo/blt-volume-manager VERSION=v1.2.3 ./docker-build-push.sh
 #
 # Defaults:
 #   IMAGE   = blt-volume-manager

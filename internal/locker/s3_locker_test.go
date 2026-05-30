@@ -7,7 +7,7 @@ import (
 	"github.com/example/blt-volume-manager/internal/store"
 )
 
-func IsLockOwned(err error) bool {
+func isLockOwned(err error) bool {
 	var le *LockError
 	return errors.As(err, &le) && le.Code == LockHeldByAnother
 }
@@ -27,8 +27,8 @@ func TestIsLockOwned(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsLockOwned(tt.err); got != tt.expected {
-				t.Errorf("IsLockOwned(%v) = %v, want %v", tt.err, got, tt.expected)
+			if got := isLockOwned(tt.err); got != tt.expected {
+				t.Errorf("isLockOwned(%v) = %v, want %v", tt.err, got, tt.expected)
 			}
 		})
 	}

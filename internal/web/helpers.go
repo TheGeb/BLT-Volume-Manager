@@ -23,7 +23,7 @@ func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return vol, true
 }
 
-func (s *Server) snapshotListResponse(volName string) (map[string]interface{}, error) {
+func (s *Server) snapshotListResponse(volName string) (map[string]any, error) {
 	rm := s.volumeManager(volName)
 	snaps, err := rm.ListSnapshots()
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *Server) snapshotListResponse(volName string) (map[string]interface{}, e
 		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"snapshots":      result,
 		"restorePointID": restorePointID,
 	}, nil
@@ -58,7 +58,7 @@ func respondError(w http.ResponseWriter, err error, status int) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-func respondJSON(w http.ResponseWriter, v interface{}) {
+func respondJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
 }

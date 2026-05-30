@@ -15,5 +15,3 @@ type RestorePoint struct {
 	SnapshotID   string `json:"snapshotID"`
 	FallbackHash string `json:"fallbackHash"`
 }
-
-

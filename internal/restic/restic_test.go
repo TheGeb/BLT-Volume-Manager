@@ -207,9 +207,9 @@ func TestCommonPathPrefixIdentical(t *testing.T) {
 
 func TestPathBelongsToVolume(t *testing.T) {
 	tests := []struct {
-		path    string
-		volume  string
-		want    bool
+		path   string
+		volume string
+		want   bool
 	}{
 		{"/var/lib/docker-volumes/volumes/my-vol/data/file.txt", "my-vol", true},
 		{"/volumes/my-vol/data", "my-vol", true},
@@ -235,9 +235,9 @@ func TestPathBelongsToVolume(t *testing.T) {
 
 func TestPathBelongsToVolumeColdSnapEdgeCases(t *testing.T) {
 	tests := []struct {
-		path    string
-		volume  string
-		want    bool
+		path   string
+		volume string
+		want   bool
 	}{
 		{"/snaps/my-vol-cold-snapshot", "my-vol", true},
 		{"/snaps/group/sub-vol-cold-snapshot", "group/sub-vol", true},

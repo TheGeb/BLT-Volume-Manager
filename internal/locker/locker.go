@@ -19,7 +19,7 @@ type Lock interface {
 }
 
 // Simple file-based locker that creates a lock file using O_EXCL.
-type fileLocker struct{
+type fileLocker struct {
 	dir string
 }
 
@@ -32,14 +32,14 @@ type fileLock struct {
 }
 
 func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
-	if err := os.MkdirAll(l.dir, 0755); err != nil {
+	if err := os.MkdirAll(l.dir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 	path := filepath.Join(l.dir, name+".lock")
 	// Try repeatedly for a short period
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
 			if _, werr := fmt.Fprintf(f, "pid:%d\n", os.Getpid()); werr != nil {
 				_ = f.Close()

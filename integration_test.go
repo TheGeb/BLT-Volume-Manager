@@ -27,9 +27,9 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 
 	// Use real S3 via Garage for restore points (not FakeS3)
 	realStore, err := store.NewS3Store(store.S3StoreOpts{
-		S3Bucket:    garage.BucketName,
-		S3Endpoint:    garage.Endpoint,
-		Region:        "us-east-1",
+		S3Bucket:   garage.BucketName,
+		S3Endpoint: garage.Endpoint,
+		Region:     "us-east-1",
 	})
 	if err != nil {
 		t.Fatalf("create real s3 store: %v", err)
@@ -43,10 +43,10 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 	// Back up a file
 	backupDir := t.TempDir()
 	srcDir := filepath.Join(backupDir, "data")
-	if err := os.MkdirAll(srcDir, 0755); err != nil {
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(srcDir, "test.txt"), []byte("hello garage"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(srcDir, "test.txt"), []byte("hello garage"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := rm.Backup(srcDir, constants.BackupTagCold); err != nil {
@@ -69,6 +69,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 	var found bool
 	filepath.Walk(restoreDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
+			t.Logf("walk error at %s: %v", path, err)
 			return nil
 		}
 		if !fi.IsDir() && fi.Name() == "test.txt" {
@@ -125,9 +126,9 @@ func TestS3LocksWithGarage(t *testing.T) {
 
 	// Create a real S3 store via Garage
 	s3Store, err := store.NewS3Store(store.S3StoreOpts{
-		S3Bucket:    garage.BucketName,
-		S3Endpoint:    garage.Endpoint,
-		Region:        "us-east-1",
+		S3Bucket:   garage.BucketName,
+		S3Endpoint: garage.Endpoint,
+		Region:     "us-east-1",
 	})
 	if err != nil {
 		t.Fatalf("create s3 store: %v", err)

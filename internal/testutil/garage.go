@@ -35,8 +35,8 @@ func StartGarage(t *testing.T) *GarageServer {
 
 	// Build a one-off image with the config baked in — use project-relative path
 	// so Docker's build context is accessible to the daemon.
-	buildDir := filepath.Join(".docker-build-"+randomString(8))
-	if err := os.MkdirAll(buildDir, 0755); err != nil {
+	buildDir := ".docker-build-" + randomString(8)
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(buildDir) })
@@ -62,11 +62,11 @@ root_domain = ".web.garage.localhost"
 api_bind_addr = "0.0.0.0:3903"
 `, rpcSecret)
 
-	if err := os.WriteFile(filepath.Join(buildDir, "config.toml"), []byte(config), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(buildDir, "config.toml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dockerfile := "FROM " + garageImage + "\nCOPY config.toml /etc/garage.toml\n"
-	if err := os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(dockerfile), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -135,7 +135,11 @@ func (g *GarageServer) waitReady(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatalf("garage at %s did not become ready within 30s", g.Endpoint)
 		default:
-			resp, err := http.Get(checkURL)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
+			if err != nil {
+				t.Fatalf("create request: %v", err)
+			}
+			resp, err := http.DefaultClient.Do(req) //nolint:gosec // Test helper checking known Garage endpoint
 			if err == nil {
 				_ = resp.Body.Close()
 				return

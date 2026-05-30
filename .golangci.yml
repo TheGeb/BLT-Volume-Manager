@@ -1,6 +1,44 @@
 version: "2"
 
 linters:
+  default: standard
+  enable:
+    - copyloopvar
+    - dupword
+    - exhaustive
+    - gocritic
+    - gosec
+    - misspell
+    - mirror
+    - nilnil
+    - unconvert
+    - usestdlibvars
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    unused:
+      check-exported: true
+  exclusions:
+    paths:
+      - web/ui/node_modules
+    rules:
+      - linters:
+          - gosec
+        text: "G204:"
+      - linters:
+          - gosec
+        text: "G301:"
+      - linters:
+          - gosec
+        text: "G304:"
+      - linters:
+          - gosec
+        text: "G306:"
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
   exclusions:
     paths:
       - web/ui/node_modules

@@ -50,16 +50,16 @@ func TestListOrphaned_EmptyDir(t *testing.T) {
 func TestListOrphaned_FindsColdSnaps(t *testing.T) {
 	snapDir := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(snapDir, "vol1"+constants.ColdSnapSuffix), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "vol1"+constants.ColdSnapSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(snapDir, "vol2"+constants.ColdSnapSuffix), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "vol2"+constants.ColdSnapSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(snapDir, "regular-dir"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "regular-dir"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(snapDir, "some-file.txt"), nil, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(snapDir, "some-file.txt"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +85,7 @@ func TestListOrphaned_FindsColdSnaps(t *testing.T) {
 
 func TestListOrphaned_AccessPath(t *testing.T) {
 	snapDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(snapDir, "test-vol"+constants.ColdSnapSuffix), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "test-vol"+constants.ColdSnapSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
 

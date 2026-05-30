@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,26 +18,39 @@ const (
 )
 
 var levelNames = map[string]int{
-	"error": LevelError,
-	"warn":  LevelWarn,
+	"error":   LevelError,
+	"warn":    LevelWarn,
 	"warning": LevelWarn,
-	"info":  LevelInfo,
-	"debug": LevelDebug,
-	"trace": LevelTrace,
+	"info":    LevelInfo,
+	"debug":   LevelDebug,
+	"trace":   LevelTrace,
 }
 
-var CurrentLevel int
+var currentLevel atomic.Int32
 
 func init() {
 	lvl := os.Getenv("LOG_LEVEL")
 	if lvl == "" {
 		lvl = "info"
 	}
+	level := LevelInfo
 	if v, ok := levelNames[strings.ToLower(lvl)]; ok {
-		CurrentLevel = v
-	} else {
-		CurrentLevel = LevelInfo
+		level = v
 	}
+	currentLevel.Store(int32(level))
+}
+
+// CurrentLevel returns the current log level. Use SetLevel to change it.
+func CurrentLevel() int {
+	return int(currentLevel.Load())
+}
+
+// SetLevel sets the log level.
+func SetLevel(level int) {
+	if level < LevelError || level > LevelTrace {
+		level = LevelInfo
+	}
+	currentLevel.Store(int32(level))
 }
 
 type Entry struct {
@@ -58,7 +72,7 @@ type Entry struct {
 
 func Log(e Entry) {
 	v, ok := levelNames[e.Level]
-	if !ok || v > CurrentLevel {
+	if !ok || v > CurrentLevel() {
 		return
 	}
 	e.Time = time.Now().UTC().Format(time.RFC3339Nano)

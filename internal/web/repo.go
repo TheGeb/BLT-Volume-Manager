@@ -22,7 +22,7 @@ func (s *Server) handleRepoStatus(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	respondJSON(w, map[string]interface{}{"initialized": exists, "hostname": store.Hostname()})
+	respondJSON(w, map[string]any{"initialized": exists, "hostname": store.Hostname()})
 }
 
 func (s *Server) handleRepoInit(w http.ResponseWriter, r *http.Request) {

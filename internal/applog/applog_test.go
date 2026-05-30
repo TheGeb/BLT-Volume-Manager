@@ -1,48 +1,22 @@
 package applog
 
 import (
-	"io"
-	"os"
 	"testing"
 )
 
-func captureLogOutput(t *testing.T, fn func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	defer func() { _ = r.Close() }()
-
-	old := os.Stdout
-	os.Stdout = w
-
-	fn()
-
-	_ = w.Close()
-	os.Stdout = old
-
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read log output: %v", err)
-	}
-	return string(data)
-}
-
 func TestLogLevelInit(t *testing.T) {
-	if CurrentLevel < LevelError {
-		t.Errorf("CurrentLevel (%d) should be >= LevelError (%d)", CurrentLevel, LevelError)
+	if CurrentLevel() < LevelError {
+		t.Errorf("CurrentLevel (%d) should be >= LevelError (%d)", CurrentLevel(), LevelError)
 	}
 }
 
 func TestLogLevelFiltering(t *testing.T) {
-	oldLevel := CurrentLevel
-	defer func() { CurrentLevel = oldLevel }()
+	oldLevel := CurrentLevel()
+	defer func() { SetLevel(oldLevel) }()
 
-	CurrentLevel = LevelError
+	SetLevel(LevelError)
 
 	Log(Entry{Level: "info", Event: "test_event"})
-	_ = captureLogOutput
 }
 
 func TestLogEntryLevelNames(t *testing.T) {
@@ -70,19 +44,19 @@ func TestLogLevelNames(t *testing.T) {
 }
 
 func TestLogJSONBelowLevel(t *testing.T) {
-	oldLevel := CurrentLevel
-	defer func() { CurrentLevel = oldLevel }()
+	oldLevel := CurrentLevel()
+	defer func() { SetLevel(oldLevel) }()
 
-	CurrentLevel = LevelError
+	SetLevel(LevelError)
 
 	Log(Entry{Level: "trace", Event: "should_not_appear"})
 }
 
 func TestLogJSONInvalidLevel(t *testing.T) {
-	oldLevel := CurrentLevel
-	defer func() { CurrentLevel = oldLevel }()
+	oldLevel := CurrentLevel()
+	defer func() { SetLevel(oldLevel) }()
 
-	CurrentLevel = LevelTrace
+	SetLevel(LevelTrace)
 
 	Log(Entry{Level: "invalid", Event: "test"})
 }

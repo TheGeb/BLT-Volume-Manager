@@ -28,7 +28,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(lw, r)
 		dur := time.Since(start)
 		level := "debug"
-		if r.Method == "GET" && strings.HasSuffix(r.URL.Path, ".js") {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, ".js") {
 			level = "trace"
 		}
 		applog.Log(applog.Entry{

@@ -24,6 +24,11 @@ func init() {
 	}
 }
 
+type statsCache struct {
+	CachedAt     string `json:"cached_at"`
+	TotalVolumes int    `json:"total_volumes"`
+}
+
 type Server struct {
 	dataDir      string
 	resticBase   string
@@ -36,7 +41,7 @@ type Server struct {
 	s3StoreMu    sync.RWMutex
 	s3StoreCache map[string]store.S3Store
 	statsMu      sync.RWMutex
-	statsCache   map[string]interface{}
+	statsCache   *statsCache
 	statsCacheAt time.Time
 }
 
@@ -46,13 +51,13 @@ func NewServer(cfg appconfig.Config) *Server {
 
 func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
 	if s.s3Bucket == "" {
-		return nil, nil
+		return nil, nil //nolint:nilnil // S3 not configured is not an error
 	}
 	s.s3StoreOnce.Do(func() {
 		s.s3Store, s.s3StoreErr = store.NewS3Store(store.S3StoreOpts{
-			S3Bucket:    s.s3Bucket,
-			S3Endpoint:  s.s3Endpoint,
-			Region:      s.s3Region,
+			S3Bucket:   s.s3Bucket,
+			S3Endpoint: s.s3Endpoint,
+			Region:     s.s3Region,
 		})
 	})
 	return s.s3Store, s.s3StoreErr
@@ -60,7 +65,7 @@ func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
 
 func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, error) {
 	if s.s3Bucket == "" {
-		return nil, nil
+		return nil, nil //nolint:nilnil // S3 not configured is not an error
 	}
 	s.s3StoreMu.RLock()
 	if s.s3StoreCache != nil {
@@ -72,10 +77,10 @@ func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, err
 	s.s3StoreMu.RUnlock()
 
 	s3Store, err := store.NewS3Store(store.S3StoreOpts{
-		S3Bucket:        s.s3Bucket,
+		S3Bucket:       s.s3Bucket,
 		S3VolumePrefix: prefix,
-		S3Endpoint:      s.s3Endpoint,
-		Region:          s.s3Region,
+		S3Endpoint:     s.s3Endpoint,
+		Region:         s.s3Region,
 	})
 	if err != nil {
 		return nil, err
