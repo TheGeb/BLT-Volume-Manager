@@ -21,10 +21,19 @@
             pname = "blt-volume-manager";
             version = "0.1.0";
             src = ./.;
-            # TODO: replace with actual hash — run `nix build .#blt-volume-manager 2>&1 | grep 'got:'`
+
+            # Build web UI via Makefile before Go compilation
+            preBuild = ''
+              ${pkgs.gnumake}/bin/make ui
+            '';
+
+            # TODO: replace with actual hash -- run `nix build .#blt-volume-manager 2>&1 | grep 'got:'`
             vendorHash = pkgs.lib.fakeSha256;
             ldflags = [ "-s" "-w" ];
             CGO_ENABLED = 0;
+
+            nativeBuildInputs = [ pkgs.gnumake pkgs.nodejs ];
+
             meta = with pkgs.lib; {
               description = "Docker/Podman volume plugin for S3 backup using restic";
               # TODO: set to real repository URL
@@ -38,7 +47,10 @@
         };
 
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [ go gopls gotools ];
+          buildInputs = with pkgs; [ go gopls gotools nodejs gnumake ];
+          shellHook = ''
+            echo "Run 'make dev ARGS=\"--http-only --http-addr :8081\"' to build and run"
+          '';
         };
       }
     ) // {

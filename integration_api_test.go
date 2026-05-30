@@ -12,9 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/blt-volume-manager/store"
-	"github.com/example/blt-volume-manager/testutil"
-	"github.com/example/blt-volume-manager/web"
+	"github.com/example/blt-volume-manager/internal/appconfig"
+	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/example/blt-volume-manager/internal/testutil"
+	"github.com/example/blt-volume-manager/internal/web"
 )
 
 // setupAPITest starts Garage, creates a driver + web server backed by real S3,
@@ -33,7 +34,13 @@ func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
 	mux := http.NewServeMux()
-	web.NewServer(dataDir, resticBase, garage.BucketName, garage.Endpoint, "us-east-1").Register(mux)
+	web.NewServer(appconfig.Config{
+		DataDir:    dataDir,
+		ResticBase: resticBase,
+		S3Bucket:   garage.BucketName,
+		S3Endpoint: garage.Endpoint,
+		S3Region:   "us-east-1",
+	}).Register(mux)
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 

@@ -1,0 +1,64 @@
+package web
+
+import (
+	"encoding/json"
+	"net/http"
+	"path/filepath"
+)
+
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
+	vol := r.URL.Query().Get("volume")
+	if vol == "" {
+		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		return "", false
+	}
+	return vol, true
+}
+
+func (s *Server) snapshotListResponse(volName string) (map[string]interface{}, error) {
+	rm := s.volumeManager(volName)
+	snaps, err := rm.ListSnapshots()
+	if err != nil {
+		return nil, err
+	}
+
+	restorePointID := ""
+	volPath := filepath.Join(s.dataDir, "volumes", volName)
+	if id, err := rm.FindRestorePoint(volPath); err == nil {
+		restorePointID = id
+	}
+
+	result := make([]SnapshotWithVolume, 0, len(snaps))
+	for _, snap := range snaps {
+		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
+	}
+
+	return map[string]interface{}{
+		"snapshots":      result,
+		"restorePointID": restorePointID,
+	}, nil
+}
+
+func respondError(w http.ResponseWriter, err error, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	msg := "unknown error"
+	if err != nil {
+		msg = err.Error()
+		logError("request_error", err)
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func respondJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}

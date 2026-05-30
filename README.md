@@ -41,13 +41,13 @@ Example run
 Build container:
 
 ```bash
-docker build -t s3vol:local .
+docker build -t blt-volume-manager:local .
 ```
 
 Run as plugin (binary mode on host):
 
 ```bash
-sudo ./s3vol --data-dir /var/lib/docker-volumes --socket /run/docker/plugins/s3vol.sock
+sudo ./blt-volume-manager --data-dir /var/lib/docker-volumes --socket /run/docker/plugins/blt-volume-manager.sock
 ```
 
 To run as a container, mount `/run/docker/plugins` and `/var/lib/docker-volumes` appropriately and set env vars for restic/S3.
@@ -56,5 +56,5 @@ Enable S3 locker (example build):
 
 ```bash
 # implement S3 locker and build with tag 's3' OR vendor a package that provides it
-go build -tags s3 -o s3vol ./...
+go build -tags s3 -o blt-volume-manager ./...
 ```

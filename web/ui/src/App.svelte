@@ -39,7 +39,7 @@
     if (!$themeDark) document.body.classList.add('light');
     await loadVolumes();
     if ($volumes.length === 0) {
-      setBanner('No volumes found. Create one with: docker volume create --driver s3vol --name <name>');
+      setBanner('No volumes found. Create one with: docker volume create --driver blt-volume-manager --name <name>');
     } else {
       setBanner('');
     }

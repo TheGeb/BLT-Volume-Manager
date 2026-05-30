@@ -24,7 +24,7 @@
     <div style="background:rgb(255 255 255 / 3%);border:1px solid var(--border);border-radius:16px;padding:20px;">
       <h3 class="stats-heading" style="margin:0 0 12px;">Quick start</h3>
       <div style="display:flex;flex-direction:column;gap:8px;font-size:0.85rem;font-family:monospace;">
-        <code style="padding:10px;background:rgb(0 0 0 / 20%);border-radius:8px;color:var(--accent);">docker volume create --driver s3vol --name my-volume</code>
+        <code style="padding:10px;background:rgb(0 0 0 / 20%);border-radius:8px;color:var(--accent);">docker volume create --driver blt-volume-manager --name my-volume</code>
         <code style="padding:10px;background:rgb(0 0 0 / 20%);border-radius:8px;color:var(--accent);">docker run -v my-volume:/data alpine echo hello</code>
       </div>
     </div>

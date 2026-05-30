@@ -32,6 +32,7 @@ node_modules/
 
 # Build output
 /web/static/
+/internal/web/static/
 
 # Built binaries
 blt-volume-manager

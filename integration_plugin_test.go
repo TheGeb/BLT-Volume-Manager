@@ -13,8 +13,9 @@ import (
 	"testing"
 
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/blt-volume-manager/driver"
-	"github.com/example/blt-volume-manager/testutil"
+	"github.com/example/blt-volume-manager/internal/appconfig"
+	"github.com/example/blt-volume-manager/internal/driver"
+	"github.com/example/blt-volume-manager/internal/testutil"
 )
 
 // setupPluginTest starts Garage, creates a Driver backed by real S3, and
@@ -32,7 +33,13 @@ func setupPluginTest(t *testing.T) (string, *testutil.GarageServer) {
 	dataDir := t.TempDir()
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
-	drv := driver.NewDriver(dataDir, resticBase, garage.BucketName, garage.Endpoint, "us-east-1")
+	drv := driver.NewDriver(appconfig.Config{
+		DataDir:    dataDir,
+		ResticBase: resticBase,
+		S3Bucket:   garage.BucketName,
+		S3Endpoint: garage.Endpoint,
+		S3Region:   "us-east-1",
+	})
 	h := volume.NewHandler(drv)
 
 	socketPath := filepath.Join(t.TempDir(), "plugin.sock")

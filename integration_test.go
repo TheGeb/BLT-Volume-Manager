@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/example/blt-volume-manager/restic"
-	"github.com/example/blt-volume-manager/store"
-	"github.com/example/blt-volume-manager/testutil"
+	"github.com/example/blt-volume-manager/internal/constants"
+	"github.com/example/blt-volume-manager/internal/restic"
+	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/example/blt-volume-manager/internal/testutil"
 )
 
 func TestResticBackupRestoreWithGarage(t *testing.T) {
@@ -48,7 +49,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(srcDir, "test.txt"), []byte("hello garage"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := rm.Backup(srcDir, "cold"); err != nil {
+	if err := rm.Backup(srcDir, constants.BackupTagCold); err != nil {
 		t.Fatalf("backup: %v", err)
 	}
 
