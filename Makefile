@@ -2,7 +2,7 @@
 # Usage: make [target]
 # Override args: make dev ARGS="--http-only --http-addr :9090"
 
-.PHONY: all dev build test lint format clean
+.PHONY: all dev build test lint lint-go format clean coverage hadolint ui ui-dev run watch
 
 # Default target
 all: lint build
@@ -14,20 +14,38 @@ ARGS ?=
 format:
 	golangci-lint fmt ./...
 
-# Development: full lint, build, and run
-dev: format
-	cd web/ui && npm install
-	cd web/ui && npm run check
-	cd web/ui && npm run lint:fix
-	cd web/ui && npm run build
-	mkdir -p internal/web/static
-	cp -r web/static/* internal/web/static/
+# Go lint (runs after format so it lints the formatted code)
+lint-go: format
 	golangci-lint run ./...
+
+# Development: full lint, build, and run
+# Independent checks (lint-go, coverage, hadolint, ui-dev) run in parallel with: make -j dev
+dev: lint-go coverage hadolint ui-dev
 	-go run . $(ARGS)
+
+# Go test coverage report (runs after format for safety)
+coverage: format
+	go test ./... -coverprofile=coverage.out -short
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Dockerfile lint via Docker
+hadolint:
+	@echo "--- Dockerfile lint (via Docker) ---"
+	docker run --rm -i hadolint/hadolint < Dockerfile
 
 # Build the UI only
 ui:
 	cd web/ui && npm install
+	cd web/ui && npm run build
+	mkdir -p internal/web/static
+	cp -r web/static/* internal/web/static/
+
+# UI development build (includes typecheck and lint:fix)
+ui-dev:
+	cd web/ui && npm install
+	cd web/ui && npm run check
+	cd web/ui && npm run lint:fix
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
