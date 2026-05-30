@@ -2,7 +2,7 @@
 # Usage: make [target]
 # Override args: make dev ARGS="--http-only --http-addr :9090"
 
-.PHONY: all dev build test lint lint-go format clean coverage hadolint ui ui-dev run watch
+.PHONY: all dev build test lint lint-go format clean coverage check hadolint ui ui-dev run watch
 
 # Default target
 all: lint build
@@ -19,9 +19,12 @@ lint-go: format
 	golangci-lint run ./...
 
 # Development: full lint, build, and run
-# Independent checks (lint-go, coverage, hadolint, ui-dev) run in parallel with: make -j dev
-dev: lint-go coverage hadolint ui-dev
+# Independent checks (lint-go, hadolint, ui-dev) run in parallel with: make -j dev
+dev: lint-go hadolint ui-dev
 	-go run . $(ARGS)
+
+# CI / full check (includes tests and coverage)
+check: lint-go coverage hadolint ui-dev
 
 # Go test coverage report (runs after format for safety)
 coverage: format
