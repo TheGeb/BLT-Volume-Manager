@@ -74,7 +74,6 @@ api_bind_addr = "0.0.0.0:3903"
 		t.Fatalf("build garage image: %v\n%s", err, out)
 	}
 
-	// Start the container
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "3900",
 		"-e", "GARAGE_DEFAULT_ACCESS_KEY="+accessKey,
@@ -93,7 +92,6 @@ api_bind_addr = "0.0.0.0:3903"
 		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
-	// Wait for the port to be published
 	var hostPort string
 	for i := 0; i < 30; i++ {
 		portOut, err := exec.Command("docker", "port", containerID, "3900").CombinedOutput()

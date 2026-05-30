@@ -253,7 +253,6 @@ type RepoStats struct {
 	TotalFileCount        int64 `json:"total_file_count"`
 	TotalBlobCount        int64 `json:"total_blob_count"`
 	TotalUncompressedSize int64 `json:"total_uncompressed_size"`
-	CompressedSize        int64 `json:"compressed_size"`
 	UniqueBlobCount       int64 `json:"unique_blob_count"`
 	UniqueBlobSize        int64 `json:"unique_blob_size"`
 }

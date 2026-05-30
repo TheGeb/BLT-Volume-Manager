@@ -47,7 +47,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 			"total_file_count":        rst.TotalFileCount,
 			"total_blob_count":        rst.TotalBlobCount,
 			"total_uncompressed_size": rst.TotalUncompressedSize,
-			"compressed_size":         rst.CompressedSize,
 			"unique_blob_count":       rst.UniqueBlobCount,
 		}
 	}

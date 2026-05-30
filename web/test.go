@@ -36,14 +36,12 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 
 	rm := s.volumeManager(req.Name)
 
-	// Create volume directory
 	volPath := filepath.Join(s.dataDir, "volumes", req.Name)
 	if err := os.MkdirAll(volPath, 0755); err != nil {
 		respondError(w, fmt.Errorf("create volume dir: %w", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Write volume config so the driver can discover it
 	if err := os.WriteFile(filepath.Join(volPath, "volume.json"), []byte(`{"fs_type":""}`), 0644); err != nil {
 		respondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
 		return
@@ -72,7 +70,6 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Initialize repo if needed
 	exists, err := rm.RepoExists()
 	if err != nil {
 		respondError(w, fmt.Errorf("check repo: %w", err), http.StatusInternalServerError)

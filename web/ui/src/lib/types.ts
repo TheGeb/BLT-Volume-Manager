@@ -48,7 +48,6 @@ export interface StatsResponse {
     total_file_count?: number;
     total_blob_count?: number;
     total_uncompressed_size?: number;
-    compressed_size?: number;
     unique_blob_count?: number;
     unique_blob_size?: number;
     error?: string;
