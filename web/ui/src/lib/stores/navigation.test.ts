@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
 import { selectedVolume, landingShown, deleteVolModal, deleteConfirmText, deleteVolLoading } from './volumes';
-import { activeTab, themeDark, lockStatus, stats, statsLoading, checking, repairing } from './repo';
-import { currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal, snapshots } from './snapshots';
-import { creatingTest, testStatus, onSelectVolume, onCloseViewer, confirmDeleteVolume, syncUrl } from './navigation';
+import { currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal } from './snapshots';
+import { onSelectVolume, onCloseViewer, confirmDeleteVolume } from './navigation';
 
 describe('onSelectVolume', () => {
   beforeEach(() => {

@@ -39,7 +39,7 @@ describe('doSwitchTab', () => {
   });
 
   it('does not load snapshots when switching away from snapshots tab', () => {
-    snapshots.set([{ id: '1' } as any]);
+    snapshots.set([{ id: '1', short_id: 'a', time: '', tags: [], paths: [], hostname: 'h' }]);
     doSwitchTab('repo');
     expect(get(activeTab)).toBe('repo');
   });

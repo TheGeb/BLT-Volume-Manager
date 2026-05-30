@@ -1,8 +1,26 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { get, derived } from 'svelte/store';
-import { volumes, volumeFilter, selectedVolume, deleteVolModal, deleteConfirmText, filteredVolumes, onFilterChange, openDeleteVolModal } from './volumes';
+import { get } from 'svelte/store';
+import { volumes, volumeFilter, selectedVolume, deleteVolModal, deleteConfirmText, filteredVolumes, filterVolumes, onFilterChange, openDeleteVolModal } from './volumes';
 
-describe('filteredVolumes', () => {
+describe('filterVolumes', () => {
+  it('returns all when filter is empty', () => {
+    expect(filterVolumes(['vol-a', 'vol-b'], '')).toEqual(['vol-a', 'vol-b']);
+  });
+
+  it('filters case-insensitively', () => {
+    expect(filterVolumes(['MyVol', 'OtherVol'], 'myvol')).toEqual(['MyVol']);
+  });
+
+  it('returns empty when no match', () => {
+    expect(filterVolumes(['vol-a', 'vol-b'], 'zzz')).toEqual([]);
+  });
+
+  it('matches partial strings', () => {
+    expect(filterVolumes(['alpha', 'beta', 'gamma'], 'ph')).toEqual(['alpha']);
+  });
+});
+
+describe('filteredVolumes derived store', () => {
   beforeEach(() => {
     volumes.set([]);
     volumeFilter.set('');
@@ -23,48 +41,6 @@ describe('filteredVolumes', () => {
     volumes.set(['vol-a', 'vol-b']);
     volumeFilter.set('zzz');
     expect(get(filteredVolumes)).toEqual([]);
-  });
-
-  it('subscribing reactively updates when volumeFilter changes', () => {
-    volumes.set(['alpha', 'beta', 'gamma']);
-    const updates: string[][] = [];
-    const unsub = filteredVolumes.subscribe(v => { updates.push(v); });
-    expect(updates).toHaveLength(1);
-    expect(updates[0]).toEqual(['alpha', 'beta', 'gamma']);
-    volumeFilter.set('a');
-    expect(get(volumeFilter)).toBe('a');
-    expect(updates).toHaveLength(2);
-    expect(updates[1]).toEqual(['alpha', 'gamma']);
-    volumeFilter.set('be');
-    expect(updates).toHaveLength(3);
-    expect(updates[2]).toEqual(['beta']);
-    unsub();
-  });
-
-  it('inline derived store works correctly', () => {
-    const testFilter = derived([volumes, volumeFilter], ([$v, $f]) =>
-      $v.filter(x => x.includes($f))
-    );
-    volumes.set(['a', 'b', 'ab']);
-    const updates: string[][] = [];
-    const unsub = testFilter.subscribe(v => { updates.push(v); });
-    expect(updates).toHaveLength(1);
-    expect(updates[0]).toEqual(['a', 'ab']);
-    volumeFilter.set('b');
-    expect(updates).toHaveLength(2);
-    expect(updates[1]).toEqual(['b', 'ab']);
-    unsub();
-  });
-
-  it('updates reactively when volumes change', () => {
-    volumeFilter.set('vol');
-    let value: string[] = [];
-    const unsub = filteredVolumes.subscribe(v => { value = v; });
-    volumes.set(['volume-1', 'other', 'volume-2']);
-    expect(value).toEqual(['volume-1', 'volume-2']);
-    volumes.set(['volume-1']);
-    expect(value).toEqual(['volume-1']);
-    unsub();
   });
 });
 

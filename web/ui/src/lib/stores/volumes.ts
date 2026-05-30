@@ -14,10 +14,13 @@ export const deleteVolModal = writable(false);
 export const deleteConfirmText = writable('');
 export const deleteVolLoading = writable(false);
 
+export function filterVolumes(all: string[], filter: string): string[] {
+  return all.filter(v => v.toLowerCase().includes(filter.toLowerCase()));
+}
+
 export const filteredVolumes = derived(
   [volumes, volumeFilter],
-  ([$volumes, $volumeFilter]) =>
-    $volumes.filter(v => v.toLowerCase().includes($volumeFilter.toLowerCase()))
+  ([$volumes, $volumeFilter]) => filterVolumes($volumes, $volumeFilter)
 );
 
 export async function loadVolumes() {

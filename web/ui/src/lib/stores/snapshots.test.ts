@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deletingSnap, deleteSnapModal, snapDeleteInput, filteredSnapshots, sortedSnapshots, hosts, snapshotHashInput, sha256Short, getSnapshotHash, onToggleSort, onSearch, onTypeFilter, onHostFilter, onDeleteSnapshot } from './snapshots';
+import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deletingSnap, deleteSnapModal, snapDeleteInput, filteredSnapshots, sortedSnapshots, hosts, snapshotHashInput, sha256Short, getSnapshotHash, onToggleSort, onSearch, onTypeFilter, onHostFilter, onDeleteSnapshot, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
 import type { Snapshot } from '../types';
 
 function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
@@ -93,118 +93,125 @@ describe('getSnapshotHash', () => {
   });
 });
 
-describe('filteredSnapshots', () => {
-  beforeEach(() => {
-    snapshots.set([snapA, snapB, snapC]);
-    typeFilter.set('all');
-    hostFilter.set('');
-    query.set('');
-  });
+describe('filterSnapshots', () => {
+  const snaps = [snapA, snapB, snapC];
 
   it('returns all when no filters active', () => {
-    expect(get(filteredSnapshots)).toEqual([snapA, snapB, snapC]);
+    expect(filterSnapshots(snaps, 'all', '', '')).toEqual(snaps);
   });
 
   it('filters by hot tag', () => {
-    typeFilter.set('hot');
-    expect(get(filteredSnapshots)).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'hot', '', '')).toEqual([snapA]);
   });
 
   it('filters by cold tag', () => {
-    typeFilter.set('cold');
-    expect(get(filteredSnapshots)).toEqual([snapB]);
+    expect(filterSnapshots(snaps, 'cold', '', '')).toEqual([snapB]);
   });
 
   it('filters by hostname', () => {
-    hostFilter.set('h1');
-    expect(get(filteredSnapshots)).toEqual([snapA, snapC]);
+    expect(filterSnapshots(snaps, 'all', 'h1', '')).toEqual([snapA, snapC]);
   });
 
   it('filters by query matching short_id', () => {
-    query.set('b');
-    expect(get(filteredSnapshots)).toEqual([snapB]);
+    expect(filterSnapshots(snaps, 'all', '', 'b')).toEqual([snapB]);
   });
 
   it('filters by query matching hostname', () => {
-    query.set('h1');
-    expect(get(filteredSnapshots)).toEqual([snapA, snapC]);
+    expect(filterSnapshots(snaps, 'all', '', 'h1')).toEqual([snapA, snapC]);
   });
 
   it('filters by query matching tags', () => {
-    query.set('hot');
-    expect(get(filteredSnapshots)).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'all', '', 'hot')).toEqual([snapA]);
   });
 
   it('filters by query case-insensitively', () => {
-    query.set('HOT');
-    expect(get(filteredSnapshots)).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'all', '', 'HOT')).toEqual([snapA]);
   });
 
   it('combines multiple filters', () => {
-    typeFilter.set('hot');
-    hostFilter.set('h1');
-    expect(get(filteredSnapshots)).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'hot', 'h1', '')).toEqual([snapA]);
   });
 
   it('returns empty when no match', () => {
-    query.set('nonexistent');
-    expect(get(filteredSnapshots)).toEqual([]);
+    expect(filterSnapshots(snaps, 'all', '', 'nonexistent')).toEqual([]);
   });
 });
 
-describe('sortedSnapshots', () => {
-  beforeEach(() => {
-    snapshots.set([snapC, snapA, snapB]);
-    typeFilter.set('all');
-    hostFilter.set('');
-    query.set('');
-    sortNewestFirst.set(true);
-  });
-
-  it('sorts newest first by default', () => {
-    const result = get(sortedSnapshots);
+describe('sortSnapshots', () => {
+  it('sorts newest first', () => {
+    const result = sortSnapshots([snapC, snapA, snapB], true);
     expect(result[0].id).toBe('1');
     expect(result[1].id).toBe('2');
     expect(result[2].id).toBe('3');
   });
 
-  it('sorts oldest first when toggled', () => {
-    sortNewestFirst.set(false);
-    const result = get(sortedSnapshots);
+  it('sorts oldest first', () => {
+    const result = sortSnapshots([snapC, snapA, snapB], false);
     expect(result[0].id).toBe('3');
     expect(result[1].id).toBe('2');
     expect(result[2].id).toBe('1');
   });
 
   it('does not mutate the original array', () => {
-    const original = get(snapshots);
-    get(sortedSnapshots);
-    expect(get(snapshots)).toBe(original);
-    expect(get(snapshots)[0]).toBe(snapC);
+    const original = [snapC, snapA, snapB];
+    sortSnapshots(original, true);
+    expect(original[0]).toBe(snapC);
+  });
+
+  it('handles empty array', () => {
+    expect(sortSnapshots([], true)).toEqual([]);
   });
 });
 
-describe('hosts', () => {
-  beforeEach(() => {
-    snapshots.set([]);
-  });
-
+describe('extractHosts', () => {
   it('extracts unique sorted hostnames', () => {
-    snapshots.set([snapA, snapB, snapC]);
-    expect(get(hosts)).toEqual(['h1', 'h2']);
+    expect(extractHosts([snapA, snapB, snapC])).toEqual(['h1', 'h2']);
   });
 
   it('returns empty when no snapshots', () => {
-    expect(get(hosts)).toEqual([]);
+    expect(extractHosts([])).toEqual([]);
   });
 
   it('deduplicates hostnames', () => {
-    snapshots.set([
+    const snaps = [
       makeSnap({ hostname: 'h1' }),
       makeSnap({ hostname: 'h1' }),
       makeSnap({ hostname: 'h2' }),
-    ]);
-    expect(get(hosts)).toEqual(['h1', 'h2']);
+    ];
+    expect(extractHosts(snaps)).toEqual(['h1', 'h2']);
+  });
+});
+
+describe('derived stores initial state', () => {
+  beforeEach(() => {
+    snapshots.set([]);
+    query.set('');
+    sortNewestFirst.set(true);
+    typeFilter.set('all');
+    hostFilter.set('');
+  });
+
+  it('filteredSnapshots starts empty', () => {
+    expect(get(filteredSnapshots)).toEqual([]);
+  });
+
+  it('sortedSnapshots starts empty', () => {
+    expect(get(sortedSnapshots)).toEqual([]);
+  });
+
+  it('hosts starts empty', () => {
+    expect(get(hosts)).toEqual([]);
+  });
+
+  it('filteredSnapshots computes initial value', () => {
+    snapshots.set([snapA, snapB, snapC]);
+    typeFilter.set('hot');
+    expect(get(filteredSnapshots)).toEqual([snapA]);
+  });
+
+  it('sortedSnapshots computes initial value', () => {
+    snapshots.set([snapC, snapA, snapB]);
+    expect(get(sortedSnapshots).map(s => s.id)).toEqual(['1', '2', '3']);
   });
 });
 

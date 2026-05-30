@@ -24,34 +24,43 @@ export const restorePointLoading = writable<Record<string, boolean>>({});
 export const restorePointID = writable('');
 export const sizeLoading = writable<Record<string, boolean>>({});
 
+export function filterSnapshots(snapshots: Snapshot[], typeFilter: string, hostFilter: string, query: string): Snapshot[] {
+  return snapshots.filter(sn => {
+    if (typeFilter === 'hot' && !sn.tags.includes('hot')) return false;
+    if (typeFilter === 'cold' && !sn.tags.includes('cold')) return false;
+    if (hostFilter && sn.hostname !== hostFilter) return false;
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return sn.short_id.toLowerCase().includes(q) ||
+      sn.tags.some(t => t.toLowerCase().includes(q)) ||
+      sn.hostname?.toLowerCase().includes(q);
+  });
+}
+
 export const filteredSnapshots = derived(
   [snapshots, typeFilter, hostFilter, query],
   ([$snapshots, $typeFilter, $hostFilter, $query]) =>
-    $snapshots.filter(sn => {
-      if ($typeFilter === 'hot' && !sn.tags.includes('hot')) return false;
-      if ($typeFilter === 'cold' && !sn.tags.includes('cold')) return false;
-      if ($hostFilter && sn.hostname !== $hostFilter) return false;
-      if (!$query) return true;
-      const q = $query.toLowerCase();
-      return sn.short_id.toLowerCase().includes(q) ||
-        sn.tags.some(t => t.toLowerCase().includes(q)) ||
-        sn.hostname?.toLowerCase().includes(q);
-    })
+    filterSnapshots($snapshots, $typeFilter, $hostFilter, $query)
 );
+
+export function sortSnapshots(snapshots: Snapshot[], newestFirst: boolean): Snapshot[] {
+  return [...snapshots].sort((a, b) => {
+    const da = new Date(a.time).getTime();
+    const db = new Date(b.time).getTime();
+    return newestFirst ? db - da : da - db;
+  });
+}
 
 export const sortedSnapshots = derived(
   [filteredSnapshots, sortNewestFirst],
-  ([$filtered, $newestFirst]) =>
-    [...$filtered].sort((a, b) => {
-      const da = new Date(a.time).getTime();
-      const db = new Date(b.time).getTime();
-      return $newestFirst ? db - da : da - db;
-    })
+  ([$filtered, $newestFirst]) => sortSnapshots($filtered, $newestFirst)
 );
 
-export const hosts = derived(snapshots, $s =>
-  [...new Set($s.map(sn => sn.hostname).filter(Boolean))].sort()
-);
+export function extractHosts(snapshots: Snapshot[]): string[] {
+  return [...new Set(snapshots.map(sn => sn.hostname).filter(Boolean))].sort();
+}
+
+export const hosts = derived(snapshots, $s => extractHosts($s));
 
 export async function sha256Short(message: string, length: number): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
