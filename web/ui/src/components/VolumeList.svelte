@@ -403,8 +403,9 @@
     width: 100%; box-sizing: border-box; text-decoration: none;
     transition: background 0.1s;
   }
-  .tree-row:hover { background: rgb(255 255 255 / 6%); border-radius: 8px; }
-  .tree-row[data-lock="middle"]:hover { border-radius: 0; }
+  .tree-row:hover { background: rgb(255 255 255 / 6%); }
+  .tree-row:not(.in-lock):hover { border-radius: 8px; }
+  .tree-row.in-lock:hover { background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%)); }
   .tree-group .lock-badge { margin-left: auto; }
   .tree-name { font-weight: 500; white-space: nowrap; }
   .folder-icon, .volume-icon { flex-shrink: 0; opacity: 0.7; }
