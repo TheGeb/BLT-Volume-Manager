@@ -2,7 +2,7 @@
 # Usage: make [target]
 # Override args: make dev ARGS="--http-only --http-addr :9090"
 
-.PHONY: all dev build test lint lint-go format clean coverage check hadolint ui ui-dev run watch
+.PHONY: all dev build test lint lint-go format clean coverage check hadolint ui ui-dev run watch tidy
 
 # Default target
 all: lint build
@@ -24,7 +24,7 @@ dev: lint-go hadolint ui-dev
 	-go run . $(ARGS)
 
 # CI / full check (includes tests and coverage)
-check: lint-go coverage hadolint ui-dev
+check: tidy lint-go coverage hadolint ui-dev
 
 # Go test coverage report (runs after format for safety)
 coverage: format
@@ -53,8 +53,12 @@ ui-dev:
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
 
+# Tidy Go module dependencies
+tidy:
+	go mod tidy
+
 # Build the Go binary (includes UI build)
-build: format ui
+build: tidy format ui
 	go build -o blt-volume-manager .
 
 # Run all tests
