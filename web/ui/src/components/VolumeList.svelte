@@ -373,11 +373,6 @@
   .tree { display: flex; flex-direction: column; }
   .tree-row { display: flex; align-items: stretch; min-height: 36px; position: relative; box-sizing: border-box; }
 
-  .tree-row.in-lock .tree-group,
-  .tree-row.in-lock .tree-volume {
-    background: color-mix(in srgb, var(--green) 8%, transparent);
-  }
-
   .tree-row[data-lock="start"] .tree-group,
   .tree-row[data-lock="start"] .tree-volume {
     border-radius: 8px 8px 0 0;
@@ -407,6 +402,7 @@
     width: calc(75% - 2px);
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
+    background: color-mix(in srgb, var(--green) 8%, transparent);
     pointer-events: none;
     z-index: 0;
   }
@@ -452,10 +448,6 @@
   .lock-mode .tree-group,
   .lock-mode .tree-volume {
     width: 75%;
-  }
-
-  .tree-row.in-lock {
-    clip-path: inset(0 25% 0 0);
   }
 
   .tree-row:not(.in-lock) .tree-group:hover,
