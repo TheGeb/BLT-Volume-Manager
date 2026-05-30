@@ -32,10 +32,15 @@ coverage: format
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-# Dockerfile lint via Docker
+# Dockerfile lint via Docker (falls back to podman)
 hadolint:
-	@echo "--- Dockerfile lint (via Docker) ---"
-	docker run --rm -i hadolint/hadolint < Dockerfile
+	@echo "--- Dockerfile lint ---"
+	@DOCKER=$$(command -v docker 2>/dev/null || command -v podman 2>/dev/null); \
+	if [ -z "$$DOCKER" ]; then \
+		echo "Error: neither docker nor podman found" >&2; \
+		exit 1; \
+	fi; \
+	$$DOCKER run --rm -i hadolint/hadolint < Dockerfile
 
 # Build the UI only
 ui:
