@@ -5,7 +5,7 @@
   import type { DiffHunk, DiffLine } from '../lib/diff';
   import { formatBytes } from '../lib/util';
   import * as api from '../lib/api';
-  import { getSnapshotHash } from '../lib/stores';
+  import { getSnapshotHash } from '../lib/stores/snapshots';
   import FileTreeNode from './FileTreeNode.svelte';
 
   export let snapshot: Snapshot;

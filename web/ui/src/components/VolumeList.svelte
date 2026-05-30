@@ -2,6 +2,7 @@
   import { slide } from 'svelte/transition';
   import { formatExpiration } from '../lib/util';
   import type { VolumeLockInfo } from '../lib/types';
+  import { volumes as allVolumes } from '../lib/stores/volumes';
 
   export let volumes: string[] = [];
   export let loading = false;
@@ -44,6 +45,7 @@
   interface FlatItem { name: string; path: string; depth: number; isGroup: boolean; }
 
   $: tree = buildTree(filtered);
+  $: fullTree = buildTree($allVolumes);
   let autoExpanded = false;
   $: if (!autoExpanded && Object.keys(expanded).length === 0 && tree.length > 0) {
     expanded = allExpanded(tree);
@@ -147,7 +149,7 @@
     return result;
   }
 
-  $: folderLocks = computeFolderLocks(tree, volumeLockInfo);
+  $: folderLocks = computeFolderLocks(fullTree, volumeLockInfo);
 
   $: flatItemLocks = flatItems.map(item => {
     let owner = '';
@@ -223,7 +225,7 @@
   })();
 </script>
 
-<section class="panel" style="display:block;">
+<section class="panel" class:lock-mode={showLockBorders} style="display:block;">
   <div class="filter-row">
     <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
       bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
@@ -402,7 +404,7 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 75%;
+    width: calc(75% - 2px);
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
     pointer-events: none;
@@ -437,12 +439,27 @@
     padding: 6px 10px; border: none; border-radius: 8px;
     background: none; color: var(--text); font-size: 0.9rem;
     font-family: inherit; cursor: pointer; text-align: left;
-    width: 75%; box-sizing: border-box; text-decoration: none;
-    transition: background 0.1s;
+    width: 100%; box-sizing: border-box; text-decoration: none;
     margin-right: 10px;
   }
 
-  .tree-row:not(.in-lock):hover { background: rgb(255 255 255 / 6%); border-radius: 8px; }
+  section:not(.lock-mode) .tree-group,
+  section:not(.lock-mode) .tree-volume {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .lock-mode .tree-group,
+  .lock-mode .tree-volume {
+    width: 75%;
+  }
+
+  .tree-row.in-lock {
+    clip-path: inset(0 25% 0 0);
+  }
+
+  .tree-row:not(.in-lock) .tree-group:hover,
+  .tree-row:not(.in-lock) .tree-volume:hover { background: rgb(255 255 255 / 6%); border-radius: 8px; }
 
   .tree-row.in-lock .tree-group:hover,
   .tree-row.in-lock .tree-volume:hover { background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%)); }
@@ -454,6 +471,10 @@
   .lock-info {
     display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding-right: 18px;
     position: relative;
+  }
+
+  .lock-mode .lock-info {
+    padding-left: 6px;
   }
 
   .lock-info.has-owner {

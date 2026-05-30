@@ -12,20 +12,28 @@
   import Modal from './components/Modal.svelte';
   import type { Snapshot } from './lib/types';
   import { get } from 'svelte/store';
-  import { 
-    snapshots, volumes, selectedVolume, volumeFilter, query, sortNewestFirst, hostname, prevStats, 
-    typeFilter, hostFilter, themeDark, loading, activeTab, bannerText, bannerError, lockStatus, 
-    stats, statsLoading,     sizes, currentSnapshot, allSnapshots, viewerOpen, checking, repairing, 
-    deleteVolModal, deleteSnapModal, deletingSnap, deleteConfirmText, snapDeleteInput, 
-    deleteVolLoading, creatingTest, testStatus, volumesLoading, snapsLoading, 
-    landingShown, restorePointLoading, sizeLoading, filteredVolumes, filteredSnapshots, sortedSnapshots, hosts,
-    diffTargetId, diffTargetFallbackHash, volumeLockInfo, restorePointID,
-    onSelectVolume, onToggleSort, onSearch, onFilterChange, onTypeFilter, onHostFilter, 
-    onOpenViewer, onCloseViewer, onAddTag, onRemoveTag, onDeleteSnapshot, confirmDeleteSnapshot, 
-    openDeleteVolModal, confirmDeleteVolume, handleCheck, handleRepair, handleCreateTestVolume, 
-    switchTab, toggleTheme, loadVolumes, setBanner, handleRefresh, handleSizeLoaded, loadLockStatus,
-    loadAll, navigateTo, syncUrl, setDiffTarget
-  } from './lib/stores';
+  import { bannerText, bannerError, setBanner } from './lib/stores/banner';
+  import {
+    volumes, selectedVolume, volumeFilter, hostname, volumeLockInfo, volumesLoading, landingShown,
+    deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
+    loadVolumes, onFilterChange, openDeleteVolModal
+  } from './lib/stores/volumes';
+  import {
+    snapshots, query, sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
+    viewerOpen, deleteSnapModal, deletingSnap, snapDeleteInput, snapsLoading, restorePointLoading,
+    sizeLoading, filteredSnapshots, sortedSnapshots, hosts, diffTargetId, diffTargetFallbackHash, restorePointID,
+    onToggleSort, onSearch, onTypeFilter, onHostFilter, onAddTag, onRemoveTag, onDeleteSnapshot,
+    confirmDeleteSnapshot, handleSizeLoaded
+  } from './lib/stores/snapshots';
+  import {
+    prevStats, themeDark, loading, activeTab, lockStatus, stats, statsLoading, checking, repairing,
+    toggleTheme, loadLockStatus, loadStats, handleCheck, handleRepair
+  } from './lib/stores/repo';
+  import {
+    creatingTest, testStatus,
+    onSelectVolume, onOpenViewer, onCloseViewer, confirmDeleteVolume, handleCreateTestVolume,
+    switchTab, loadAll, navigateTo, syncUrl, setDiffTarget, handleRefresh
+  } from './lib/stores/navigation';
 
   let initialSyncDone = false;
 

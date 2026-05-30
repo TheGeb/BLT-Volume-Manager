@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snapshotHashInput } from './stores';
+import { snapshotHashInput } from './stores/snapshots';
 import type { Snapshot } from './types';
 
 function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
