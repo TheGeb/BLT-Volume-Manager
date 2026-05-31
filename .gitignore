@@ -37,6 +37,8 @@ node_modules/
 
 # Built binaries
 blt-volume-manager
+blt-volume-manager-web
+blt-volume-manager-plugin
 .node-bin
 
 # Editor/IDE

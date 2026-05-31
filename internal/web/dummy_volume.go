@@ -13,7 +13,7 @@ import (
 	"github.com/example/blt-volume-manager/internal/store"
 )
 
-func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDummyVolume(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -37,7 +37,13 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 
 	rm := s.volumeManager(req.Name)
 
-	volPath := filepath.Join(s.dataDir, constants.VolumesDir, req.Name)
+	volPath, err := os.MkdirTemp("", "blt-dummy-*")
+	if err != nil {
+		respondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
+		return
+	}
+	defer func() { _ = os.RemoveAll(volPath) }()
+
 	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		respondError(w, fmt.Errorf("create volume dir: %w", err), http.StatusInternalServerError)
 		return

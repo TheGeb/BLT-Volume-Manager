@@ -30,14 +30,12 @@ func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
 	t.Setenv("RESTIC_PASSWORD", "test-password")
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
-	t.Setenv("BLT_ENABLE_TEST_ENDPOINTS", "1")
+	t.Setenv("BLT_ENABLE_DUMMY_VOLUME", "1")
 
-	dataDir := t.TempDir()
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
 	mux := http.NewServeMux()
 	web.NewServer(appconfig.Config{
-		DataDir:    dataDir,
 		ResticBase: resticBase,
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
@@ -151,7 +149,7 @@ func TestAPI_Snapshots(t *testing.T) {
 
 	// Create test volume via the test endpoint (requires "group/name" format)
 	body := map[string]string{"name": "test-group/snap-vol"}
-	m := apiOK(t, ts, "POST", "/api/test/create-volume", body)
+	m := apiOK(t, ts, "POST", "/api/dummy-volume", body)
 	if m["status"] != "ok" {
 		t.Fatalf("create test volume: %v", m)
 	}
@@ -174,7 +172,7 @@ func TestAPI_Stats(t *testing.T) {
 	}
 
 	// Create volume + backup via test endpoint
-	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "test-group/stat-vol"})
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/stat-vol"})
 
 	m = apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
 	snaps, _ := m["snapshots"].(map[string]any)
@@ -219,7 +217,7 @@ func TestAPI_DeleteVolume(t *testing.T) {
 	ts, _ := setupAPITest(t)
 
 	// Create volume via test endpoint (requires group/name format)
-	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "test-group/del-vol"})
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/del-vol"})
 
 	// Delete volume — the locks handler expects simple names for the URL path
 	// but we delete the volume created under test-group/del-vol
@@ -241,7 +239,7 @@ func TestAPI_EdgeCases(t *testing.T) {
 	apiErr(t, ts, "GET", "/api/repo/status", nil, http.StatusBadRequest)
 
 	// Test create-volume with invalid name (missing "/")
-	resp := api(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": "badname"})
+	resp := api(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "badname"})
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for name without '/', got %d", resp.StatusCode)
@@ -286,7 +284,7 @@ func TestAPI_SnapshotViewFallbackHash(t *testing.T) {
 	ts, _ := setupAPITest(t)
 
 	volName := "test-group/fallback-vol"
-	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snapshots, _ := m["snapshots"].([]any)
@@ -333,8 +331,8 @@ func TestAPI_SnapshotViewDiffFallbackHash(t *testing.T) {
 	ts, _ := setupAPITest(t)
 
 	volName := "test-group/diff-fallback-vol"
-	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
-	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snapshots, _ := m["snapshots"].([]any)

@@ -33,7 +33,6 @@ type statsCache struct {
 }
 
 type Server struct {
-	dataDir      string
 	resticBase   string
 	s3Bucket     string
 	s3Endpoint   string
@@ -54,7 +53,7 @@ func (s *Server) Shutdown() {
 }
 
 func NewServer(cfg appconfig.Config) *Server {
-	return &Server{dataDir: cfg.DataDir, resticBase: cfg.ResticBase, s3Bucket: cfg.S3Bucket, s3Endpoint: cfg.S3Endpoint, s3Region: cfg.S3Region}
+	return &Server{resticBase: cfg.ResticBase, s3Bucket: cfg.S3Bucket, s3Endpoint: cfg.S3Endpoint, s3Region: cfg.S3Region}
 }
 
 func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
@@ -141,14 +140,15 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/snapshots", s.handleSnapshots)
 	inner.HandleFunc("/api/snapshot/", s.handleSnapshotAction)
 	inner.HandleFunc("/api/snapshot-view/", s.handleSnapshotView)
+	inner.HandleFunc("/api/snapshots/delete-batch", s.handleSnapshotBatchDelete)
 	inner.HandleFunc("/api/volume/", s.handleVolumeAction)
 	inner.HandleFunc("/api/stats", s.handleStats)
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)
 	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
-	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
-		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
+	if os.Getenv("BLT_ENABLE_DUMMY_VOLUME") != "" {
+		inner.HandleFunc("/api/dummy-volume", s.handleDummyVolume)
 	}
 
 	verifyStaticFiles()

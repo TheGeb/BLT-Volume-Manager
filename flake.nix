@@ -10,23 +10,19 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
-        formatter = pkgs.nixfmt-rfc-style;
-        # TODO: commit generated flake.lock to pin inputs
 
-        packages = rec {
-          blt-volume-manager = pkgs.buildGoModule {
-            pname = "blt-volume-manager";
+        build-module = { pname, subPackages, meta-description }:
+          pkgs.buildGoModule {
+            inherit pname;
             version = "0.1.0";
             src = ./.;
 
-            # Build web UI via Makefile before Go compilation
+            inherit subPackages;
+
             preBuild = ''
               ${pkgs.gnumake}/bin/make ui
             '';
 
-            # TODO: replace with actual hash -- run `nix build .#blt-volume-manager 2>&1 | grep 'got:'`
             vendorHash = pkgs.lib.fakeSha256;
             ldflags = [ "-s" "-w" ];
             CGO_ENABLED = 0;
@@ -34,13 +30,26 @@
             nativeBuildInputs = [ pkgs.gnumake pkgs.nodejs ];
 
             meta = with pkgs.lib; {
-              description = "Docker/Podman volume plugin for S3 backup using restic";
-              # TODO: set to real repository URL
+              inherit meta-description;
               homepage = "https://github.com/example/blt-volume-manager";
-              # TODO: verify actual project license
               license = licenses.mit;
               platforms = platforms.linux;
             };
+          };
+      in
+      {
+        formatter = pkgs.nixfmt-rfc-style;
+
+        packages = rec {
+          blt-volume-manager = build-module {
+            pname = "blt-volume-manager";
+            subPackages = [ "cmd/driver" ];
+            meta-description = "Docker/Podman volume plugin for S3 backup using restic";
+          };
+          blt-volume-manager-web = build-module {
+            pname = "blt-volume-manager-web";
+            subPackages = [ "cmd/web" ];
+            meta-description = "BLT Volume Manager web UI";
           };
           default = blt-volume-manager;
         };
@@ -48,7 +57,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [ go gopls gotools nodejs gnumake ];
           shellHook = ''
-            echo "Run 'make dev ARGS=\"--http-only --http-addr :8081\"' to build and run"
+            echo "Run 'make dev ARGS=\"--http-addr :8081\"' to build and run the driver"
           '';
         };
       }
@@ -118,7 +127,6 @@
 
               environment = cfg.environment;
 
-              # TODO: consider adding restartTriggers for config change detection
               serviceConfig = {
                 Type = "simple";
                 ExecStart = "${pkg}/bin/blt-volume-manager"

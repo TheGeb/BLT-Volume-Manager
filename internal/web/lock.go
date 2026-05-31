@@ -138,12 +138,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 		}
 	}
 
-	// 3. Delete file-based lock
-	lockPath := filepath.Join(s.dataDir, constants.LocksDir, volumeName+".lock")
-	//nolint:gosec // volumeName is validated above
-	_ = os.Remove(lockPath)
-
-	// 4. Delete local restic repo directory (if resticBase is a local path)
+	// 3. Delete local restic repo directory (if resticBase is a local path)
 	if !strings.HasPrefix(s.resticBase, "s3:") {
 		repoPath := filepath.Join(s.resticBase, constants.ResticDir, volumeName)
 		//nolint:gosec // volumeName is validated above
@@ -153,15 +148,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 		}
 	}
 
-	// 5. Delete volume data directory
-	volPath := filepath.Join(s.dataDir, constants.VolumesDir, volumeName)
-	//nolint:gosec // volumeName is validated above
-	if err := os.RemoveAll(volPath); err != nil {
-		respondError(w, fmt.Errorf("delete volume data: %w", err), http.StatusInternalServerError)
-		return
-	}
-
-	// 6. Refresh caches
+	// 4. Refresh caches
 	s.refreshStats()
 
 	respondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
@@ -322,8 +309,9 @@ func (s *Server) handleCopyVolume(w http.ResponseWriter, r *http.Request, volume
 	}
 
 	var req struct {
-		Target          string `json:"target"`
-		PreserveHistory *bool  `json:"preserve_history"`
+		Target          string   `json:"target"`
+		PreserveHistory *bool    `json:"preserve_history"`
+		SnapshotIDs     []string `json:"snapshot_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
@@ -366,12 +354,18 @@ func (s *Server) handleCopyVolume(w http.ResponseWriter, r *http.Request, volume
 	if req.PreserveHistory != nil {
 		preserveHistory = *req.PreserveHistory
 	}
-	if preserveHistory {
+	switch {
+	case len(req.SnapshotIDs) > 0:
+		if err := sourceManager.CopyTo(targetManager.Repo(), req.SnapshotIDs...); err != nil {
+			respondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
+			return
+		}
+	case preserveHistory:
 		if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
 			respondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
 			return
 		}
-	} else {
+	default:
 		snaps, err := sourceManager.ListSnapshots()
 		if err != nil {
 			respondError(w, fmt.Errorf("list snapshots: %w", err), http.StatusInternalServerError)

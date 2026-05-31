@@ -8,6 +8,8 @@ node_modules/
 web/static/
 internal/web/static/
 blt-volume-manager
+blt-volume-manager-web
+blt-volume-manager-plugin
 .env
 .env.*
 *.md

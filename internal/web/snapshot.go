@@ -273,3 +273,44 @@ func (s *Server) handleSnapshotSizes(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, result)
 }
+
+type batchDeleteError struct {
+	ID    string `json:"id"`
+	Error string `json:"error"`
+}
+
+type batchDeleteResponse struct {
+	Deleted int                `json:"deleted"`
+	Failed  int                `json:"failed"`
+	Errors  []batchDeleteError `json:"errors"`
+}
+
+func (s *Server) handleSnapshotBatchDelete(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	var req struct {
+		Volume string   `json:"volume"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Volume == "" || len(req.IDs) == 0 {
+		http.Error(w, "missing volume or ids", http.StatusBadRequest)
+		return
+	}
+
+	rm := s.volumeManager(req.Volume)
+	resp := batchDeleteResponse{Errors: []batchDeleteError{}}
+	for _, id := range req.IDs {
+		if err := rm.ForgetSnapshot(id); err != nil {
+			resp.Failed++
+			resp.Errors = append(resp.Errors, batchDeleteError{ID: id, Error: err.Error()})
+		} else {
+			resp.Deleted++
+		}
+	}
+	respondJSON(w, resp)
+}
