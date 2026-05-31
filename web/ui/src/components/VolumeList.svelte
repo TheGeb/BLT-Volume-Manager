@@ -390,8 +390,12 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; }
-  .tree-row { display: flex; align-items: stretch; min-height: 36px; position: relative; box-sizing: border-box; }
+  .tree { display: flex; flex-direction: column; contain: layout style; }
+
+  .tree-row {
+    display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
+    contain: layout style;
+  }
 
   .tree-row[data-lock="start"] .tree-group,
   .tree-row[data-lock="start"] .tree-volume {
@@ -457,6 +461,8 @@
     font-family: inherit; cursor: pointer; text-align: left;
     width: 100%; box-sizing: border-box; text-decoration: none;
     margin-right: 10px;
+    overflow: hidden;
+    transition: width 0.3s ease, margin 0.3s ease, background 0.15s ease;
   }
 
   section:not(.lock-mode) .tree-group,
@@ -470,15 +476,20 @@
     width: 75%;
     padding-right: 0;
     box-sizing: border-box;
+    overflow: hidden;
   }
 
   .tree-row:not(.in-lock) .tree-group:hover,
-  .tree-row:not(.in-lock) .tree-volume:hover { background: rgb(255 255 255 / 6%); border-radius: 8px; }
+  .tree-row:not(.in-lock) .tree-volume:hover {
+    background: rgb(255 255 255 / 6%);
+  }
 
   .tree-row.in-lock .tree-group:hover,
-  .tree-row.in-lock .tree-volume:hover { background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%)); }
+  .tree-row.in-lock .tree-volume:hover {
+    background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%));
+  }
 
-  .tree-name { font-weight: 500; white-space: nowrap; }
+  .tree-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .folder-icon, .volume-icon { flex-shrink: 0; opacity: 0.7; }
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
@@ -486,6 +497,7 @@
     display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding-right: 18px;
     position: relative;
     z-index: 5;
+    transition: padding 0.25s ease;
   }
 
   .lock-mode .lock-info {
@@ -496,6 +508,7 @@
     background: var(--surface);
     padding: 4px 18px 4px 6px;
     border-radius: 4px;
+    transition: padding 0.25s ease;
   }
 
   .lock-info.has-owner::before {
@@ -519,11 +532,15 @@
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
   .vol-actions {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
     margin-left: auto;
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: width 0.2s ease, opacity 0.2s ease;
   }
 
   .tree-volume {
@@ -534,10 +551,12 @@
 
   .lock-mode .tree-volume {
     padding-right: 0;
+    transition: padding 0.25s ease;
   }
 
   .tree-volume:hover .vol-actions {
-    display: flex;
+    width: 60px;
+    opacity: 1;
   }
 
   .vol-action-btn {

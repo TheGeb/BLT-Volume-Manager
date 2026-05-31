@@ -18,19 +18,29 @@
 </div>
 
 <style>
-  .banner-slot {
+.banner-slot {
     min-height: 54px;
     margin-bottom: 20px;
+    position: relative;
   }
 
   .banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex; align-items: center; gap: 16px;
     padding: 16px 24px; border-radius: 24px;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
     border: 1px solid transparent;
   }
-  .banner-slot.visible .banner { opacity: 1; }
+
+  .banner-slot.visible .banner {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   .banner.error {
     background: rgb(239 68 68 / 8%); border-color: rgb(239 68 68 / 30%);
