@@ -17,8 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// LogS3 is a callback for structured S3 call logging. Set by the web server.
-var LogS3 func(op, bucket, key string, dur time.Duration, err error)
+// ErrKeyNotFound is returned when an S3 key does not exist.
+var ErrKeyNotFound = errors.New("key not found")
 
 const (
 	LockPrefix         = "blt-volume-manager/locks/"
@@ -118,11 +118,7 @@ func NewS3Store(cfg S3StoreConfig) (S3Store, error) {
 }
 
 func (s *S3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
-	fn := s.cfg.Logger
-	if fn == nil {
-		fn = LogS3
-	}
-	if fn != nil {
+	if fn := s.cfg.Logger; fn != nil {
 		fn(op, bucket, key, dur, err)
 	}
 }
@@ -148,7 +144,7 @@ func (s *S3Client) ReadObject(key string) ([]byte, error) {
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return nil, nil
+			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}

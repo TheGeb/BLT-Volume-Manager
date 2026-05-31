@@ -85,6 +85,21 @@ func apiOK(t *testing.T, ts *httptest.Server, method, path string, body any) map
 	return m
 }
 
+func apiArray(t *testing.T, ts *httptest.Server, method, path string) []any {
+	t.Helper()
+	resp := api(t, ts, method, path, nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("%s %s: expected 200, got %d: %s", method, path, resp.StatusCode, string(b))
+	}
+	var arr []any
+	if err := json.NewDecoder(resp.Body).Decode(&arr); err != nil {
+		t.Fatalf("decode array response: %v", err)
+	}
+	return arr
+}
+
 func apiErr(t *testing.T, ts *httptest.Server, method, path string, body any, wantCode int) map[string]any {
 	t.Helper()
 	resp := api(t, ts, method, path, body)
@@ -264,5 +279,92 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 	}
 	if len(objects) == 0 {
 		t.Fatal("expected lock objects in Garage, found none")
+	}
+}
+
+func TestAPI_SnapshotViewFallbackHash(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	volName := "test-group/fallback-vol"
+	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
+
+	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snapshots, _ := m["snapshots"].([]any)
+	if len(snapshots) < 1 {
+		t.Fatal("expected at least 1 snapshot")
+	}
+
+	snap := snapshots[0].(map[string]any)
+	realID := snap["id"].(string)
+	fallbackHash, _ := snap["fallbackHash"].(string)
+	if fallbackHash == "" {
+		t.Fatal("expected fallbackHash in snapshot response")
+	}
+
+	nodes := apiArray(t, ts, "GET",
+		"/api/snapshot-view/fake-nonexistent-id/ls?volume="+volName+"&fallbackHash="+fallbackHash)
+	if len(nodes) == 0 {
+		t.Fatal("expected file nodes from fallback resolution")
+	}
+
+	nodesReal := apiArray(t, ts, "GET",
+		"/api/snapshot-view/"+realID+"/ls?volume="+volName)
+	if len(nodesReal) != len(nodes) {
+		t.Fatalf("fallback and direct ls should return same count; got %d vs %d", len(nodes), len(nodesReal))
+	}
+
+	resp := api(t, ts, "GET",
+		"/api/snapshot-view/fake-id/dump?volume="+volName+"&path=/readme.txt&fallbackHash="+fallbackHash, nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("dump with fallback; expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	resp2 := api(t, ts, "GET",
+		"/api/snapshot-view/fake-id/ls?volume="+volName+"&fallbackHash=deadbeef1234", nil)
+	defer resp2.Body.Close()
+	if resp2.StatusCode == http.StatusOK {
+		t.Fatal("expected error with invalid fallbackHash, got 200")
+	}
+}
+
+func TestAPI_SnapshotViewDiffFallbackHash(t *testing.T) {
+	ts, _ := setupAPITest(t)
+
+	volName := "test-group/diff-fallback-vol"
+	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
+	apiOK(t, ts, "POST", "/api/test/create-volume", map[string]string{"name": volName})
+
+	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snapshots, _ := m["snapshots"].([]any)
+	if len(snapshots) < 2 {
+		t.Fatalf("expected at least 2 snapshots for diff, got %d", len(snapshots))
+	}
+
+	snapA := snapshots[0].(map[string]any)
+	snapB := snapshots[1].(map[string]any)
+	_ = snapA["id"].(string) // direct ID not needed, tested via fallback
+	idB := snapB["id"].(string)
+	hashA, _ := snapA["fallbackHash"].(string)
+	hashB, _ := snapB["fallbackHash"].(string)
+
+	mFallback := apiOK(t, ts, "GET",
+		"/api/snapshot-view/fake-a/diff/fake-b?volume="+volName+"&fallbackHash="+hashA+"&diffFallbackHash="+hashB, nil)
+	if _, ok := mFallback["change_sets"]; !ok {
+		t.Fatal("expected change_sets in fallback diff response")
+	}
+
+	mPartial := apiOK(t, ts, "GET",
+		"/api/snapshot-view/fake-a/diff/"+idB+"?volume="+volName+"&fallbackHash="+hashA, nil)
+	if _, ok := mPartial["change_sets"]; !ok {
+		t.Fatal("expected change_sets in partial fallback diff response")
+	}
+
+	respErr := api(t, ts, "GET",
+		"/api/snapshot-view/dead1/diff/beef2?volume="+volName, nil)
+	defer respErr.Body.Close()
+	if respErr.StatusCode < 400 {
+		t.Fatalf("expected 4xx error for diff with nonexistent IDs, got %d", respErr.StatusCode)
 	}
 }

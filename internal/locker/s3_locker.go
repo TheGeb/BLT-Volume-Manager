@@ -80,7 +80,9 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 	objects, err := s3.ListObjects(folder)
 	if err != nil {
-		_ = s3.DeleteObject(myKey)
+		if derr := s3.DeleteObject(myKey); derr != nil {
+			applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
+		}
 		return nil, &LockError{Code: NoLockAcquired, Msg: fmt.Sprintf("list proposals: %v", err)}
 	}
 
@@ -88,14 +90,18 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 	key, _ := store.FilterValidLocks(s3, objects)
 	if key == "" {
-		_ = s3.DeleteObject(myKey)
+		if derr := s3.DeleteObject(myKey); derr != nil {
+			applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
+		}
 		return nil, &LockError{Code: LockHeldByAnother, Msg: "lock held by another host"}
 	}
 	if key == myKey {
 		return &s3Lock{store: s3, myKey: myKey}, nil
 	}
 
-	_ = s3.DeleteObject(myKey)
+	if derr := s3.DeleteObject(myKey); derr != nil {
+		applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
+	}
 	return nil, &LockError{Code: LockHeldByAnother, Msg: "lock held by another host"}
 }
 

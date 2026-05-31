@@ -115,6 +115,17 @@ func logLevel() slog.Level {
 	return levelVar.Level()
 }
 
+func Verbosity() int {
+	switch l := levelVar.Level(); {
+	case l <= levelTrace:
+		return 2
+	case l <= slog.LevelDebug:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func SetLevel(level int) {
 	var slogLevel slog.Level
 	switch level {

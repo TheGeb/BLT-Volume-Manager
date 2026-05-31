@@ -97,10 +97,10 @@ func WriteRestorePoint(s3 S3Store, volumeName string, rp RestorePoint) error {
 func ReadRestorePoint(s3 S3Store, volumeName string) (*RestorePoint, error) {
 	data, err := s3.ReadObject(RestorePointPrefix + volumeName + ".json")
 	if err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			return nil, ErrRestorePointNotFound
+		}
 		return nil, err
-	}
-	if data == nil {
-		return nil, ErrRestorePointNotFound
 	}
 	var rp RestorePoint
 	if err := json.Unmarshal(data, &rp); err != nil {

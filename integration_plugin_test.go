@@ -120,7 +120,7 @@ func pluginOK(t *testing.T, socketPath, endpoint string, req any) map[string]any
 func TestPlugin_CreateVolume(t *testing.T) {
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "test-vol"})
-	if err, _ := m["Err"].(string); err != "" {
+	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("create: %s", err)
 	}
 }
@@ -130,7 +130,7 @@ func TestPlugin_CreateDuplicate(t *testing.T) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
 	// Creating the same volume again should succeed (idempotent)
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
-	if err, _ := m["Err"].(string); err != "" {
+	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("duplicate create: %s", err)
 	}
 }
@@ -253,7 +253,7 @@ func TestPlugin_EdgeCases(t *testing.T) {
 
 	// Remove non-existent volume (should not error — driver just logs failures)
 	m := pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})
-	if err, _ := m["Err"].(string); err != "" {
+	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("remove non-existent: %s", err)
 	}
 
@@ -267,7 +267,7 @@ func TestPlugin_EdgeCases(t *testing.T) {
 
 	// Unmount non-existent volume (should not error)
 	m = pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
-	if err, _ := m["Err"].(string); err != "" {
+	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("unmount non-existent: %s", err)
 	}
 

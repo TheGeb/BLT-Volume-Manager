@@ -55,10 +55,14 @@ func respondError(w http.ResponseWriter, err error, status int) {
 		msg = err.Error()
 		logError("request_error", err)
 	}
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		logError("encode_error_response_failed", err)
+	}
 }
 
 func respondJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		logError("encode_response_failed", err)
+	}
 }

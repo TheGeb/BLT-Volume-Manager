@@ -3,7 +3,7 @@
   import { formatBytes } from '../lib/util';
   import FileTreeNode from './FileTreeNode.svelte';
 
-  export let node: any;
+  export let node: FileNode;
   export let depth = 0;
   export let diffMap: Map<string, string> | null = null;
   export let otherId = '';
@@ -101,7 +101,7 @@
       : '';
   $: dirBorder = isSearchActive ? '2px solid var(--accent)' : '2px solid transparent';
 
-  $: children = node.children ? (Object.values(node.children) as any[]).sort((a: any, b: any) => {
+  $: children = node.children ? (Object.values(node.children) as FileNode[]).sort((a, b) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
     return a.name.localeCompare(b.name);
   }) : [];

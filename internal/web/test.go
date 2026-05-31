@@ -98,7 +98,9 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 			Logger:         s3LogFn(),
 		})
 		if err == nil {
-			_ = s3.WriteVolumeMarker(req.Name)
+			if err := s3.WriteVolumeMarker(req.Name); err != nil {
+				logError("write_volume_marker_failed", err)
+			}
 		}
 	}
 

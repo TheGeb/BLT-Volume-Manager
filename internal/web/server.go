@@ -17,12 +17,14 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
-func init() {
-	// Verify that web assets were generated before compilation.
-	// Run `make ui` to build them.
-	if _, err := staticFiles.ReadDir("static"); err != nil {
-		panic("web assets not found. Run: make ui")
-	}
+var staticFilesOK sync.Once
+
+func verifyStaticFiles() {
+	staticFilesOK.Do(func() {
+		if _, err := staticFiles.ReadDir("static"); err != nil {
+			panic("web assets not found. Run: make ui")
+		}
+	})
 }
 
 type statsCache struct {
@@ -143,10 +145,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
 		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
 	}
-	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
-		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
-	}
 
+	verifyStaticFiles()
 	uiFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		panic(err)

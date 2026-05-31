@@ -36,7 +36,6 @@ func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 	path := filepath.Join(l.dir, name+".lock")
-	// Try repeatedly for a short period
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
@@ -53,7 +52,7 @@ func (l *fileLocker) Acquire(ctx context.Context, name string) (Lock, error) {
 			return &fileLock{path: path}, nil
 		}
 		if time.Now().After(deadline) {
-			return nil, err
+			return nil, fmt.Errorf("acquire lock after 5s: %w", err)
 		}
 		select {
 		case <-ctx.Done():

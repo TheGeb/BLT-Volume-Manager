@@ -70,6 +70,8 @@ export interface FileNode {
   path: string;
   full_path?: string;
   size?: number;
+  children?: Record<string, FileNode>;
+  dirDiffType?: string;
 }
 
 export interface DiffChange {

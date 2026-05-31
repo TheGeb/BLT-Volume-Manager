@@ -711,11 +711,8 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 		args = append(args, "--from-password-file", tmpName, "--password-file", tmpName)
 	}
 
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "trace":
-		args = append(args, "--verbose=2")
-	case "debug":
-		args = append(args, "--verbose=1")
+	if v := applog.Verbosity(); v > 0 {
+		args = append(args, fmt.Sprintf("--verbose=%d", v))
 	}
 
 	applog.Debugf("restic_command", "args=%s", strings.Join(args, " "))
@@ -733,11 +730,8 @@ func (m *Manager) Unlock() error {
 
 func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	global := []string{"-r", m.repo}
-	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
-	case "trace":
-		global = append(global, "--verbose=2")
-	case "debug":
-		global = append(global, "--verbose=1")
+	if v := applog.Verbosity(); v > 0 {
+		global = append(global, fmt.Sprintf("--verbose=%d", v))
 	}
 
 	global = append(global, args...)
