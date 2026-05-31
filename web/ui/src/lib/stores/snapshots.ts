@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import type { Snapshot } from '../types';
 import * as api from '../api';
-import { setBanner } from './banner';
+import { showToast } from './toast';
 import { selectedVolume } from './volumes';
 import { formatBytes } from '../util';
 
@@ -15,7 +15,6 @@ export const currentSnapshot = writable<Snapshot | null>(null);
 export const allSnapshots = derived(snapshots, $s => $s);
 export const viewerOpen = writable(false);
 export const deleteSnapModal = writable(false);
-export const deletingSnap = writable<Snapshot | null>(null);
 export const snapDeleteInput = writable('');
 export const diffTargetId = writable('');
 export const diffTargetFallbackHash = writable('');
@@ -110,7 +109,7 @@ export async function loadSnapshots(volume: string) {
   } catch {
     snapshots.set([]);
     restorePointID.set('');
-    setBanner('Failed to load snapshots', true);
+    showToast('Failed to load snapshots', true);
   } finally {
     snapsLoading.set(false);
     reconcileViewerSnapshots();
@@ -135,7 +134,7 @@ export async function onAddTag(id: string, tag: string, vol: string) {
     restorePointID.set(result.restorePointID ?? '');
     reconcileViewerSnapshots();
   } catch (e) {
-    setBanner(`Failed to add tag: ${String(e)}`, true);
+    showToast(`Failed to add tag: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -151,7 +150,7 @@ export async function onRemoveTag(id: string, tag: string, vol: string) {
     restorePointID.set(result.restorePointID ?? '');
     reconcileViewerSnapshots();
   } catch (e) {
-    setBanner(`Failed to remove tag: ${String(e)}`, true);
+    showToast(`Failed to remove tag: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -159,23 +158,44 @@ export async function onRemoveTag(id: string, tag: string, vol: string) {
   }
 }
 
-export function onDeleteSnapshot(sn: Snapshot) {
-  deletingSnap.set(sn);
+export const selectedForDeletion = writable<Set<string>>(new Set());
+
+export const selectedDeletionCount = derived(selectedForDeletion, $s => $s.size);
+
+export function toggleForDeletion(sn: Snapshot) {
+  selectedForDeletion.update(s => {
+    const next = new Set(s);
+    if (next.has(sn.id)) {
+      next.delete(sn.id);
+    } else {
+      next.add(sn.id);
+    }
+    return next;
+  });
+}
+
+export function openBulkDeleteModal() {
   snapDeleteInput.set('');
   deleteSnapModal.set(true);
 }
 
 export async function confirmDeleteSnapshot() {
-  const sn = get(deletingSnap);
   const vol = get(selectedVolume);
-  if (!sn) return;
+  const ids = [...get(selectedForDeletion)];
+  if (ids.length === 0) return;
+  deleteSnapModal.set(false);
   try {
-    await api.deleteSnapshot(sn.id, vol);
-    deleteSnapModal.set(false);
-    deletingSnap.set(null);
-    setBanner('Snapshot deleted');
+    const result = await api.deleteSnapshots(vol, ids);
+    selectedForDeletion.set(new Set());
+    if (result.failed > 0) {
+      showToast(`Deleted ${String(result.deleted)}, failed ${String(result.failed)}`, true);
+    } else {
+      showToast(`Deleted ${String(result.deleted)} snapshot${result.deleted !== 1 ? 's' : ''}`);
+    }
     await loadSnapshots(vol);
-  } catch (e: unknown) { setBanner((e as Error).message, true); }
+  } catch (e: unknown) {
+    showToast((e as Error).message, true);
+  }
 }
 
 export async function handleSizeLoaded(id: string) {

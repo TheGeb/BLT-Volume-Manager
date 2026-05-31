@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
-import type { VolumeLockInfo } from '../types';
+import type { Snapshot, VolumeLockInfo } from '../types';
 import * as api from '../api';
-import { setBanner } from './banner';
+import { showToast } from './toast';
 
 export const volumes = writable<string[]>([]);
 export const selectedVolume = writable('');
@@ -20,7 +20,11 @@ export const copyRenameSource = writable('');
 export const copyRenameTarget = writable('');
 export const copyRenameLoading = writable(false);
 export const copyRenameError = writable('');
-export const copyPreserveHistory = writable(true);
+export const copySnapshots = writable<Snapshot[]>([]);
+export const copySnapshotsLoading = writable(false);
+export const copySnapshotMode = writable<'all' | 'specific'>('all');
+export const copySelectedSnapshotIds = writable<string[]>([]);
+export const copyRestorePointID = writable('');
 
 export function filterVolumes(all: string[], filter: string): string[] {
   return all.filter(v => v.toLowerCase().includes(filter.toLowerCase()));
@@ -37,7 +41,7 @@ export async function loadVolumes() {
     volumes.set(await api.fetchVolumes());
     void fetchAllVolumeLockInfo();
   } catch {
-    setBanner('Cannot reach server', true);
+    showToast('Cannot reach server', true);
   } finally {
     volumesLoading.set(false);
   }
@@ -81,8 +85,26 @@ export function openCopyVolModal(vol: string) {
   copyRenameSource.set(vol);
   copyRenameTarget.set('');
   copyRenameError.set('');
-  copyPreserveHistory.set(true);
+  copySnapshotMode.set('all');
+  copySelectedSnapshotIds.set([]);
+  copyRestorePointID.set('');
+  copySnapshots.set([]);
   copyVolModal.set(true);
+  void loadCopySnapshots(vol);
+}
+
+async function loadCopySnapshots(vol: string) {
+  copySnapshotsLoading.set(true);
+  try {
+    const result = await api.fetchSnapshots(vol);
+    copySnapshots.set(result.snapshots);
+    copyRestorePointID.set(result.restorePointID ?? '');
+  } catch {
+    copySnapshots.set([]);
+    copyRestorePointID.set('');
+  } finally {
+    copySnapshotsLoading.set(false);
+  }
 }
 
 export function openRenameVolModal(vol: string) {
@@ -95,16 +117,21 @@ export function openRenameVolModal(vol: string) {
 export async function confirmCopyVolume() {
   const src = get(copyRenameSource);
   const target = get(copyRenameTarget);
-  const preserveHistory = get(copyPreserveHistory);
+  const mode = get(copySnapshotMode);
+  const snapshotIds = get(copySelectedSnapshotIds);
   if (!src || !target) return;
 
   copyRenameLoading.set(true);
   copyRenameError.set('');
   try {
-    await api.copyVolume(src, target, preserveHistory);
+    if (mode === 'specific' && snapshotIds.length > 0) {
+      await api.copyVolume(src, target, undefined, snapshotIds);
+    } else {
+      await api.copyVolume(src, target, true);
+    }
     copyVolModal.set(false);
     await loadVolumes();
-    setBanner(`Volume "${src}" copied to "${target}"`);
+    showToast(`Volume "${src}" copied to "${target}"`);
   } catch (err: unknown) {
     copyRenameError.set(err instanceof Error ? err.message : 'Copy failed');
   } finally {
@@ -123,7 +150,7 @@ export async function confirmRenameVolume() {
     await api.renameVolume(src, target);
     renameVolModal.set(false);
     await loadVolumes();
-    setBanner(`Volume "${src}" renamed to "${target}"`);
+    showToast(`Volume "${src}" renamed to "${target}"`);
   } catch (err: unknown) {
     copyRenameError.set(err instanceof Error ? err.message : 'Rename failed');
   } finally {

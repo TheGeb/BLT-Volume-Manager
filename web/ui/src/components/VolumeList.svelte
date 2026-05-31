@@ -536,7 +536,7 @@
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
-    margin-left: auto;
+    margin-left: 6px;
     width: 0;
     opacity: 0;
     overflow: hidden;

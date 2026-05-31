@@ -3,6 +3,7 @@
 
   export let show = false;
   export let onClose: () => void = () => {};
+  export let wide = false;
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape' && show) onClose();
@@ -19,7 +20,7 @@
 {#if show}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div class="modal-overlay" on:click={handleOverlayClick}>
-    <div class="modal">
+    <div class="modal" class:modal-wide={wide}>
       <slot />
     </div>
   </div>
@@ -40,5 +41,10 @@
     max-width: 440px;
     width: 90%;
     box-shadow: var(--shadow);
+    transition: max-width 0.25s ease;
+  }
+
+  .modal-wide {
+    max-width: 600px;
   }
 </style>

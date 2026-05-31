@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deletingSnap, deleteSnapModal, snapDeleteInput, filteredSnapshots, sortedSnapshots, hosts, onToggleSort, onSearch, onTypeFilter, onHostFilter, onDeleteSnapshot, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
+import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deleteSnapModal, snapDeleteInput, selectedForDeletion, filteredSnapshots, sortedSnapshots, hosts, onToggleSort, onSearch, onTypeFilter, onHostFilter, toggleForDeletion, openBulkDeleteModal, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
 import type { Snapshot } from '../types';
 
 function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
@@ -183,22 +183,36 @@ describe('onHostFilter', () => {
   });
 });
 
-describe('onDeleteSnapshot', () => {
+describe('toggleForDeletion', () => {
   beforeEach(() => {
-    deletingSnap.set(null);
+    selectedForDeletion.set(new Set());
     deleteSnapModal.set(false);
     snapDeleteInput.set('dirty');
   });
 
-  it('sets the snapshot to delete and opens modal', () => {
+  it('adds a snapshot to the selection set', () => {
     const snap = makeSnap({ id: 'del-id' });
-    onDeleteSnapshot(snap);
-    expect(get(deletingSnap)?.id).toBe('del-id');
-    expect(get(deleteSnapModal)).toBe(true);
+    toggleForDeletion(snap);
+    expect(get(selectedForDeletion).has('del-id')).toBe(true);
   });
 
-  it('clears the delete input', () => {
-    onDeleteSnapshot(makeSnap());
+  it('removes a snapshot when toggled again', () => {
+    const snap = makeSnap({ id: 'del-id' });
+    toggleForDeletion(snap);
+    toggleForDeletion(snap);
+    expect(get(selectedForDeletion).has('del-id')).toBe(false);
+  });
+});
+
+describe('openBulkDeleteModal', () => {
+  beforeEach(() => {
+    snapDeleteInput.set('dirty');
+    deleteSnapModal.set(false);
+  });
+
+  it('clears the delete input and opens modal', () => {
+    openBulkDeleteModal();
     expect(get(snapDeleteInput)).toBe('');
+    expect(get(deleteSnapModal)).toBe(true);
   });
 });

@@ -1,34 +1,30 @@
 <script lang="ts">
   import type { Snapshot } from '../lib/types';
+  import { slide } from 'svelte/transition';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
   export let selectedVolume = '';
   export let sortNewestFirst = true;
-  export let query = '';
   export let typeFilter = 'all';
   export let hostFilter = '';
   export let hosts: string[] = [];
   export let loading = false;
   export let restorePointLoading: Record<string, boolean> = {};
   export let sizeLoading: Record<string, boolean> = {};
-  export let onSearch: (q: string) => void = () => {};
   export let onToggleSort: () => void = () => {};
   export let onTypeFilter: (t: string) => void = () => {};
   export let onHostFilter: (h: string) => void = () => {};
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
   export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
-  export let onDeleteSnapshot: (sn: Snapshot) => void = () => {};
   export let onSizeLoaded: (id: string) => void = () => {};
   export let restorePointID = '';
+  export let selectedForDeletion: Set<string> = new Set();
+  export let onToggleDeletion: (sn: Snapshot) => void = () => {};
+  export let onDeleteSelected: () => void = () => {};
 
-  let searchVal = '';
   let openFilter: 'type' | 'host' | null = null;
-
-  $: searchVal = query;
-
-  function handleSearch() { onSearch(searchVal); }
 
   function toggleFilter(f: 'type' | 'host') {
     openFilter = openFilter === f ? null : f;
@@ -52,10 +48,6 @@
 <svelte:window on:keydown={handleFilterKeydown} on:click={handleDocClick} />
 
 <section class="panel table-panel" style="margin-bottom:0;">
-  <div class="row gap" style="margin-bottom:16px;">
-    <input class="input" type="search" placeholder="Filter by name or tag"
-      bind:value={searchVal} on:input={handleSearch} />
-  </div>
   <div style="overflow-x:auto;">
     <table class="data-table">
       <thead>
@@ -116,7 +108,7 @@
       </thead>
       <tbody id="snapshotTable" style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
         {#each snapshots as sn (sn.id)}
-          <tr>
+          <tr class:del-row={selectedForDeletion.has(sn.id)}>
              <td style="text-align:center">
                {#if restorePointLoading[sn.id]}
                  <svg width="20" height="20" viewBox="0 0 20 20" class="spin" style="vertical-align:middle;">
@@ -167,12 +159,17 @@
             <td>{new Date(sn.time).toLocaleDateString()}<br>
               <span style="font-size:0.85rem;color:var(--muted);">{new Date(sn.time).toLocaleTimeString()}</span>
             </td>
-            <td>
-              <div style="display:flex;gap:4px;flex-wrap:nowrap;">
-                <button class="button button-secondary button-xs" on:click={() => onOpenViewer(sn)}>View</button>
-                <button class="button button-secondary button-xs" on:click={() => onDeleteSnapshot(sn)} style="color:var(--red);">Delete</button>
-              </div>
-            </td>
+         <td>
+               <div style="display:flex;gap:4px;flex-wrap:nowrap;">
+                 <button class="button button-secondary button-xs" on:click={() => onOpenViewer(sn)}>View</button>
+                 <button
+                   class="button button-xs del-toggle"
+                   class:del-selected={selectedForDeletion.has(sn.id)}
+                   on:click={() => onToggleDeletion(sn)}>
+                   {selectedForDeletion.has(sn.id) ? '×' : 'Delete'}
+                 </button>
+               </div>
+             </td>
           </tr>
         {:else}
           <tr>
@@ -184,6 +181,14 @@
       </tbody>
     </table>
   </div>
+  {#if selectedForDeletion.size > 0}
+    <div class="bulk-bar" transition:slide={{ duration: 200 }}>
+      <span class="bulk-count">{selectedForDeletion.size} snapshot{selectedForDeletion.size !== 1 ? 's' : ''} selected</span>
+      <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
+        Delete selected
+      </button>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -332,6 +337,76 @@
     white-space: normal; width: 260px; z-index: 10; pointer-events: none;
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     margin-top: 6px; text-align: center;
+  }
+
+  .del-toggle {
+    background: none;
+    border: 1px solid var(--red);
+    color: var(--red);
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s;
+    width: 56px;
+    text-align: center;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .del-toggle:hover {
+    background: rgb(255 80 80 / 15%);
+  }
+
+  .del-toggle.del-selected {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+    font-weight: 700;
+  }
+
+  .del-toggle.del-selected:hover {
+    background: color-mix(in srgb, var(--red) 80%, #000);
+  }
+
+  tr.del-row {
+    background: rgb(255 80 80 / 6%);
+    outline: 1px solid rgb(255 80 80 / 15%);
+    outline-offset: -1px;
+  }
+
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 8px 8px;
+    position: sticky;
+    bottom: 0;
+  }
+
+  .bulk-count {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .del-confirm-btn {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    padding: 6px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .del-confirm-btn:hover {
+    background: color-mix(in srgb, var(--red) 80%, #000);
   }
 
   @media (width <= 900px) {

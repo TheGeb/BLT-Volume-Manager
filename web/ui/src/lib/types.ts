@@ -101,3 +101,9 @@ export interface SnapshotsResponse {
 	snapshots: Snapshot[];
 	restorePointID?: string;
 }
+
+export interface BatchDeleteResponse {
+	deleted: number;
+	failed: number;
+	errors: { id: string; error: string }[];
+}

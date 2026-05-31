@@ -1,4 +1,4 @@
-import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse, FileNode, DiffResult } from './types';
+import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
 export async function fetchVolumes(): Promise<string[]> {
 	const resp = await fetch('/api/volumes');
@@ -118,6 +118,15 @@ export async function deleteSnapshot(snapshotId: string, volume: string): Promis
   if (!resp.ok) throw new Error('Failed to delete snapshot');
 }
 
+export async function deleteSnapshots(volume: string, ids: string[]): Promise<BatchDeleteResponse> {
+  const resp = await fetch('/api/snapshots/delete-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume, ids }),
+  });
+  return parseResponse<BatchDeleteResponse>(resp);
+}
+
 export async function deleteVolume(volume: string): Promise<void> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}`, { method: 'DELETE' });
   if (!resp.ok) {
@@ -140,11 +149,17 @@ export async function repairRepo(volume: string): Promise<string> {
   return d.status ?? '';
 }
 
-export async function copyVolume(source: string, target: string, preserveHistory?: boolean): Promise<{ status: string; source_locked?: boolean; source_owner?: string }> {
+export async function copyVolume(source: string, target: string, preserveHistory?: boolean, snapshotIds?: string[]): Promise<{ status: string; source_locked?: boolean; source_owner?: string }> {
+  const body: Record<string, unknown> = { target };
+  if (snapshotIds && snapshotIds.length > 0) {
+    body.snapshot_ids = snapshotIds;
+  } else {
+    body.preserve_history = preserveHistory;
+  }
   const resp = await fetch(`/api/volume/${encodeURIComponent(source)}/copy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target, preserve_history: preserveHistory }),
+    body: JSON.stringify(body),
   });
   return parseResponse(resp);
 }
@@ -176,7 +191,7 @@ async function parseResponse<T>(resp: Response): Promise<T> {
 }
 
 export async function createTestVolume(name: string): Promise<void> {
-  const resp = await fetch('/api/test/create-volume', {
+  const resp = await fetch('/api/dummy-volume', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),

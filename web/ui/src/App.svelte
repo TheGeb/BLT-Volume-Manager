@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
-  import Banner from './components/Banner.svelte';
+  import Toast from './components/Toast.svelte';
   import LandingPanel from './components/LandingPanel.svelte';
   import VolumeList from './components/VolumeList.svelte';
   import SnapshotTable from './components/SnapshotTable.svelte';
@@ -12,19 +12,21 @@
   import Modal from './components/Modal.svelte';
   import type { Snapshot } from './lib/types';
   import { get } from 'svelte/store';
-  import { bannerText, bannerError, setBanner } from './lib/stores/banner';
+  import { showToast } from './lib/stores/toast';
   import {
     volumes, selectedVolume, volumeFilter, hostname, volumeLockInfo, volumesLoading, landingShown,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
-    copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError, copyPreserveHistory,
+    copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError,
+    copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
     loadVolumes, onFilterChange, openDeleteVolModal,
     confirmCopyVolume, confirmRenameVolume
   } from './lib/stores/volumes';
   import {
-    snapshots, query, sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
-    viewerOpen, deleteSnapModal, deletingSnap, snapDeleteInput, snapsLoading, restorePointLoading,
+    snapshots, sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
+    viewerOpen, deleteSnapModal, snapDeleteInput, snapsLoading, restorePointLoading,
     sizeLoading, filteredSnapshots, sortedSnapshots, hosts, diffTargetId, diffTargetFallbackHash, restorePointID,
-    onToggleSort, onSearch, onTypeFilter, onHostFilter, onAddTag, onRemoveTag, onDeleteSnapshot,
+    selectedForDeletion, selectedDeletionCount, toggleForDeletion, openBulkDeleteModal,
+    onToggleSort, onTypeFilter, onHostFilter, onAddTag, onRemoveTag,
     confirmDeleteSnapshot, handleSizeLoaded
   } from './lib/stores/snapshots';
   import {
@@ -49,9 +51,9 @@
     if (!$themeDark) document.body.classList.add('light');
     await loadVolumes();
     if ($volumes.length === 0) {
-      setBanner('No volumes found. Create one with: docker volume create --driver blt-volume-manager --name <name>');
+      showToast('No volumes found. Create one with: docker volume create --driver blt-volume-manager --name <name>');
     } else {
-      setBanner('');
+      showToast('');
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -184,6 +186,56 @@
       align-items: flex-start;
     }
   }
+
+  .snap-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    white-space: nowrap;
+  }
+  .snap-row:last-child { border-bottom: none; }
+  .snap-row:hover { background: rgb(255 255 255 / 4%); }
+  .snap-row.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .snap-row input { margin: 0; flex-shrink: 0; }
+
+  .snap-short-id {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .snap-date { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  .snap-tags { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+
+  .snap-rp-badge {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .snap-tag-badge {
+    background: color-mix(in srgb, var(--muted) 20%, transparent);
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    text-transform: capitalize;
+  }
+  .snap-row.restore-point { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  .snap-row.restore-point:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .snap-host { color: var(--muted); margin-left: auto; flex-shrink: 0; }
 </style>
 
 <div class="page-shell">
@@ -219,7 +271,7 @@
     </div>
   </header>
 
-  <Banner bannerText={$bannerText} bannerError={$bannerError} onClose={() => setBanner('')} />
+  <Toast />
 
   {#if $landingShown}
     {#if $volumes.length === 0 && !$volumesLoading}
@@ -291,7 +343,6 @@
               sizes={$sizes}
               selectedVolume={$selectedVolume}
               sortNewestFirst={$sortNewestFirst}
-              query={$query}
               typeFilter={$typeFilter}
               hostFilter={$hostFilter}
               hosts={$hosts}
@@ -299,14 +350,15 @@
               restorePointLoading={$restorePointLoading}
               sizeLoading={$sizeLoading}
               restorePointID={$restorePointID}
-              onSearch={onSearch}
+              selectedForDeletion={$selectedForDeletion}
               onToggleSort={onToggleSort}
               onTypeFilter={onTypeFilter}
               onHostFilter={onHostFilter}
               onOpenViewer={onOpenViewer}
               onAddTag={onAddTag}
               onRemoveTag={onRemoveTag}
-              onDeleteSnapshot={onDeleteSnapshot}
+              onToggleDeletion={toggleForDeletion}
+              onDeleteSelected={openBulkDeleteModal}
               onSizeLoaded={handleSizeLoaded}
             />
         </div>
@@ -360,14 +412,10 @@
 </Modal>
 
 <Modal show={$deleteSnapModal} onClose={() => $deleteSnapModal = false}>
-  <h3 style="margin:0 0 12px;color:var(--red);">Delete snapshot</h3>
-  {#if $deletingSnap}
-  <div style="margin-bottom:16px;font-size:0.85rem;">
-    <div><strong>Hostname:</strong> {$deletingSnap.hostname}</div>
-    <div><strong>Date:</strong> {new Date($deletingSnap.time).toLocaleString()}</div>
-    <div><strong>Tags:</strong> {$deletingSnap.tags.join(', ') || '—'}</div>
+  <h3 style="margin:0 0 12px;color:var(--red);">Delete snapshot{$selectedDeletionCount !== 1 ? 's' : ''}</h3>
+  <div style="margin-bottom:16px;font-size:0.85rem;color:var(--muted);">
+    {$selectedDeletionCount} snapshot{$selectedDeletionCount !== 1 ? 's' : ''} selected for deletion.
   </div>
-  {/if}
   <p style="margin:0 0 8px;font-size:0.85rem;">Type <strong>delete</strong> to confirm:</p>
   <input class="input" type="text" placeholder='Type "delete" to confirm'
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
@@ -376,11 +424,11 @@
     <button class="button button-secondary" on:click={() => $deleteSnapModal = false}>Cancel</button>
     <button class="button" style="background:var(--red);color:#fff;"
       disabled={$snapDeleteInput !== 'delete'}
-      on:click={confirmDeleteSnapshot}>Delete</button>
+      on:click={confirmDeleteSnapshot}>Delete {$selectedDeletionCount}</button>
   </div>
 </Modal>
 
-<Modal show={$copyVolModal} onClose={() => $copyVolModal = false}>
+<Modal show={$copyVolModal} onClose={() => $copyVolModal = false} wide={$copySnapshotMode === 'specific'}>
   <h3 style="margin:0 0 12px;">Copy volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
     Copy snapshots from <strong>{$copyRenameSource}</strong> to a new volume.
@@ -389,18 +437,64 @@
     New volume name:
   </p>
   <input class="input" type="text" placeholder="Enter new volume name"
-    style="width:100%;box-sizing:border-box;margin-bottom:8px;"
+    style="width:100%;box-sizing:border-box;margin-bottom:12px;"
     bind:value={$copyRenameTarget} />
-  <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.85rem;cursor:pointer;">
-    <input type="checkbox" bind:checked={$copyPreserveHistory} />
-    Preserve snapshot history
-  </label>
+
+  <fieldset style="border:none;padding:0;margin:0 0 8px;">
+    <legend style="font-size:0.85rem;margin-bottom:6px;">Snapshots to copy:</legend>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85rem;cursor:pointer;">
+      <input type="radio" name="copyMode" value="all" bind:group={$copySnapshotMode} />
+      All snapshots
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85rem;cursor:pointer;">
+      <input type="radio" name="copyMode" value="specific" bind:group={$copySnapshotMode} />
+      Specific snapshot…
+    </label>
+  </fieldset>
+
+  {#if $copySnapshotMode === 'specific'}
+    <div style="margin-bottom:8px;">
+      {#if $copySnapshotsLoading}
+        <p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:12px;">Loading snapshots…</p>
+      {:else if $copySnapshots.length === 0}
+        <p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:12px;">No snapshots found</p>
+      {:else}
+        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+          {#each $copySnapshots as sn (sn.id)}
+            <label class="snap-row" class:selected={$copySelectedSnapshotIds.includes(sn.id)} class:restore-point={sn.id === $copyRestorePointID || sn.short_id === $copyRestorePointID}>
+              <input type="checkbox" checked={$copySelectedSnapshotIds.includes(sn.id)}
+                on:change={(e) => {
+                  const checked = e.currentTarget.checked;
+                  $copySelectedSnapshotIds = checked
+                    ? [...$copySelectedSnapshotIds, sn.id]
+                    : $copySelectedSnapshotIds.filter(id => id !== sn.id);
+                }} />
+              <span class="snap-short-id">{sn.short_id.slice(0, 8)}</span>
+              <span class="snap-date">{new Date(sn.time).toLocaleDateString()} {new Date(sn.time).toLocaleTimeString()}</span>
+              {#each sn.tags.filter(t => t !== 'restore-point') as tag (tag)}
+                {#if tag === 'hot' || tag === 'cold'}
+                  <span class="snap-tag-badge">{tag}</span>
+                {:else}
+                  <span class="snap-tags">{tag}</span>
+                {/if}
+              {/each}
+              {#if sn.id === $copyRestorePointID || sn.short_id === $copyRestorePointID}
+                <span class="snap-rp-badge" title="Restore point">Restore Point</span>
+              {/if}
+              <span class="snap-host">{sn.hostname}</span>
+            </label>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   {#if $copyRenameError}
     <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
   {/if}
   <div style="display:flex;gap:8px;justify-content:flex-end;">
     <button class="button button-secondary" on:click={() => $copyVolModal = false}>Cancel</button>
-    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading}
+    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading || ($copySnapshotMode === 'specific' && $copySelectedSnapshotIds.length === 0)}
       on:click={confirmCopyVolume}>
       {$copyRenameLoading ? 'Copying...' : 'Copy'}
     </button>

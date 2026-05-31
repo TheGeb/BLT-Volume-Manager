@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import type { StatsResponse, LockStatus } from '../types';
 import * as api from '../api';
-import { setBanner } from './banner';
+import { showToast } from './toast';
 import { selectedVolume } from './volumes';
 import { snapshots, loadSnapshots } from './snapshots';
 
@@ -44,11 +44,11 @@ export async function handleCheck() {
   const vol = get(selectedVolume);
   if (!vol) return;
   checking.set(true);
-  setBanner('');
+  showToast('');
   try {
     const msg = await api.checkRepo(vol);
-    setBanner(msg);
-  } catch (e: unknown) { setBanner((e as Error).message, true); }
+    showToast(msg);
+  } catch (e: unknown) { showToast((e as Error).message, true); }
   finally { checking.set(false); }
 }
 
@@ -56,11 +56,11 @@ export async function handleRepair() {
   const vol = get(selectedVolume);
   if (!vol) return;
   repairing.set(true);
-  setBanner('');
+  showToast('');
   try {
     const msg = await api.repairRepo(vol);
-    setBanner(msg);
-  } catch (e: unknown) { setBanner((e as Error).message, true); }
+    showToast(msg);
+  } catch (e: unknown) { showToast((e as Error).message, true); }
   finally { repairing.set(false); }
 }
 

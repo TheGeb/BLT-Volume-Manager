@@ -2,7 +2,7 @@ import { get } from 'svelte/store';
 import { writable } from 'svelte/store';
 import type { Snapshot } from '../types';
 import * as api from '../api';
-import { setBanner } from './banner';
+import { showToast } from './toast';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
 import { activeTab, loadLockStatus, loadStats, doSwitchTab } from './repo';
 import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal } from './snapshots';
@@ -92,7 +92,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
 }
 
 export async function handleRefresh() {
-  setBanner('');
+  showToast('');
   try { await api.refreshStats(); } catch {}
   const vol = get(selectedVolume);
   if (vol) {
@@ -126,7 +126,7 @@ export async function confirmDeleteVolume() {
     await api.deleteVolume(vol);
     deleteVolModal.set(false);
     deleteVolLoading.set(false);
-    setBanner(`Volume ${vol} deleted`);
+    showToast(`Volume ${vol} deleted`);
     selectedVolume.set('');
     landingShown.set(true);
     currentSnapshot.set(null);
@@ -138,7 +138,7 @@ export async function confirmDeleteVolume() {
     ]);
   } catch (e: unknown) {
     deleteVolLoading.set(false);
-    setBanner((e as Error).message, true);
+    showToast((e as Error).message, true);
   }
 }
 
