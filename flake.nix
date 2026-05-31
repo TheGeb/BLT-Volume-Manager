@@ -12,8 +12,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        # TODO: add formatter output for nix fmt, e.g.:
-        #   formatter = pkgs.nixfmt;
+        formatter = pkgs.nixfmt-rfc-style;
         # TODO: commit generated flake.lock to pin inputs
 
         packages = rec {

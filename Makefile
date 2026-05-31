@@ -21,7 +21,10 @@ lint-go: format
 # Development: full lint, build, and run
 # Independent checks (lint-go, hadolint, ui-dev) run in parallel with: make -j dev
 dev: lint-go hadolint ui-dev
-	-go run . $(ARGS)
+	go run . $(ARGS)
+
+dev-ui: ui-dev
+	cd web/ui && npm run dev
 
 # CI / full check (includes tests and coverage)
 check: tidy lint-go coverage hadolint ui-dev
@@ -87,6 +90,7 @@ lint: format
 # Clean build artifacts
 clean:
 	rm -f blt-volume-manager
+	go clean -cache
 	rm -rf web/ui/node_modules
 	rm -rf web/static/*
 	rm -rf internal/web/static/*

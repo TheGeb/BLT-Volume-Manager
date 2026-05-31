@@ -1,0 +1,16 @@
+.git/
+.gitignore
+coverage.*
+*.out
+*.coverprofile
+profile.cov
+node_modules/
+web/static/
+internal/web/static/
+blt-volume-manager
+.env
+.env.*
+*.md
+!README.md
+.DS_Store
+*.log
