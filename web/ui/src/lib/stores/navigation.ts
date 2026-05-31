@@ -21,6 +21,7 @@ export async function loadAll(volume: string) {
   diffTargetId.set('');
   diffTargetFallbackHash.set('');
   landingShown.set(!volume);
+  syncUrl();
   if (volume) {
     await Promise.all([
       loadSnapshots(volume),
