@@ -1,6 +1,8 @@
 package restic
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -565,61 +567,74 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 }
 
 // DiffSnapshots returns the diff between two snapshots.
-// Parses restic's human-readable diff output (no --json flag available for diff).
-// The format is per-line with a single prefix character: + (added), - (removed),
-// M (modified), U (metadata changed), T (type changed). Fragile across restic versions.
+// Uses restic diff --json (JSON lines format) for structured output.
 func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "diff", "--no-lock", snapID1, snapID2)
+	cmd, err := m.resticCommand(ctx, "diff", "--no-lock", "--json", snapID1, snapID2)
 	if err != nil {
 		return nil, err
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		// restic may emit an exit_error JSON message on stderr on error
 		return nil, fmt.Errorf("restic diff: %w\n%s", err, string(out))
 	}
 
-	var changes []DiffChange
 	groups := map[string][]string{}
 	order := []string{}
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		if len(line) < 2 || line[1] != ' ' {
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
 			continue
 		}
-		prefix := string(line[0])
-		path := strings.TrimSpace(line[2:])
-		if path == "" {
+		var msg struct {
+			Type     string `json:"message_type"`
+			Path     string `json:"path"`
+			Modifier string `json:"modifier"`
+		}
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
 			continue
 		}
-		var typ string
-		switch prefix {
-		case "+":
-			typ = "added"
-		case "-":
-			typ = "removed"
-		case "M":
-			typ = "modified"
-		case "U":
-			typ = "metadata"
-		case "T":
-			typ = "type-changed"
-		default:
+		if msg.Type != "change" || msg.Path == "" {
+			continue
+		}
+		typ := modifierToChangeType(msg.Modifier)
+		if typ == "" {
 			continue
 		}
 		if _, ok := groups[typ]; !ok {
 			order = append(order, typ)
 		}
-		groups[typ] = append(groups[typ], path)
+		groups[typ] = append(groups[typ], msg.Path)
 	}
 
+	changes := make([]DiffChange, 0, len(order))
 	for _, typ := range order {
 		changes = append(changes, DiffChange{Type: typ, Paths: groups[typ]})
 	}
-
 	return &DiffResult{ChangeSets: changes}, nil
+}
+
+func modifierToChangeType(modifier string) string {
+	for _, ch := range modifier {
+		switch ch {
+		case '+':
+			return "added"
+		case '-':
+			return "removed"
+		case 'M':
+			return "modified"
+		case 'U':
+			return "metadata"
+		case 'T':
+			return "type-changed"
+		}
+	}
+	return ""
 }
 
 func (m *Manager) repositoryExists() (bool, error) {

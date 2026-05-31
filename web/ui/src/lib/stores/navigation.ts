@@ -32,7 +32,7 @@ export async function loadAll(volume: string) {
   }
 }
 
-export async function navigateTo(volume: string, opts?: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string }) {
+export async function navigateTo(volume: string, params?: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string }) {
   selectedVolume.set(volume);
   sizes.set({});
   deleteVolModal.set(false);
@@ -40,15 +40,15 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
   testStatus.set('');
   landingShown.set(false);
 
-  const tab = (opts?.tab ?? 'snapshots') as 'snapshots' | 'repo';
+  const tab = (params?.tab ?? 'snapshots') as 'snapshots' | 'repo';
   activeTab.set(tab);
 
-  if (tab === 'snapshots' && opts?.snapshotId) {
+  if (tab === 'snapshots' && params?.snapshotId) {
     viewerOpen.set(true);
-    diffTargetId.set(opts.diffId || '');
-    if (opts.diffFallbackHash) {
-      diffTargetFallbackHash.set(opts.diffFallbackHash);
-    } else if (!opts.diffId) {
+    diffTargetId.set(params.diffId || '');
+    if (params.diffFallbackHash) {
+      diffTargetFallbackHash.set(params.diffFallbackHash);
+    } else if (!params.diffId) {
       diffTargetFallbackHash.set('');
     }
   } else {
@@ -65,23 +65,23 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
     await loadLockStatus();
     await loadStats(volume);
 
-    if (opts?.snapshotId) {
-      let snap = get(snapshots).find(s => s.id === opts.snapshotId || s.short_id === opts.snapshotId);
-      if (!snap && opts?.fallbackHash) {
-        snap = get(snapshots).find(s => s.fallbackHash === opts.fallbackHash);
+    if (params?.snapshotId) {
+      let snap = get(snapshots).find(s => s.id === params.snapshotId || s.short_id === params.snapshotId);
+      if (!snap && params?.fallbackHash) {
+        snap = get(snapshots).find(s => s.fallbackHash === params.fallbackHash);
       }
       if (snap) {
-        snap.fallbackHash = opts.fallbackHash ?? '';
+        snap.fallbackHash = params.fallbackHash ?? '';
         currentSnapshot.set(snap);
       }
-      if (opts?.diffId && opts?.diffFallbackHash) {
-        let diffSnap = get(snapshots).find(s => s.id === opts.diffId || s.short_id === opts.diffId);
+      if (params?.diffId && params?.diffFallbackHash) {
+        let diffSnap = get(snapshots).find(s => s.id === params.diffId || s.short_id === params.diffId);
         if (!diffSnap) {
-          diffSnap = get(snapshots).find(s => s.fallbackHash === opts.diffFallbackHash);
+          diffSnap = get(snapshots).find(s => s.fallbackHash === params.diffFallbackHash);
         }
         if (diffSnap) {
-          diffSnap.fallbackHash = opts.diffFallbackHash;
-          diffTargetFallbackHash.set(opts.diffFallbackHash);
+          diffSnap.fallbackHash = params.diffFallbackHash;
+          diffTargetFallbackHash.set(params.diffFallbackHash);
           diffTargetId.set(diffSnap.id);
         }
       }
@@ -171,6 +171,7 @@ export function onCloseViewer() {
 export async function setDiffTarget(id: string) {
   const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
   if (!snap) return;
+  diffTargetFallbackHash.set(snap.fallbackHash || '');
   diffTargetFallbackHash.set(snap.fallbackHash || '');
   diffTargetId.set(snap.id);
   syncUrl();

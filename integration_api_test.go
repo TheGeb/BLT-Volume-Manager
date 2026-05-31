@@ -248,7 +248,7 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 	apiOK(t, ts, "POST", "/api/volume/persist-vol/locks", nil)
 
 	// Read it back via a direct S3 SDK call to Garage (bypassing the API)
-	directStore, err := store.NewS3Store(store.S3StoreOpts{
+	directStore, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		Region:     "us-east-1",

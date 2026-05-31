@@ -26,7 +26,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 	rm := restic.NewManager(repoURL)
 
 	// Use real S3 via Garage for restore points (not FakeS3)
-	realStore, err := store.NewS3Store(store.S3StoreOpts{
+	realStore, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		Region:     "us-east-1",
@@ -125,7 +125,7 @@ func TestS3LocksWithGarage(t *testing.T) {
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
 	// Create a real S3 store via Garage
-	s3Store, err := store.NewS3Store(store.S3StoreOpts{
+	s3Store, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		Region:     "us-east-1",

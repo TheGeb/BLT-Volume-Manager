@@ -44,10 +44,10 @@ type S3Store interface {
 
 type S3Client struct {
 	s3Client *s3.Client
-	opts     S3StoreOpts
+	cfg      S3StoreConfig
 }
 
-type S3StoreOpts struct {
+type S3StoreConfig struct {
 	S3Bucket       string
 	S3LockFolder   string
 	S3VolumePrefix string
@@ -56,8 +56,8 @@ type S3StoreOpts struct {
 	Logger         func(op, bucket, key string, dur time.Duration, err error)
 }
 
-func (opts S3StoreOpts) validate() error {
-	if opts.S3Bucket == "" {
+func (cfg S3StoreConfig) validate() error {
+	if cfg.S3Bucket == "" {
 		return fmt.Errorf("S3Bucket required")
 	}
 	return nil
@@ -65,33 +65,33 @@ func (opts S3StoreOpts) validate() error {
 
 var _ S3Store = (*S3Client)(nil)
 
-func NewS3Store(opts S3StoreOpts) (S3Store, error) {
-	if err := opts.validate(); err != nil {
-		return nil, fmt.Errorf("invalid S3 store options: %w", err)
+func NewS3Store(cfg S3StoreConfig) (S3Store, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid S3 store config: %w", err)
 	}
 
-	loadOpts := []func(*config.LoadOptions) error{}
-	if opts.Region != "" {
-		loadOpts = append(loadOpts, config.WithRegion(opts.Region))
+	loadCfg := []func(*config.LoadOptions) error{}
+	if cfg.Region != "" {
+		loadCfg = append(loadCfg, config.WithRegion(cfg.Region))
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.Background(), loadOpts...)
+	awsCfg, err := config.LoadDefaultConfig(context.Background(), loadCfg...)
 	if err != nil {
 		return nil, fmt.Errorf("error loading s3 config %w", err)
 	}
 
 	clientOpts := []func(*s3.Options){}
-	if opts.S3Endpoint != "" {
-		ep := opts.S3Endpoint
+	if cfg.S3Endpoint != "" {
+		ep := cfg.S3Endpoint
 		if !strings.Contains(ep, "://") {
 			ep = "https://" + ep
 		}
 		u, err := url.Parse(ep)
 		if err != nil {
-			return nil, fmt.Errorf("invalid S3 endpoint %q: %w", opts.S3Endpoint, err)
+			return nil, fmt.Errorf("invalid S3 endpoint %q: %w", cfg.S3Endpoint, err)
 		}
 		if u.Host == "" {
-			return nil, fmt.Errorf("S3 endpoint %q has no host", opts.S3Endpoint)
+			return nil, fmt.Errorf("S3 endpoint %q has no host", cfg.S3Endpoint)
 		}
 		base := u.Scheme + "://" + u.Host
 		clientOpts = append(clientOpts, func(o *s3.Options) {
@@ -103,22 +103,22 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.UsePathStyle = true
 		})
-	} else if opts.S3Endpoint == "" {
+	} else if cfg.S3Endpoint == "" {
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.UsePathStyle = false
 		})
 	}
 
-	client := s3.NewFromConfig(cfg, clientOpts...)
+	client := s3.NewFromConfig(awsCfg, clientOpts...)
 
 	return &S3Client{
 		s3Client: client,
-		opts:     opts,
+		cfg:      cfg,
 	}, nil
 }
 
 func (s *S3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
-	fn := s.opts.Logger
+	fn := s.cfg.Logger
 	if fn == nil {
 		fn = LogS3
 	}
@@ -130,21 +130,21 @@ func (s *S3Client) logS3Call(op, bucket, key string, dur time.Duration, err erro
 func (s *S3Client) PutObject(key string, data []byte) error {
 	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket: aws.String(s.opts.S3Bucket),
+		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
-	s.logS3Call("PutObject", s.opts.S3Bucket, key, time.Since(start), err)
+	s.logS3Call("PutObject", s.cfg.S3Bucket, key, time.Since(start), err)
 	return err
 }
 
 func (s *S3Client) ReadObject(key string) ([]byte, error) {
 	start := time.Now()
 	output, err := s.s3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(s.opts.S3Bucket),
+		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 	})
-	s.logS3Call("GetObject", s.opts.S3Bucket, key, time.Since(start), err)
+	s.logS3Call("GetObject", s.cfg.S3Bucket, key, time.Since(start), err)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
@@ -159,10 +159,10 @@ func (s *S3Client) ReadObject(key string) ([]byte, error) {
 func (s *S3Client) DeleteObject(key string) error {
 	start := time.Now()
 	_, err := s.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-		Bucket: aws.String(s.opts.S3Bucket),
+		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 	})
-	s.logS3Call("DeleteObject", s.opts.S3Bucket, key, time.Since(start), err)
+	s.logS3Call("DeleteObject", s.cfg.S3Bucket, key, time.Since(start), err)
 	return err
 }
 
@@ -170,18 +170,18 @@ func (s *S3Client) ListObjects(prefix string) ([]types.Object, error) {
 	start := time.Now()
 	var objects []types.Object
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.opts.S3Bucket),
+		Bucket: aws.String(s.cfg.S3Bucket),
 		Prefix: aws.String(prefix),
 	})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
-			s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
+			s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), err)
 			return nil, err
 		}
 		objects = append(objects, page.Contents...)
 	}
-	s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
+	s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), nil)
 	return objects, nil
 }
 
@@ -189,14 +189,14 @@ func (s *S3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error
 	start := time.Now()
 	var prefixes []string
 	paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.opts.S3Bucket),
+		Bucket:    aws.String(s.cfg.S3Bucket),
 		Prefix:    aws.String(prefix),
 		Delimiter: aws.String(delimiter),
 	})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
-			s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
+			s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), err)
 			return nil, err
 		}
 		for _, cp := range page.CommonPrefixes {
@@ -205,7 +205,7 @@ func (s *S3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error
 			}
 		}
 	}
-	s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
+	s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), nil)
 	return prefixes, nil
 }
 
@@ -230,33 +230,33 @@ func (s *S3Client) DeleteObjectsWithPrefix(prefix string) error {
 			end = len(idents)
 		}
 		_, err = s.s3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-			Bucket: aws.String(s.opts.S3Bucket),
+			Bucket: aws.String(s.cfg.S3Bucket),
 			Delete: &types.Delete{Objects: idents[i:end]},
 		})
 		if err != nil {
-			return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.opts.S3Bucket, prefix, err)
+			return fmt.Errorf("batch deleting objects (bucket=%s, prefix=%s): %w", s.cfg.S3Bucket, prefix, err)
 		}
 	}
 	return nil
 }
 
 func (s *S3Client) WriteVolumeMarker(name string) error {
-	return s.PutObject(s.opts.S3VolumePrefix+name+".json", nil)
+	return s.PutObject(s.cfg.S3VolumePrefix+name+".json", nil)
 }
 
 func (s *S3Client) DeleteVolumeMarker(name string) error {
-	return s.DeleteObject(s.opts.S3VolumePrefix + name + ".json")
+	return s.DeleteObject(s.cfg.S3VolumePrefix + name + ".json")
 }
 
 func (s *S3Client) ListVolumeMarkers() ([]string, error) {
-	return ListVolumeMarkers(s, s.opts.S3VolumePrefix)
+	return ListVolumeMarkers(s, s.cfg.S3VolumePrefix)
 }
 
 func (s *S3Client) DeleteLockObjects() error {
-	if s.opts.S3LockFolder == "" {
+	if s.cfg.S3LockFolder == "" {
 		return nil
 	}
-	return s.DeleteObjectsWithPrefix(s.opts.S3LockFolder)
+	return s.DeleteObjectsWithPrefix(s.cfg.S3LockFolder)
 }
 
 func (s *S3Client) WriteRestorePoint(volumeName string, rp RestorePoint) error {

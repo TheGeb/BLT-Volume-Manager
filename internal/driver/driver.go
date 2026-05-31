@@ -73,7 +73,7 @@ func NewDriver(cfg appconfig.Config) *Driver {
 	}
 
 	if cfg.S3Bucket != "" {
-		if rw, err := store.NewS3Store(store.S3StoreOpts{
+		if rw, err := store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:   cfg.S3Bucket,
 			S3Endpoint: cfg.S3Endpoint,
 			Region:     cfg.S3Region,

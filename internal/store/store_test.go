@@ -2,14 +2,14 @@ package store
 
 import "testing"
 
-func TestS3StoreOptsValidate(t *testing.T) {
-	opts := S3StoreOpts{S3Bucket: ""}
-	if err := opts.validate(); err == nil {
+func TestS3StoreConfigValidate(t *testing.T) {
+	cfg := S3StoreConfig{S3Bucket: ""}
+	if err := cfg.validate(); err == nil {
 		t.Error("expected error for empty bucket name")
 	}
 
-	opts2 := S3StoreOpts{S3Bucket: "my-bucket"}
-	if err := opts2.validate(); err != nil {
+	cfg2 := S3StoreConfig{S3Bucket: "my-bucket"}
+	if err := cfg2.validate(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

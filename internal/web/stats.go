@@ -101,7 +101,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 			"hot":              hot,
 			"cold":             cold,
 			"excluded":         excluded,
-			"volumes":          1,
 			"newest":           newestStr,
 			"oldest":           oldestStr,
 			"hot_volumes":      hotVols,

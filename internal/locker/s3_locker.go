@@ -48,7 +48,7 @@ func NewS3Locker(bucket string, endpoint string, region string) (Locker, error) 
 			maxMins = v
 		}
 	}
-	s3, err := store.NewS3Store(store.S3StoreOpts{
+	s3, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:   bucket,
 		S3Endpoint: endpoint,
 		Region:     region,

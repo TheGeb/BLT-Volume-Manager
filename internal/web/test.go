@@ -90,7 +90,7 @@ func (s *Server) handleTestCreateVolume(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if s.s3Bucket != "" {
-		s3, err := store.NewS3Store(store.S3StoreOpts{
+		s3, err := store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:       s.s3Bucket,
 			S3VolumePrefix: store.VolumePrefix,
 			S3Endpoint:     s.s3Endpoint,

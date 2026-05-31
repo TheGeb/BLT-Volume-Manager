@@ -100,7 +100,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 	}
 	// 1. Delete S3 locks, volume marker, and restore point
 	if s.s3Bucket != "" {
-		s3, err := store.NewS3Store(store.S3StoreOpts{
+		s3, err := store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:       s.s3Bucket,
 			S3VolumePrefix: store.VolumePrefix,
 			S3Endpoint:     s.s3Endpoint,
@@ -116,7 +116,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 
 	// 2. Delete S3 restic repo data (if repo is S3-based)
 	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
-		s3, err := store.NewS3Store(store.S3StoreOpts{
+		s3, err := store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,
@@ -269,7 +269,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]any,
 }
 
 func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
-	opts := store.S3StoreOpts{
+	cfg := store.S3StoreConfig{
 		S3Bucket:       s.s3Bucket,
 		S3LockFolder:   store.LockFolder(volumeName),
 		S3VolumePrefix: store.VolumePrefix,
@@ -278,7 +278,7 @@ func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 		Logger:         s3LogFn(),
 	}
 
-	return store.NewS3Store(opts)
+	return store.NewS3Store(cfg)
 }
 
 func (s *Server) isVolumeLocked(volumeName string) (bool, string, error) {
@@ -484,7 +484,7 @@ func (s *Server) handleRenameVolume(w http.ResponseWriter, r *http.Request, volu
 
 	// Delete source restic repo data
 	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
-		s3, err := store.NewS3Store(store.S3StoreOpts{
+		s3, err := store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,

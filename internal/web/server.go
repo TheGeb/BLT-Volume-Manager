@@ -55,7 +55,7 @@ func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
 		return nil, nil //nolint:nilnil // S3 not configured is not an error
 	}
 	s.s3StoreOnce.Do(func() {
-		s.s3Store, s.s3StoreErr = store.NewS3Store(store.S3StoreOpts{
+		s.s3Store, s.s3StoreErr = store.NewS3Store(store.S3StoreConfig{
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,
@@ -89,7 +89,7 @@ func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, err
 		}
 	}
 
-	s3Store, err := store.NewS3Store(store.S3StoreOpts{
+	s3Store, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:       s.s3Bucket,
 		S3VolumePrefix: prefix,
 		S3Endpoint:     s.s3Endpoint,
@@ -140,6 +140,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
+	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
+		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
+	}
 	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
 		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
 	}
