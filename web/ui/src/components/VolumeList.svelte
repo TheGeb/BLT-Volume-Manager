@@ -238,6 +238,18 @@
     }
     return map;
   })();
+
+  function handleOutroStart(e: Event) {
+    const el = e.target as HTMLElement;
+    const row = el.querySelector('.tree-row');
+    if (row) row.setAttribute('data-fading', 'true');
+  }
+
+  function handleIntroEnd(e: Event) {
+    const el = e.target as HTMLElement;
+    const row = el.querySelector('.tree-row');
+    if (row) row.removeAttribute('data-fading');
+  }
 </script>
 
 <section class="panel" class:lock-mode={showLockBorders} style="display:block;">
@@ -290,8 +302,8 @@
   {:else}
     <div class="tree">
       {#each flatItems as item, idx (item.path)}
-        <div transition:slide|local>
-          <div class="tree-row" class:in-lock={showLockBorders && !!lockStyles[idx]} data-lock={showLockBorders ? lockStyles[idx] || '' : ''}>
+        <div transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
+          <div class="tree-row" data-lock={showLockBorders ? lockStyles[idx] || '' : ''}>
             {#if item.isGroup}
               <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
               <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -305,7 +317,6 @@
                 </svg>
                 <span class="tree-name">{item.name}</span>
               </button>
-              {#if showLockBorders}
               <span class="lock-info" class:has-owner={folderLocks[item.path] && labelAtIdx[idx]} style:transform={labelOffset[idx] || ''}>
                 {#if folderLocks[item.path] && labelAtIdx[idx]}
                   <span class="lock-badge lock-locked">
@@ -314,7 +325,6 @@
                   <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
                 {/if}
               </span>
-              {/if}
             {:else}
               <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
                 on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
@@ -345,7 +355,6 @@
                 </span>
                 {/if}
               </button>
-              {#if showLockBorders}
               <span class="lock-info" class:has-owner={volumeLockInfo[item.path]?.owner && (!lockStyles[idx] || labelAtIdx[idx])} style:transform={labelOffset[idx] || ''}>
                 {#if volumeLockInfo[item.path]}
                   {#if !lockStyles[idx] || labelAtIdx[idx]}
@@ -360,7 +369,6 @@
                   <span class="lock-badge">—</span>
               {/if}
             </span>
-              {/if}
             {/if}
 
           </div>
@@ -408,7 +416,7 @@
 
   .tree-row {
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
-    contain: layout style;
+    contain: layout style; margin-bottom: -2px;
   }
 
   .tree-row[data-lock="start"] .tree-group,
@@ -431,18 +439,43 @@
     border-radius: 8px;
   }
 
-  .tree-row.in-lock::before {
+  .tree-row::before {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
     width: calc(75% - 2px);
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+    border-top: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    border-radius: 8px;
+    transition: opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease, border-radius 0.25s ease;
+  }
+
+  .tree-row[data-lock]:not([data-lock=""])::before {
+    opacity: 1;
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
     background: color-mix(in srgb, var(--green) 8%, transparent);
-    pointer-events: none;
-    z-index: 0;
+    animation: lock-fade-in 0.25s ease;
+  }
+
+  :global(.tree-row[data-fading="true"])::before {
+    opacity: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    transition: opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  }
+
+  @keyframes lock-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .tree-row[data-lock="start"]::before {
@@ -461,11 +494,6 @@
     border-radius: 8px;
   }
 
-  .tree-row[data-lock="end"],
-  .tree-row[data-lock="single"] {
-    margin-bottom: -2px;
-  }
-
   .tree-row > * { flex-shrink: 0; }
 
   .tree-group, .tree-volume {
@@ -473,33 +501,19 @@
     padding: 6px 10px; border: none; border-radius: 8px;
     background: none; color: var(--text); font-size: 0.9rem;
     font-family: inherit; cursor: pointer; text-align: left;
-    width: 100%; box-sizing: border-box; text-decoration: none;
+    width: 75%; box-sizing: border-box; text-decoration: none;
     margin-right: 10px;
     overflow: hidden;
     transition: background 0.15s ease;
   }
 
-  section:not(.lock-mode) .tree-group,
-  section:not(.lock-mode) .tree-volume {
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .lock-mode .tree-group,
-  .lock-mode .tree-volume {
-    width: 75%;
-    padding-right: 0;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  .tree-row:not(.in-lock) .tree-group:hover,
-  .tree-row:not(.in-lock) .tree-volume:hover {
+  .tree-row[data-lock=""] .tree-group:hover,
+  .tree-row[data-lock=""] .tree-volume:hover {
     background: rgb(255 255 255 / 6%);
   }
 
-  .tree-row.in-lock .tree-group:hover,
-  .tree-row.in-lock .tree-volume:hover {
+  .tree-row:not([data-lock=""]) .tree-group:hover,
+  .tree-row:not([data-lock=""]) .tree-volume:hover {
     background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%));
   }
 
@@ -508,13 +522,23 @@
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
   .lock-info {
-    display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding-right: 18px;
+    display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
     position: relative;
     z-index: 5;
+    transition: opacity 0.25s ease;
   }
 
-  .lock-mode .lock-info {
-    padding-left: 6px;
+  section:not(.lock-mode) .lock-info {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  :global(.tree-row[data-lock]:not([data-lock=""])) .lock-info {
+    animation: lock-fade-in 0.25s ease;
+  }
+
+  :global(.tree-row[data-fading="true"]) .lock-info {
+    opacity: 0 !important;
   }
 
   .lock-info.has-owner {
@@ -532,6 +556,11 @@
     height: 2px;
     background: var(--green);
     transform: translateY(-50%);
+    transition: opacity 0.25s ease;
+  }
+
+  :global(.tree-row[data-fading="true"]) .lock-info.has-owner::before {
+    opacity: 0 !important;
   }
 
   .lock-badge {
