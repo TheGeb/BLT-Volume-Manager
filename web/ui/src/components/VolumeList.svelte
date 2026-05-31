@@ -15,6 +15,19 @@
   let statusFilter: 'all' | 'locked' | 'unlocked' = 'all';
   let hostFilterVal = '';
   let showLockBorders = true;
+  let actionsReady = false;
+  let readyTimer: ReturnType<typeof setTimeout>;
+
+  function onActionsEnter() {
+    actionsReady = false;
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(() => { actionsReady = true; }, 250);
+  }
+
+  function onActionsLeave() {
+    actionsReady = false;
+    clearTimeout(readyTimer);
+  }
 
   const savedPref = typeof localStorage !== 'undefined' ? localStorage.getItem('showLockBorders') : null;
   if (savedPref !== null) showLockBorders = JSON.parse(savedPref);
@@ -313,17 +326,18 @@
                 </svg>
                 <span class="tree-name">{item.name}</span>
                 {#if !item.isGroup}
-                <span class="vol-actions">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span class="vol-actions" on:mouseenter={onActionsEnter} on:mouseleave={onActionsLeave}>
                   <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
-                    on:click|stopPropagation={() => openCopyVolModal(item.path)}
-                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openCopyVolModal(item.path); }}>
+                    on:click|stopPropagation={() => { if (actionsReady) openCopyVolModal(item.path); }}
+                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                   </span>
                   <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
-                    on:click|stopPropagation={() => openRenameVolModal(item.path)}
-                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openRenameVolModal(item.path); }}>
+                    on:click|stopPropagation={() => { if (actionsReady) openRenameVolModal(item.path); }}
+                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
                     </svg>
@@ -538,14 +552,12 @@
     width: 0;
     opacity: 0;
     overflow: hidden;
-    pointer-events: none;
-    transition: width 0.2s ease, opacity 0.2s ease;
+    transition: width 0.25s ease, opacity 0.25s ease;
   }
 
   .tree-volume:hover .vol-actions {
     width: 60px;
     opacity: 1;
-    pointer-events: auto;
   }
 
   .vol-action-btn {
