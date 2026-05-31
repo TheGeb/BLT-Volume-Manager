@@ -31,6 +31,12 @@
   let selectedCompareId = '';
   let compareLoading = true;
   let diffLoading = false;
+  let selectEl: HTMLSelectElement;
+  let treePanelStartWidth = 300;
+
+  $: if (selectEl) {
+    treePanelStartWidth = selectEl.offsetWidth;
+  }
 
   let snapSizes: Record<string, string> = {};
   let snapSizeLoading: Record<string, boolean> = {};
@@ -404,18 +410,18 @@
       <span class="skeleton-btn-bar"></span>
     </div>
   {:else}
-    <div style="margin-bottom:20px;">
+    <div style="gap:12px;margin-bottom:12px;display:flex;align-items:center;">
       {#if compareSnaps.length > 0}
-        <select bind:value={selectedCompareId}>
+        <select bind:value={selectedCompareId} bind:this={selectEl}>
           {#each compareSnaps as cs (cs.id)}
             <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()} {new Date(cs.time).toLocaleTimeString()} -  {cs.hostname})</option>
           {/each}
         </select>
-        <button class="button button-xs" style="margin-left:6px;padding:8px 12px;font-size:0.85rem;border-radius:10px;" on:click={() => doDiff()}>Diff</button>
+        <button class="button button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" on:click={() => doDiff()}>Diff</button>
       {/if}
       {#if currentDiffResult}
-        <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={clearDiff}>Clear diff</button>
-        <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={handleSwapDiff}>Swap diff</button>
+        <button class="button button-secondary button-xs" style="margin-left:8px;" on:click={clearDiff}>Clear diff</button>
+        <button class="button button-secondary button-xs" style="margin-left:8px;" on:click={handleSwapDiff}>Swap diff</button>
       {/if}
     </div>
   {/if}
@@ -426,11 +432,11 @@
 
    <div id="viewerContent" style="display:flex;flex-direction:column;gap:8px;height:400px;min-height:200px;max-height:calc(100vh - 350px);" bind:this={contentEl}>
     <div style="display:flex;flex:1;min-height:0;">
-      <div id="viewerTreePanel" style="flex:0 0 300px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
+      <div id="viewerTreePanel" style="flex:0 0 {treePanelStartWidth}px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
          <div style="display:flex;gap:4px;align-items:center;">
           <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
             style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgb(255 255 255 / 4%);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
-          <button class="button button-secondary button-xs mode-toggle" style="padding:7px 6px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
+          <button class="button button-secondary button-xs mode-toggle" style="padding:7px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
             {#if treeSearchFullPath}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                 <line x1="17" y1="4" x2="7" y2="20"/>
