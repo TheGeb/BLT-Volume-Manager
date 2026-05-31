@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,7 @@ func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,
+			Logger:     s3LogFn(),
 		})
 	})
 	return s.s3Store, s.s3StoreErr
@@ -67,6 +69,7 @@ func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, err
 	if s.s3Bucket == "" {
 		return nil, nil //nolint:nilnil // S3 not configured is not an error
 	}
+
 	s.s3StoreMu.RLock()
 	if s.s3StoreCache != nil {
 		if cached, ok := s.s3StoreCache[prefix]; ok {
@@ -76,22 +79,31 @@ func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, err
 	}
 	s.s3StoreMu.RUnlock()
 
+	s.s3StoreMu.Lock()
+	defer s.s3StoreMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if s.s3StoreCache != nil {
+		if cached, ok := s.s3StoreCache[prefix]; ok {
+			return cached, nil
+		}
+	}
+
 	s3Store, err := store.NewS3Store(store.S3StoreOpts{
 		S3Bucket:       s.s3Bucket,
 		S3VolumePrefix: prefix,
 		S3Endpoint:     s.s3Endpoint,
 		Region:         s.s3Region,
+		Logger:         s3LogFn(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.s3StoreMu.Lock()
 	if s.s3StoreCache == nil {
 		s.s3StoreCache = make(map[string]store.S3Store)
 	}
 	s.s3StoreCache[prefix] = s3Store
-	s.s3StoreMu.Unlock()
 
 	return s3Store, nil
 }
@@ -128,7 +140,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
-	inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
+	if os.Getenv("BLT_ENABLE_TEST_ENDPOINTS") != "" {
+		inner.HandleFunc("/api/test/create-volume", s.handleTestCreateVolume)
+	}
 
 	uiFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

@@ -83,39 +83,31 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		if !oldest.IsZero() {
 			oldestStr = oldest.Format(time.RFC3339)
 		}
+		var hotVols, coldVols, excludedVols, otherVols []string
+		if hot > 0 {
+			hotVols = []string{volName}
+		}
+		if cold > 0 {
+			coldVols = []string{volName}
+		}
+		if excluded > 0 {
+			excludedVols = []string{volName}
+		}
+		if o := len(snaps) - hot - cold - excluded; o > 0 {
+			otherVols = []string{volName}
+		}
 		snapshotStats = map[string]any{
-			"total":    len(snaps),
-			"hot":      hot,
-			"cold":     cold,
-			"excluded": excluded,
-			"volumes":  1,
-			"newest":   newestStr,
-			"oldest":   oldestStr,
-			"hot_volumes": func() []string {
-				if hot > 0 {
-					return []string{volName}
-				}
-				return nil
-			}(),
-			"cold_volumes": func() []string {
-				if cold > 0 {
-					return []string{volName}
-				}
-				return nil
-			}(),
-			"excluded_volumes": func() []string {
-				if excluded > 0 {
-					return []string{volName}
-				}
-				return nil
-			}(),
-			"other_volumes": func() []string {
-				o := len(snaps) - hot - cold - excluded
-				if o > 0 {
-					return []string{volName}
-				}
-				return nil
-			}(),
+			"total":            len(snaps),
+			"hot":              hot,
+			"cold":             cold,
+			"excluded":         excluded,
+			"volumes":          1,
+			"newest":           newestStr,
+			"oldest":           oldestStr,
+			"hot_volumes":      hotVols,
+			"cold_volumes":     coldVols,
+			"excluded_volumes": excludedVols,
+			"other_volumes":    otherVols,
 		}
 	}
 

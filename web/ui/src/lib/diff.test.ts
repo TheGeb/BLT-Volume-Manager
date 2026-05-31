@@ -13,9 +13,9 @@ describe('computeDiff', () => {
     const b = ['line1', 'line2', 'line3'];
     const hunks = computeDiff(a, b);
     expect(hunks.length).toBeGreaterThan(0);
-    const added = hunks[0].lines.filter(l => l.type === 'add');
+    const added = hunks[0]!.lines.filter(l => l.type === 'add');
     expect(added.length).toBe(1);
-    expect(added[0].content).toBe('line3');
+    expect(added[0]!.content).toBe('line3');
   });
 
   it('detects deleted lines', () => {

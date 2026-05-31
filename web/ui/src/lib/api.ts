@@ -140,18 +140,6 @@ export async function repairRepo(volume: string): Promise<string> {
   return d.status;
 }
 
-async function parseResponse<T>(resp: Response): Promise<T> {
-  let body: Record<string, unknown>;
-  try {
-    body = await resp.json() as Record<string, unknown>;
-  } catch {
-    const text = await resp.text();
-    throw new Error(text || `HTTP ${resp.status}`);
-  }
-  if (!resp.ok) throw new Error(String(body.error ?? '') || `HTTP ${resp.status}`);
-  return body as T;
-}
-
 export async function copyVolume(source: string, target: string, preserveHistory?: boolean): Promise<{ status: string; source_locked?: boolean; source_owner?: string }> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(source)}/copy`, {
     method: 'POST',
@@ -168,6 +156,18 @@ export async function renameVolume(source: string, target: string): Promise<{ st
     body: JSON.stringify({ target }),
   });
   return parseResponse(resp);
+}
+
+async function parseResponse<T>(resp: Response): Promise<T> {
+  let body: Record<string, unknown>;
+  try {
+    body = await resp.json() as Record<string, unknown>;
+  } catch {
+    const text = await resp.text();
+    throw new Error(text || `HTTP ${resp.status}`);
+  }
+  if (!resp.ok) throw new Error(String(body.error ?? '') || `HTTP ${resp.status}`);
+  return body as T;
 }
 
 export async function createTestVolume(name: string): Promise<void> {

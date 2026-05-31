@@ -54,8 +54,8 @@
       const maxLen = Math.max(pendingDel.length, pendingAdd.length);
       for (let i = 0; i < maxLen; i++) {
         pairs.push({
-          left: i < pendingDel.length ? pendingDel[i] : '',
-          right: i < pendingAdd.length ? pendingAdd[i] : '',
+          left: i < pendingDel.length ? (pendingDel[i] ?? '') : '',
+          right: i < pendingAdd.length ? (pendingAdd[i] ?? '') : '',
           ltype: i < pendingDel.length ? 'del' : 'ctx',
           rtype: i < pendingAdd.length ? 'add' : 'ctx',
         });

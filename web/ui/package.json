@@ -11,7 +11,7 @@
     "lint:css": "stylelint 'src/**/*.{css,svelte}' 'public/*.css'",
     "lint:fix": "eslint src/ --fix && stylelint --fix 'src/**/*.{css,svelte}' 'public/*.css'",
     "check": "npx svelte-check",
-    "full": "npm install && npx svelte-check && npm run lint:fix && npm run build && cd ../.. && golangci-lint run ./... && go run . --http-only --http-addr '0.0.0.0:8081' --data-dir=/home/gabe/vol-testing"
+    "full": "npm install && npx svelte-check && npm run lint:fix && npm run build && cd ../.. && golangci-lint run ./... && go run . --http-only --http-addr '0.0.0.0:8081'"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",

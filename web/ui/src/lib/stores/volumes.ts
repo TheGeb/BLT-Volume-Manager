@@ -51,16 +51,16 @@ export async function fetchAllVolumeLockInfo() {
   );
   const info: Record<string, VolumeLockInfo> = {};
   for (let i = 0; i < vols.length; i++) {
-    const r = results[i];
+    const r = results[i]!;
     if (r) {
-      info[vols[i]] = {
+      info[vols[i]!] = {
         locked: r.locked,
         owner: r.owner || '',
         expiresIn: r.expires_in || 0,
         status: r.locked ? 'locked' : 'unlocked',
       };
     } else {
-      info[vols[i]] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
+      info[vols[i]!] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
     }
   }
   volumeLockInfo.set(info);

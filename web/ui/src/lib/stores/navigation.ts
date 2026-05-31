@@ -5,7 +5,7 @@ import * as api from '../api';
 import { setBanner } from './banner';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
 import { activeTab, loadLockStatus, loadStats, doSwitchTab } from './repo';
-import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, snapshotHashInput, sha256Short, sizes, deleteSnapModal } from './snapshots';
+import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal } from './snapshots';
 
 export const creatingTest = writable(false);
 export const testStatus = writable('');
@@ -30,7 +30,6 @@ export async function loadAll(volume: string) {
   } else {
     await loadVolumes();
   }
-  syncUrl();
 }
 
 export async function navigateTo(volume: string, opts?: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string }) {
@@ -69,30 +68,16 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
     if (opts?.snapshotId) {
       let snap = get(snapshots).find(s => s.id === opts.snapshotId || s.short_id === opts.snapshotId);
       if (!snap && opts?.fallbackHash) {
-        for (const s of get(snapshots)) {
-          const msg = snapshotHashInput(s);
-          const hash = await sha256Short(msg, s.short_id.length);
-          if (hash === opts.fallbackHash) {
-            snap = s;
-            break;
-          }
-        }
+        snap = get(snapshots).find(s => s.fallbackHash === opts.fallbackHash);
       }
       if (snap) {
-        snap.fallbackHash = opts.fallbackHash;
+        snap.fallbackHash = opts.fallbackHash ?? '';
         currentSnapshot.set(snap);
       }
       if (opts?.diffId && opts?.diffFallbackHash) {
         let diffSnap = get(snapshots).find(s => s.id === opts.diffId || s.short_id === opts.diffId);
         if (!diffSnap) {
-          for (const s of get(snapshots)) {
-            const msg = snapshotHashInput(s);
-            const hash = await sha256Short(msg, s.short_id.length);
-            if (hash === opts.diffFallbackHash) {
-              diffSnap = s;
-              break;
-            }
-          }
+          diffSnap = get(snapshots).find(s => s.fallbackHash === opts.diffFallbackHash);
         }
         if (diffSnap) {
           diffSnap.fallbackHash = opts.diffFallbackHash;
@@ -102,8 +87,6 @@ export async function navigateTo(volume: string, opts?: { tab?: string; snapshot
       }
     }
   }
-
-  syncUrl();
 }
 
 export async function handleRefresh() {
@@ -171,10 +154,6 @@ export async function handleCreateTestVolume(name: string) {
 }
 
 export async function onOpenViewer(snapshot: Snapshot) {
-  const msg = snapshotHashInput(snapshot);
-  const hash = await sha256Short(msg, snapshot.short_id.length);
-  snapshot.fallbackHash = hash;
-
   currentSnapshot.set(snapshot);
   viewerOpen.set(true);
   diffTargetId.set('');
@@ -192,10 +171,7 @@ export function onCloseViewer() {
 export async function setDiffTarget(id: string) {
   const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
   if (!snap) return;
-  const msg = snapshotHashInput(snap);
-  const hash = await sha256Short(msg, snap.short_id.length);
-  snap.fallbackHash = hash;
-  diffTargetFallbackHash.set(hash);
+  diffTargetFallbackHash.set(snap.fallbackHash || '');
   diffTargetId.set(snap.id);
   syncUrl();
 }
@@ -221,12 +197,6 @@ function buildUrl(): string {
         const hash = dtSnap.fallbackHash || get(diffTargetFallbackHash);
         if (hash) {
           p.set('diffFallbackHash', hash);
-        } else {
-          const msg = snapshotHashInput(dtSnap);
-          sha256Short(msg, dtSnap.short_id.length).then(h => {
-            dtSnap.fallbackHash = h;
-            syncUrl();
-          });
         }
       }
     }

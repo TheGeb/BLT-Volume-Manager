@@ -29,7 +29,7 @@ func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 
 	for _, s := range snapshots {
 		// Use same length as shortID
-		fullHash := m.generateHash(s)
+		fullHash := m.GenerateHash(s)
 		shortHash := fullHash[:len(s.ShortID)]
 		applog.Debugf("comparing_hash", "hash=%x snapshot=%s", hash, s.ID)
 		if shortHash == hash {
@@ -39,12 +39,12 @@ func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	return nil, fmt.Errorf("snapshot not found for hash %s", hash)
 }
 
-func (m *Manager) generateHash(s Snapshot) string {
-	// Sort paths to ensure consistency
+func (m *Manager) GenerateHash(s Snapshot) string {
 	paths := make([]string, len(s.Paths))
 	copy(paths, s.Paths)
 	sort.Strings(paths)
 
+	// FallbackHash is set during API response serialization (web/helpers.go).
 	data := s.Hostname + s.Time.Format(time.RFC3339Nano) + s.Tree + strings.Join(paths, ",")
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])
@@ -61,13 +61,14 @@ func (m *Manager) SetS3Store(s3Store store.S3Store) {
 }
 
 type Snapshot struct {
-	ID       string    `json:"id"`
-	ShortID  string    `json:"short_id"`
-	Time     time.Time `json:"time"`
-	Tree     string    `json:"tree"`
-	Tags     []string  `json:"tags"`
-	Paths    []string  `json:"paths"`
-	Hostname string    `json:"hostname"`
+	ID           string    `json:"id"`
+	ShortID      string    `json:"short_id"`
+	Time         time.Time `json:"time"`
+	Tree         string    `json:"tree"`
+	Tags         []string  `json:"tags"`
+	Paths        []string  `json:"paths"`
+	Hostname     string    `json:"hostname"`
+	FallbackHash string    `json:"fallbackHash,omitempty"`
 }
 
 // NewManager creates a Manager for the given restic repository URL/path.
@@ -329,7 +330,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 
 	var fallbackHash string
 	if snap, err := m.findSnapshotByID(snapshotID); err == nil {
-		fullHash := m.generateHash(*snap)
+		fullHash := m.GenerateHash(*snap)
 		fallbackHash = fullHash[:len(snap.ShortID)]
 	}
 
@@ -357,6 +358,29 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 	}
 
 	rp, err := m.s3Store.ReadRestorePoint(targetVolume)
+	if err != nil {
+		if errors.Is(err, store.ErrRestorePointNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("read restore point: %w", err)
+	}
+	if rp.SnapshotID == "" {
+		return "", nil
+	}
+	return rp.SnapshotID, nil
+}
+
+// FindRestorePointByName reads the restore-point from S3 for the given volume name.
+// Returns the snapshot ID string, or empty string if none found.
+func (m *Manager) FindRestorePointByName(volName string) (string, error) {
+	if m.s3Store == nil {
+		return "", nil
+	}
+	if volName == "" {
+		return "", nil
+	}
+
+	rp, err := m.s3Store.ReadRestorePoint(volName)
 	if err != nil {
 		if errors.Is(err, store.ErrRestorePointNotFound) {
 			return "", nil
@@ -541,6 +565,9 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 }
 
 // DiffSnapshots returns the diff between two snapshots.
+// Parses restic's human-readable diff output (no --json flag available for diff).
+// The format is per-line with a single prefix character: + (added), - (removed),
+// M (modified), U (metadata changed), T (type changed). Fragile across restic versions.
 func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutShort)
 	defer cancel()
@@ -645,13 +672,13 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutLong)
 	defer cancel()
 
-	args := []string{"copy", "--repo2", destRepo}
+	args := []string{"--from-repo", m.repo, "-r", destRepo, "copy"}
 	args = append(args, snapshotIDs...)
 
 	// restic copy needs the password for both repos. Explicitly pass password-file
 	// for both so it doesn't fail with "empty password" on the destination.
 	if pwFile := os.Getenv("RESTIC_PASSWORD_FILE"); pwFile != "" {
-		args = append(args, "--password-file", pwFile, "--password-file2", pwFile)
+		args = append(args, "--from-password-file", pwFile, "--password-file", pwFile)
 	} else if pw := os.Getenv("RESTIC_PASSWORD"); pw != "" {
 		tmpFile, err := os.CreateTemp("", "restic-pw-*")
 		if err != nil {
@@ -666,13 +693,20 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 		if err := tmpFile.Close(); err != nil {
 			return fmt.Errorf("close temp password file: %w", err)
 		}
-		args = append(args, "--password-file", tmpName, "--password-file2", tmpName)
+		args = append(args, "--from-password-file", tmpName, "--password-file", tmpName)
 	}
 
-	cmd, err := m.resticCommand(ctx, args...)
-	if err != nil {
-		return err
+	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+	case "trace":
+		args = append(args, "--verbose=2")
+	case "debug":
+		args = append(args, "--verbose=1")
 	}
+
+	applog.Debugf("restic_command", "args=%s", strings.Join(args, " "))
+	//nolint:gosec // args constructed from env vars and hardcoded strings only
+	cmd := exec.CommandContext(ctx, "restic", args...)
+	cmd.Env = os.Environ()
 	return m.runCommand(cmd)
 }
 

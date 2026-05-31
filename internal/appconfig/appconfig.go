@@ -60,17 +60,20 @@ func deriveLockBucket() string {
 }
 
 func deriveS3Endpoint() string {
-	ep := os.Getenv("S3_ENDPOINT")
-	if ep == "" {
-		ep = strings.TrimPrefix(os.Getenv("RESTIC_REPOSITORY"), "s3:")
-		ep = strings.TrimPrefix(ep, "https://")
-		ep = strings.TrimPrefix(ep, "http://")
+	if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
+		return ep
 	}
-	if ep == "" {
+	repo := os.Getenv("RESTIC_REPOSITORY")
+	if repo == "" {
 		return ""
 	}
-	if !strings.Contains(ep, "://") {
-		ep = "http://" + ep
+	repo = strings.TrimPrefix(repo, "s3:")
+	if !strings.Contains(repo, "://") {
+		return ""
 	}
-	return ep
+	u, err := url.Parse(repo)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }

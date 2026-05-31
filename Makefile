@@ -14,8 +14,9 @@ ARGS ?=
 format:
 	golangci-lint fmt ./...
 
-# Go lint (runs after format so it lints the formatted code)
-lint-go: format
+# Go lint (format first for consistency, then lint)
+lint-go:
+	golangci-lint fmt ./...
 	golangci-lint run ./...
 
 # Development: full lint, build, and run
@@ -29,8 +30,9 @@ dev-ui: ui-dev
 # CI / full check (includes tests and coverage)
 check: tidy lint-go coverage hadolint ui-dev
 
-# Go test coverage report (runs after format for safety)
-coverage: format
+# Go test coverage report
+coverage:
+	golangci-lint fmt ./...
 	go test ./... -coverprofile=coverage.out -short
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"

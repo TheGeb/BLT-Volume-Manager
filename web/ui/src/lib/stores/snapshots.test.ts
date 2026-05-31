@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deletingSnap, deleteSnapModal, snapDeleteInput, filteredSnapshots, sortedSnapshots, hosts, snapshotHashInput, sha256Short, getSnapshotHash, onToggleSort, onSearch, onTypeFilter, onHostFilter, onDeleteSnapshot, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
+import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deletingSnap, deleteSnapModal, snapDeleteInput, filteredSnapshots, sortedSnapshots, hosts, onToggleSort, onSearch, onTypeFilter, onHostFilter, onDeleteSnapshot, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
 import type { Snapshot } from '../types';
 
 function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
@@ -18,80 +18,6 @@ function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
 const snapA = makeSnap({ id: '1', short_id: 'a', time: '2024-03-01T00:00:00Z', hostname: 'h1', tags: ['hot'] });
 const snapB = makeSnap({ id: '2', short_id: 'b', time: '2024-02-01T00:00:00Z', hostname: 'h2', tags: ['cold'] });
 const snapC = makeSnap({ id: '3', short_id: 'c', time: '2024-01-01T00:00:00Z', hostname: 'h1', tags: [] });
-
-describe('snapshotHashInput', () => {
-  it('concatenates hostname, time, tree, and sorted paths', () => {
-    const snap = makeSnap({
-      hostname: 'server1',
-      time: '2024-06-15T10:30:00Z',
-      tree: 'treehash123',
-      paths: ['/volumes/test/data', '/volumes/test/config'],
-    });
-    const result = snapshotHashInput(snap);
-    expect(result).toContain('server1');
-    expect(result).toContain('2024-06-15T10:30:00Z');
-    expect(result).toContain('treehash123');
-    expect(result).toContain('/volumes/test/config');
-    expect(result).toContain('/volumes/test/data');
-  });
-
-  it('sorts paths for consistency', () => {
-    const snap1 = makeSnap({ paths: ['/b', '/a', '/c'] });
-    const snap2 = makeSnap({ paths: ['/a', '/b', '/c'] });
-    expect(snapshotHashInput(snap1)).toBe(snapshotHashInput(snap2));
-  });
-
-  it('handles missing tree', () => {
-    const snap = makeSnap({ tree: undefined });
-    expect(snapshotHashInput(snap)).toBeDefined();
-  });
-
-  it('handles empty paths', () => {
-    const snap = makeSnap({ paths: [] });
-    expect(snapshotHashInput(snap)).toBeDefined();
-  });
-});
-
-describe('sha256Short', () => {
-  it('returns a hex string of the requested length', async () => {
-    const hash = await sha256Short('hello', 8);
-    expect(hash).toMatch(/^[0-9a-f]{8}$/);
-  });
-
-  it('returns different hashes for different inputs', async () => {
-    const [h1, h2] = await Promise.all([
-      sha256Short('foo', 16),
-      sha256Short('bar', 16),
-    ]);
-    expect(h1).not.toBe(h2);
-  });
-
-  it('returns consistent results for same input', async () => {
-    const [h1, h2] = await Promise.all([
-      sha256Short('consistent', 12),
-      sha256Short('consistent', 12),
-    ]);
-    expect(h1).toBe(h2);
-  });
-
-  it('handles length 0', async () => {
-    expect(await sha256Short('anything', 0)).toBe('');
-  });
-});
-
-describe('getSnapshotHash', () => {
-  it('returns fallbackHash if present', async () => {
-    const snap = makeSnap({ fallbackHash: 'myhash' });
-    expect(await getSnapshotHash(snap)).toBe('myhash');
-  });
-
-  it('computes and caches hash', async () => {
-    const snap = makeSnap({ short_id: 'abc' });
-    const hash = await getSnapshotHash(snap);
-    expect(hash).toMatch(/^[0-9a-f]{3}$/);
-    expect(snap.fallbackHash).toBe(hash);
-  });
-});
 
 describe('filterSnapshots', () => {
   const snaps = [snapA, snapB, snapC];
@@ -140,16 +66,16 @@ describe('filterSnapshots', () => {
 describe('sortSnapshots', () => {
   it('sorts newest first', () => {
     const result = sortSnapshots([snapC, snapA, snapB], true);
-    expect(result[0].id).toBe('1');
-    expect(result[1].id).toBe('2');
-    expect(result[2].id).toBe('3');
+    expect(result[0]!.id).toBe('1');
+    expect(result[1]!.id).toBe('2');
+    expect(result[2]!.id).toBe('3');
   });
 
   it('sorts oldest first', () => {
     const result = sortSnapshots([snapC, snapA, snapB], false);
-    expect(result[0].id).toBe('3');
-    expect(result[1].id).toBe('2');
-    expect(result[2].id).toBe('1');
+    expect(result[0]!.id).toBe('3');
+    expect(result[1]!.id).toBe('2');
+    expect(result[2]!.id).toBe('1');
   });
 
   it('does not mutate the original array', () => {

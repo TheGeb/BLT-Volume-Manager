@@ -115,19 +115,19 @@ func TestGenerateHash(t *testing.T) {
 		Hostname: "host1",
 	}
 
-	hash := m.generateHash(snap)
+	hash := m.GenerateHash(snap)
 	if len(hash) != 64 {
 		t.Errorf("expected 64-char hex, got %d: %s", len(hash), hash)
 	}
 
-	hash2 := m.generateHash(snap)
+	hash2 := m.GenerateHash(snap)
 	if hash != hash2 {
 		t.Error("expected deterministic hash for same input")
 	}
 
 	snap2 := snap
 	snap2.Paths = []string{"/volumes/vol2", "/volumes/vol1"}
-	hash3 := m.generateHash(snap2)
+	hash3 := m.GenerateHash(snap2)
 	if hash != hash3 {
 		t.Error("expected same hash regardless of path order")
 	}
@@ -140,8 +140,8 @@ func TestGenerateHashDiffers(t *testing.T) {
 	snap1 := Snapshot{Hostname: "host-a", Time: now, Tree: "t1", Paths: []string{"/volumes/v1"}}
 	snap2 := Snapshot{Hostname: "host-b", Time: now, Tree: "t1", Paths: []string{"/volumes/v1"}}
 
-	h1 := m.generateHash(snap1)
-	h2 := m.generateHash(snap2)
+	h1 := m.GenerateHash(snap1)
+	h2 := m.GenerateHash(snap2)
 	if h1 == h2 {
 		t.Error("expected different hashes for different hostnames")
 	}

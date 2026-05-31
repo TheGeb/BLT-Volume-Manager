@@ -3,7 +3,6 @@ package web
 import (
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 )
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -31,13 +30,14 @@ func (s *Server) snapshotListResponse(volName string) (map[string]any, error) {
 	}
 
 	restorePointID := ""
-	volPath := filepath.Join(s.dataDir, "volumes", volName)
-	if id, err := rm.FindRestorePoint(volPath); err == nil {
+	if id, err := rm.FindRestorePointByName(volName); err == nil {
 		restorePointID = id
 	}
 
 	result := make([]SnapshotWithVolume, 0, len(snaps))
 	for _, snap := range snaps {
+		fullHash := rm.GenerateHash(snap)
+		snap.FallbackHash = fullHash[:len(snap.ShortID)]
 		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
 	}
 

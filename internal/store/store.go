@@ -53,6 +53,7 @@ type S3StoreOpts struct {
 	S3VolumePrefix string
 	S3Endpoint     string
 	Region         string
+	Logger         func(op, bucket, key string, dur time.Duration, err error)
 }
 
 func (opts S3StoreOpts) validate() error {
@@ -81,18 +82,18 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 
 	clientOpts := []func(*s3.Options){}
 	if opts.S3Endpoint != "" {
-		u, err := url.Parse(opts.S3Endpoint)
+		ep := opts.S3Endpoint
+		if !strings.Contains(ep, "://") {
+			ep = "https://" + ep
+		}
+		u, err := url.Parse(ep)
 		if err != nil {
 			return nil, fmt.Errorf("invalid S3 endpoint %q: %w", opts.S3Endpoint, err)
 		}
 		if u.Host == "" {
 			return nil, fmt.Errorf("S3 endpoint %q has no host", opts.S3Endpoint)
 		}
-		scheme := u.Scheme
-		if scheme == "" {
-			scheme = "http" // FIXME default https, ensure that http still works if specified though
-		}
-		base := scheme + "://" + u.Host
+		base := u.Scheme + "://" + u.Host
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(base)
 			o.UsePathStyle = true
@@ -101,6 +102,10 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 	if pathStyle := os.Getenv("S3_FORCE_PATH_STYLE"); strings.EqualFold(pathStyle, "1") || strings.EqualFold(pathStyle, "true") {
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.UsePathStyle = true
+		})
+	} else if opts.S3Endpoint == "" {
+		clientOpts = append(clientOpts, func(o *s3.Options) {
+			o.UsePathStyle = false
 		})
 	}
 
@@ -112,6 +117,16 @@ func NewS3Store(opts S3StoreOpts) (S3Store, error) {
 	}, nil
 }
 
+func (s *S3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
+	fn := s.opts.Logger
+	if fn == nil {
+		fn = LogS3
+	}
+	if fn != nil {
+		fn(op, bucket, key, dur, err)
+	}
+}
+
 func (s *S3Client) PutObject(key string, data []byte) error {
 	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
@@ -119,9 +134,7 @@ func (s *S3Client) PutObject(key string, data []byte) error {
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
-	if LogS3 != nil {
-		LogS3("PutObject", s.opts.S3Bucket, key, time.Since(start), err)
-	}
+	s.logS3Call("PutObject", s.opts.S3Bucket, key, time.Since(start), err)
 	return err
 }
 
@@ -131,9 +144,7 @@ func (s *S3Client) ReadObject(key string) ([]byte, error) {
 		Bucket: aws.String(s.opts.S3Bucket),
 		Key:    aws.String(key),
 	})
-	if LogS3 != nil {
-		LogS3("GetObject", s.opts.S3Bucket, key, time.Since(start), err)
-	}
+	s.logS3Call("GetObject", s.opts.S3Bucket, key, time.Since(start), err)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
@@ -151,9 +162,7 @@ func (s *S3Client) DeleteObject(key string) error {
 		Bucket: aws.String(s.opts.S3Bucket),
 		Key:    aws.String(key),
 	})
-	if LogS3 != nil {
-		LogS3("DeleteObject", s.opts.S3Bucket, key, time.Since(start), err)
-	}
+	s.logS3Call("DeleteObject", s.opts.S3Bucket, key, time.Since(start), err)
 	return err
 }
 
@@ -167,16 +176,12 @@ func (s *S3Client) ListObjects(prefix string) ([]types.Object, error) {
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
-			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
-			}
+			s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
 			return nil, err
 		}
 		objects = append(objects, page.Contents...)
 	}
-	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
-	}
+	s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
 	return objects, nil
 }
 
@@ -191,9 +196,7 @@ func (s *S3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
-			if LogS3 != nil {
-				LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
-			}
+			s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), err)
 			return nil, err
 		}
 		for _, cp := range page.CommonPrefixes {
@@ -202,9 +205,7 @@ func (s *S3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error
 			}
 		}
 	}
-	if LogS3 != nil {
-		LogS3("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
-	}
+	s.logS3Call("ListObjectsV2", s.opts.S3Bucket, prefix, time.Since(start), nil)
 	return prefixes, nil
 }
 

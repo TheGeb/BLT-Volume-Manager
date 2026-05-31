@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/docker/go-plugins-helpers/volume"
@@ -16,13 +18,13 @@ import (
 )
 
 func main() {
-	// Exit cleanly on Ctrl+C instead of printing "signal: interrupt"
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		<-c
-		os.Exit(0)
-	}()
+	os.Exit(run())
+}
+
+func run() int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	var dataDir string
 	var socketPath string
 	var httpAddr string
@@ -35,34 +37,35 @@ func main() {
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		applog.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)
-		os.Exit(1)
+		return 1
 	}
 
 	cfg, err := appconfig.FromEnv(dataDir)
 	if err != nil {
 		applog.Errorf("load_config_failed", err, "error=%v", err)
-		os.Exit(1)
+		return 1
 	}
 	if cfg.ResticBase == "" {
 		applog.Error("restic_repository_required", fmt.Errorf("RESTIC_REPOSITORY must be set"))
-		os.Exit(1)
+		return 1
 	}
 	if cfg.S3Bucket != "" {
 		applog.Info("s3_configured")
 	}
 
 	drv := driver.NewDriver(cfg)
+	var srv *http.Server
 	if httpAddr != "" {
 		mux := http.NewServeMux()
 		web.NewServer(cfg).Register(mux)
+		srv = &http.Server{
+			Addr:              httpAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
 		go func() {
 			applog.Infof("serving_http_ui", "address=%s", httpAddr)
-			srv := &http.Server{
-				Addr:              httpAddr,
-				Handler:           mux,
-				ReadHeaderTimeout: 5 * time.Second,
-			}
-			if err := srv.ListenAndServe(); err != nil {
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				applog.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
 			}
 		}()
@@ -72,13 +75,40 @@ func main() {
 		if !httpOnly {
 			applog.Info("skipping_docker_plugin_http_only_mode")
 		}
-		select {}
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if srv != nil {
+			_ = srv.Shutdown(shutdownCtx)
+		}
+		return 0
 	}
 
 	h := volume.NewHandler(drv)
 	applog.Infof("starting_plugin", "socket=%s data_dir=%s", socketPath, cfg.DataDir)
-	if err := h.ServeUnix(socketPath, 0); err != nil {
-		applog.Errorf("serve_unix_failed", err, "error=%v", err)
-		os.Exit(1)
+	socketErr := make(chan error, 1)
+	go func() {
+		socketErr <- h.ServeUnix(socketPath, 0)
+	}()
+
+	select {
+	case err := <-socketErr:
+		if err != nil {
+			applog.Errorf("serve_unix_failed", err, "error=%v", err)
+			return 1
+		}
+	case <-ctx.Done():
+		applog.Info("shutting_down")
+		_ = os.Remove(socketPath)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if srv != nil {
+			_ = srv.Shutdown(shutdownCtx)
+		}
 	}
+
+	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+		applog.Warnf("socket_cleanup_failed", "path=%s", socketPath)
+	}
+	return 0
 }

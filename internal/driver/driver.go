@@ -270,7 +270,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 		vi.Lock = lock
 
 		if vi.FsType != "" {
-			snapID, err := rm.FindRestorePoint(volPath)
+			snapID, err := rm.FindRestorePointByName(name)
 			if err != nil {
 				applog.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {

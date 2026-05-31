@@ -59,11 +59,11 @@
       const parts = fullPath.split('/');
       let level = root;
       for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
+        const part = parts[i]!;
         const isLast = i === parts.length - 1;
         if (!level[part]) level[part] = { _leaf: false, _children: {}, name: part, path: fullPath };
-        if (isLast) level[part]._leaf = true;
-        level = level[part]._children;
+        if (isLast) level[part]!._leaf = true;
+        level = level[part]!._children;
       }
     }
     function toNodes(obj: any, prefix: string): TreeNode[] {
@@ -71,7 +71,9 @@
         const full = prefix ? `${prefix}/${k}` : k;
         const n = obj[k];
         const childNodes = toNodes(n._children, full);
-        return { name: k, path: full, children: childNodes.length > 0 ? childNodes : undefined };
+        const node: TreeNode = { name: k, path: full };
+        if (childNodes.length > 0) node.children = childNodes;
+        return node;
       });
     }
     return toNodes(root, '');
@@ -137,8 +139,8 @@
         const leaves = collectLeafVolumes([node]);
         const locks = leaves.map(l => lockInfo[l]).filter(l => l && l.locked);
         if (locks.length > 0 && locks.length === leaves.length) {
-          const owners = [...new Set(locks.map(l => l.owner).filter(Boolean))];
-          result[node.path] = owners.length === 1 ? { owner: owners[0] } : null;
+          const owners = [...new Set(locks.map(l => l!.owner).filter(Boolean))];
+          result[node.path] = owners.length === 1 ? { owner: owners[0]! } : null;
         } else {
           result[node.path] = null;
         }
@@ -333,11 +335,11 @@
               <span class="lock-info" class:has-owner={volumeLockInfo[item.path]?.owner && (!lockStyles[idx] || labelAtIdx[idx])} style:transform={labelOffset[idx] || ''}>
                 {#if volumeLockInfo[item.path]}
                   {#if !lockStyles[idx] || labelAtIdx[idx]}
-                    <span class="lock-badge lock-{volumeLockInfo[item.path].status}">
-                      <span class="lock-text">{volumeLockInfo[item.path].status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                    <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
+                      <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
                     </span>
-                    {#if volumeLockInfo[item.path].owner}
-                      <span class="lock-owner">{volumeLockInfo[item.path].owner}</span>
+                    {#if volumeLockInfo[item.path]!.owner}
+                      <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
                     {/if}
                   {/if}
                 {:else if !loading && !lockStyles[idx]}

@@ -105,6 +105,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 			S3VolumePrefix: store.VolumePrefix,
 			S3Endpoint:     s.s3Endpoint,
 			Region:         s.s3Region,
+			Logger:         s3LogFn(),
 		})
 		if err == nil {
 			_ = s3.DeleteObjectsWithPrefix(store.LockFolder(volumeName))
@@ -119,6 +120,7 @@ func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volu
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,
+			Logger:     s3LogFn(),
 		})
 		if err == nil {
 			_ = s3.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/")
@@ -273,6 +275,7 @@ func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 		S3VolumePrefix: store.VolumePrefix,
 		S3Endpoint:     s.s3Endpoint,
 		Region:         s.s3Region,
+		Logger:         s3LogFn(),
 	}
 
 	return store.NewS3Store(opts)
@@ -485,6 +488,7 @@ func (s *Server) handleRenameVolume(w http.ResponseWriter, r *http.Request, volu
 			S3Bucket:   s.s3Bucket,
 			S3Endpoint: s.s3Endpoint,
 			Region:     s.s3Region,
+			Logger:     s3LogFn(),
 		})
 		if err == nil {
 			_ = s3.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/")

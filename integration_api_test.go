@@ -30,6 +30,8 @@ func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
 	t.Setenv("RESTIC_PASSWORD", "test-password")
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
+	t.Setenv("BLT_ENABLE_TEST_ENDPOINTS", "1")
+
 	dataDir := t.TempDir()
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 

@@ -1,11 +1,11 @@
 package applog
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -17,139 +17,191 @@ const (
 	LevelTrace
 )
 
-var levelNames = map[string]int{
-	"error":   LevelError,
-	"warn":    LevelWarn,
-	"warning": LevelWarn,
-	"info":    LevelInfo,
-	"debug":   LevelDebug,
-	"trace":   LevelTrace,
+const levelTrace = slog.LevelDebug - 4
+
+var levelNames = map[string]slog.Level{
+	"error":   slog.LevelError,
+	"warn":    slog.LevelWarn,
+	"warning": slog.LevelWarn,
+	"info":    slog.LevelInfo,
+	"debug":   slog.LevelDebug,
+	"trace":   levelTrace,
 }
 
-var currentLevel atomic.Int32
+var levelVar = new(slog.LevelVar)
 
 func init() {
 	lvl := os.Getenv("LOG_LEVEL")
 	if lvl == "" {
 		lvl = "info"
 	}
-	level := LevelInfo
+	level := slog.LevelInfo
 	if v, ok := levelNames[strings.ToLower(lvl)]; ok {
 		level = v
 	}
-	currentLevel.Store(int32(level))
+	levelVar.Set(level)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: levelVar})))
 }
 
-// CurrentLevel returns the current log level. Use SetLevel to change it.
-func CurrentLevel() int {
-	return int(currentLevel.Load())
+type Event struct {
+	Event      string
+	Method     string
+	Path       string
+	Status     int
+	DurationMs int64
+	Error      error
+	Message    string
+	Op         string
+	Bucket     string
+	Key        string
+	Volume     string
+	Snapshot   string
 }
 
-// SetLevel sets the log level.
+func LogEvent(level int, e Event) {
+	var slogLevel slog.Level
+	switch level {
+	case LevelError:
+		slogLevel = slog.LevelError
+	case LevelWarn:
+		slogLevel = slog.LevelWarn
+	case LevelInfo:
+		slogLevel = slog.LevelInfo
+	case LevelDebug:
+		slogLevel = slog.LevelDebug
+	case LevelTrace:
+		slogLevel = levelTrace
+	default:
+		slogLevel = slog.LevelInfo
+	}
+	attrs := make([]slog.Attr, 0, 11)
+	if e.Method != "" {
+		attrs = append(attrs, slog.String("method", e.Method))
+	}
+	if e.Path != "" {
+		attrs = append(attrs, slog.String("path", e.Path))
+	}
+	if e.Status != 0 {
+		attrs = append(attrs, slog.Int("status", e.Status))
+	}
+	if e.DurationMs != 0 {
+		attrs = append(attrs, slog.Int64("duration_ms", e.DurationMs))
+	}
+	if e.Error != nil {
+		attrs = append(attrs, slog.Any("error", e.Error))
+	}
+	if e.Message != "" {
+		attrs = append(attrs, slog.String("message", e.Message))
+	}
+	if e.Op != "" {
+		attrs = append(attrs, slog.String("op", e.Op))
+	}
+	if e.Bucket != "" {
+		attrs = append(attrs, slog.String("bucket", e.Bucket))
+	}
+	if e.Key != "" {
+		attrs = append(attrs, slog.String("key", e.Key))
+	}
+	if e.Volume != "" {
+		attrs = append(attrs, slog.String("volume", e.Volume))
+	}
+	if e.Snapshot != "" {
+		attrs = append(attrs, slog.String("snapshot", e.Snapshot))
+	}
+	slog.LogAttrs(context.Background(), slogLevel, e.Event, attrs...)
+}
+
+func logLevel() slog.Level {
+	return levelVar.Level()
+}
+
 func SetLevel(level int) {
-	if level < LevelError || level > LevelTrace {
-		level = LevelInfo
+	var slogLevel slog.Level
+	switch level {
+	case LevelError:
+		slogLevel = slog.LevelError
+	case LevelWarn:
+		slogLevel = slog.LevelWarn
+	case LevelInfo:
+		slogLevel = slog.LevelInfo
+	case LevelDebug:
+		slogLevel = slog.LevelDebug
+	case LevelTrace:
+		slogLevel = levelTrace
+	default:
+		slogLevel = slog.LevelInfo
 	}
-	currentLevel.Store(int32(level))
-}
-
-type Entry struct {
-	Level      string `json:"level"`
-	Event      string `json:"event"`
-	Method     string `json:"method,omitempty"`
-	Path       string `json:"path,omitempty"`
-	Status     int    `json:"status,omitempty"`
-	DurationMs int64  `json:"duration_ms,omitempty"`
-	Error      string `json:"error,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Op         string `json:"op,omitempty"`
-	Bucket     string `json:"bucket,omitempty"`
-	Key        string `json:"key,omitempty"`
-	Volume     string `json:"volume,omitempty"`
-	Snapshot   string `json:"snapshot,omitempty"`
-	Time       string `json:"time"`
-}
-
-func Log(e Entry) {
-	v, ok := levelNames[e.Level]
-	if !ok || v > CurrentLevel() {
-		return
-	}
-	e.Time = time.Now().UTC().Format(time.RFC3339Nano)
-	_ = json.NewEncoder(os.Stdout).Encode(e)
-}
-
-func Debug(event string) {
-	Log(Entry{Level: "debug", Event: event})
+	levelVar.Set(slogLevel)
 }
 
 func Info(event string) {
-	Log(Entry{Level: "info", Event: event})
+	slog.Info(event)
+}
+
+func Debug(event string) {
+	slog.Debug(event)
 }
 
 func Warn(event string) {
-	Log(Entry{Level: "warn", Event: event})
+	slog.Warn(event)
 }
 
 func Error(event string, err error) {
-	e := Entry{Level: "error", Event: event}
 	if err != nil {
-		e.Error = err.Error()
+		slog.Error(event, "error", err)
+	} else {
+		slog.Error(event)
 	}
-	Log(e)
 }
 
-// Infof logs a formatted message at info level.
 func Infof(event string, format string, args ...any) {
 	msg := format
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
-	Log(Entry{Level: "info", Event: event, Message: msg})
+	slog.Info(event, "message", msg)
 }
 
-// Debugf logs a formatted message at debug level.
 func Debugf(event string, format string, args ...any) {
 	msg := format
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
-	Log(Entry{Level: "debug", Event: event, Message: msg})
+	slog.Debug(event, "message", msg)
 }
 
-// Warnf logs a formatted message at warn level.
 func Warnf(event string, format string, args ...any) {
 	msg := format
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
-	Log(Entry{Level: "warn", Event: event, Message: msg})
+	slog.Warn(event, "message", msg)
 }
 
-// Errorf logs a formatted error message at error level.
 func Errorf(event string, err error, format string, args ...any) {
-	e := Entry{Level: "error", Event: event}
-	if err != nil {
-		e.Error = err.Error()
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
 	}
-	if format != "" {
-		if len(args) > 0 {
-			e.Message = fmt.Sprintf(format, args...)
-		} else {
-			e.Message = format
-		}
-	}
-	Log(e)
+	slog.Error(event, "message", msg, "error", err)
 }
 
 func S3Call(op, bucket, key string, dur time.Duration, err error) {
-	e := Entry{Level: "debug", Event: "s3_call", Op: op, Bucket: bucket, Key: key, DurationMs: dur.Milliseconds()}
+	attrs := []any{"op", op, "bucket", bucket, "key", key, "duration_ms", dur.Milliseconds()}
 	if err != nil {
-		e.Error = err.Error()
+		attrs = append(attrs, "error", err)
 	}
-	Log(e)
+	slog.Debug("s3_call", attrs...)
 }
 
 func Printf(format string, args ...any) {
-	Infof("log", format, args...)
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	}
+	slog.Info("log", "message", msg)
+}
+
+func LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
+	slog.LogAttrs(ctx, level, msg, attrs...)
 }

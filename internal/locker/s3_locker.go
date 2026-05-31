@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/example/blt-volume-manager/internal/applog"
 	"github.com/example/blt-volume-manager/internal/constants"
 	"github.com/example/blt-volume-manager/internal/store"
 )
@@ -51,6 +52,7 @@ func NewS3Locker(bucket string, endpoint string, region string) (Locker, error) 
 		S3Bucket:   bucket,
 		S3Endpoint: endpoint,
 		Region:     region,
+		Logger:     applog.S3Call,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create s3 store for locker: %w", err)

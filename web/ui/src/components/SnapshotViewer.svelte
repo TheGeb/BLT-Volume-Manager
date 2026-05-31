@@ -5,7 +5,7 @@
   import type { DiffHunk, DiffLine } from '../lib/diff';
   import { formatBytes } from '../lib/util';
   import * as api from '../lib/api';
-  import { getSnapshotHash } from '../lib/stores/snapshots';
+
   import FileTreeNode from './FileTreeNode.svelte';
 
   export let snapshot: Snapshot;
@@ -55,6 +55,7 @@
   let treeSearchResults: string[] = [];
   let treeSearchIndex = -1;
   let searchNavCount = 0;
+  let searchJustNavigated = false;
   let treeSearchFullPath = false;
 
   function collectAllPaths(node: any): string[] {
@@ -82,11 +83,15 @@
     : [];
 
   $: if (treeSearchResults.length > 0) {
-    const activeIdx = fileContentPath ? treeSearchResults.indexOf(fileContentPath) : -1;
-    if (activeIdx >= 0) {
-      treeSearchIndex = activeIdx;
-    } else if (treeSearchIndex < 0 || treeSearchIndex >= treeSearchResults.length) {
-      treeSearchIndex = 0;
+    if (searchJustNavigated) {
+      searchJustNavigated = false;
+    } else {
+      const activeIdx = fileContentPath ? treeSearchResults.indexOf(fileContentPath) : -1;
+      if (activeIdx >= 0) {
+        treeSearchIndex = activeIdx;
+      } else if (treeSearchIndex < 0 || treeSearchIndex >= treeSearchResults.length) {
+        treeSearchIndex = 0;
+      }
     }
   } else if (treeSearchQuery) {
     treeSearchIndex = -1;
@@ -119,7 +124,7 @@
   }
 
   $: searchActivePath = treeSearchResults.length > 0 && treeSearchIndex >= 0
-    ? treeSearchResults[treeSearchIndex]
+    ? treeSearchResults[treeSearchIndex] ?? ''
     : '';
 
   function scrollToSearchResult(index: number) {
@@ -142,12 +147,14 @@
     if (treeSearchResults.length === 0) return;
     treeSearchIndex = (treeSearchIndex + 1) % treeSearchResults.length;
     searchNavCount++;
+    searchJustNavigated = true;
   }
 
   function prevSearchResult() {
     if (treeSearchResults.length === 0) return;
     treeSearchIndex = (treeSearchIndex - 1 + treeSearchResults.length) % treeSearchResults.length;
     searchNavCount++;
+    searchJustNavigated = true;
   }
 
   $: diffMap = currentDiffResult ? buildDiffMap(currentDiffResult) : null;
@@ -209,7 +216,7 @@
       const parts = n.path.replace(/^\//, '').split('/');
       let cur = root;
       for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
+        const p = parts[i]!;
         if (p === '') continue;
         if (i === parts.length - 1) {
           (n as any).children = undefined;
@@ -217,10 +224,10 @@
         } else {
           if (!cur.children[p]) {
             cur.children[p] = { name: p, type: 'dir', path: '/' + parts.slice(0, i + 1).join('/'), children: {} };
-          } else if (!cur.children[p].children) {
-            cur.children[p].children = {};
+          } else if (!cur.children[p]!.children) {
+            cur.children[p]!.children = {};
           }
-          cur = cur.children[p];
+          cur = cur.children[p]!;
         }
       }
     }
@@ -284,7 +291,7 @@
 
   $: compareSnaps = allSnapshots.filter(s => s.id !== snapshot.id);
   $: if (compareSnaps.length > 0 && !selectedCompareId) {
-    selectedCompareId = compareSnaps[0].id;
+    selectedCompareId = compareSnaps[0]!.id;
   }
   let lastInitialDiffTarget = '';
   $: if (initialDiffTarget) {
@@ -298,7 +305,7 @@
       lastInitialDiffTarget = initialDiffTarget;
     }
   } else if (selectedCompareId && compareSnaps.length > 0 && !compareSnaps.some(s => s.id === selectedCompareId || s.short_id === selectedCompareId)) {
-    selectedCompareId = compareSnaps[0].id;
+    selectedCompareId = compareSnaps[0]!.id;
   }
   $: if (allSnapshots.length > 0) {
     compareLoading = false;
@@ -317,8 +324,8 @@
       const snapA = snapshot;
       const snapB = compareSnaps.find(s => s.id === targetId || s.short_id === targetId)!;
       const [hashA, hashB] = await Promise.all([
-        getSnapshotHash(snapA),
-        getSnapshotHash(snapB)
+        snapA.fallbackHash,
+        snapB.fallbackHash
       ]);
       const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume!, hashA, hashB);
       if (diffOtherId !== targetId) return;
@@ -361,7 +368,7 @@
     currentDiffHunks = [];
     error = '';
     try {
-      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, await getSnapshotHash(snapshot));
+      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, snapshot.fallbackHash);
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -377,7 +384,7 @@
     error = '';
     try {
       const snap = allSnapshots.find(s => s.id === id)!;
-      fileContent = await api.fetchFileContent(id, snapshot.volume!, path, await getSnapshotHash(snap));
+      fileContent = await api.fetchFileContent(id, snapshot.volume!, path, snap.fallbackHash);
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
     } finally {
@@ -395,8 +402,8 @@
       const snapA = snapshot;
       const snapB = allSnapshots.find(s => s.id === otherId)!;
       const [hashA, hashB] = await Promise.all([
-        getSnapshotHash(snapA),
-        getSnapshotHash(snapB)
+        snapA.fallbackHash,
+        snapB.fallbackHash
       ]);
       const [oldContent, newContent] = await Promise.all([
         api.fetchFileContent(snapshot.id, snapshot.volume!, path, hashA),

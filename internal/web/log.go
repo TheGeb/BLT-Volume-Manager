@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/store"
 )
 
-func init() {
-	store.LogS3 = applog.S3Call
+func s3LogFn() func(op, bucket, key string, dur time.Duration, err error) {
+	return applog.S3Call
 }
 
 func logInfo(event string) {
@@ -27,12 +26,11 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(lw, r)
 		dur := time.Since(start)
-		level := "debug"
+		level := applog.LevelDebug
 		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, ".js") {
-			level = "trace"
+			level = applog.LevelTrace
 		}
-		applog.Log(applog.Entry{
-			Level:      level,
+		applog.LogEvent(level, applog.Event{
 			Event:      "http_request",
 			Method:     r.Method,
 			Path:       r.URL.Path,

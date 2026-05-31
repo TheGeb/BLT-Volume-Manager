@@ -62,28 +62,7 @@ export function extractHosts(snapshots: Snapshot[]): string[] {
 
 export const hosts = derived(snapshots, $s => extractHosts($s));
 
-export async function sha256Short(message: string, length: number): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const fullHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return fullHash.substring(0, length);
-}
-
-export function snapshotHashInput(snap: Snapshot): string {
-  const paths = snap.paths ? [...snap.paths].sort().join(',') : '';
-  return snap.hostname + snap.time + (snap.tree || '') + paths;
-}
-
-export async function getSnapshotHash(snap: Snapshot): Promise<string> {
-  if (snap.fallbackHash) return snap.fallbackHash;
-  const msg = snapshotHashInput(snap);
-  const hash = await sha256Short(msg, snap.short_id.length);
-  snap.fallbackHash = hash;
-  return hash;
-}
-
-async function reconcileViewerSnapshots() {
+function reconcileViewerSnapshots() {
   if (!get(viewerOpen) || !get(currentSnapshot)) return;
 
   const $snapshots = get(snapshots);
@@ -92,16 +71,7 @@ async function reconcileViewerSnapshots() {
 
   let found = $snapshots.find(s => s.id === $current.id || s.short_id === $current.short_id);
   if (!found && $current.fallbackHash) {
-    const hash = $current.fallbackHash;
-    for (const s of $snapshots) {
-      const msg = snapshotHashInput(s);
-      const computed = await sha256Short(msg, s.short_id.length);
-      if (computed === hash) {
-        found = s;
-        s.fallbackHash = hash;
-        break;
-      }
-    }
+    found = $snapshots.find(s => s.fallbackHash === $current.fallbackHash);
   }
 
   if (found) {
@@ -118,14 +88,7 @@ async function reconcileViewerSnapshots() {
     if (!dtSnap) {
       const $hash = get(diffTargetFallbackHash);
       if ($hash) {
-        for (const s of $snapshots) {
-          const msg = snapshotHashInput(s);
-          const computed = await sha256Short(msg, s.short_id.length);
-          if (computed === $hash) {
-            dtSnap = s;
-            break;
-          }
-        }
+        dtSnap = $snapshots.find(s => s.fallbackHash === $hash);
       }
     }
     if (dtSnap) {
@@ -218,7 +181,7 @@ export async function handleSizeLoaded(id: string) {
   try {
     const data = await api.fetchSnapshotSizes(vol, [id]);
     if (data[id] != null) {
-      sizes.update(s => ({ ...s, [id]: formatBytes(data[id]) }));
+      sizes.update(s => ({ ...s, [id]: formatBytes(data[id]!) }));
     } else {
       sizes.update(s => ({ ...s, [id]: 'err' }));
     }
