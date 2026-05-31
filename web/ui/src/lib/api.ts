@@ -2,15 +2,15 @@ import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse
 
 export async function fetchVolumes(): Promise<string[]> {
 	const resp = await fetch('/api/volumes');
-	const data = await resp.json() as { volumes: string[] };
-	return data.volumes || [];
+	const data = await resp.json() as { volumes?: string[] };
+	return data.volumes ?? [];
 }
 
 export async function fetchSnapshots(volume: string): Promise<SnapshotsResponse> {
 	const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(volume)}`);
 	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
-	return { snapshots, restorePointID: data.restorePointID || '' };
+	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
+	return { snapshots, restorePointID: data.restorePointID ?? '' };
 }
 
 export async function fetchRepoStatus(volume: string): Promise<RepoStatus> {
@@ -38,8 +38,8 @@ export async function createLock(volume: string, owner?: string): Promise<void> 
 export async function deleteLocks(volume: string): Promise<void> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`, { method: 'DELETE' });
   if (!resp.ok) {
-    const body = await resp.json();
-    throw new Error(body.error || 'Failed to delete locks');
+    const body = await resp.json() as { error?: string };
+    throw new Error(body.error ?? 'Failed to delete locks');
   }
 }
 
@@ -75,11 +75,11 @@ export async function fetchFileContent(snapshotId: string, volume: string, path:
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`;
   if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => { controller.abort(); }, 30000);
   try {
     const resp = await fetch(url, { signal: controller.signal });
     if (!resp.ok) throw new Error('Failed to read file');
-    return resp.text();
+    return await resp.text();
   } finally {
     clearTimeout(timer);
   }
@@ -99,8 +99,8 @@ export async function addTag(snapshotId: string, tag: string, volume: string): P
 	const resp = await fetch(url, { method: 'POST' });
 	if (!resp.ok) throw new Error('Failed to add tag');
 	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
-	return { snapshots, restorePointID: data.restorePointID || '' };
+	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
+	return { snapshots, restorePointID: data.restorePointID ?? '' };
 }
 
 export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {
@@ -108,8 +108,8 @@ export async function removeTag(snapshotId: string, tag: string, volume: string)
 	const resp = await fetch(url, { method: 'DELETE' });
 	if (!resp.ok) throw new Error('Failed to remove tag');
 	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = (data.snapshots || []).map((sn: Snapshot) => ({ ...sn, tags: sn.tags ?? [] }));
-	return { snapshots, restorePointID: data.restorePointID || '' };
+	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
+	return { snapshots, restorePointID: data.restorePointID ?? '' };
 }
 
 export async function deleteSnapshot(snapshotId: string, volume: string): Promise<void> {
@@ -121,23 +121,23 @@ export async function deleteSnapshot(snapshotId: string, volume: string): Promis
 export async function deleteVolume(volume: string): Promise<void> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}`, { method: 'DELETE' });
   if (!resp.ok) {
-    const d = await resp.json();
-    throw new Error(d.error || 'delete failed');
+    const d = await resp.json() as { error?: string };
+    throw new Error(d.error ?? 'delete failed');
   }
 }
 
 export async function checkRepo(volume: string): Promise<string> {
   const resp = await fetch(`/api/repo/check?volume=${encodeURIComponent(volume)}`, { method: 'POST' });
-  const d = await resp.json();
-  if (!resp.ok) throw new Error(d.error || 'check failed');
-  return d.status;
+  const d = await resp.json() as { status?: string; error?: string };
+  if (!resp.ok) throw new Error(d.error ?? 'check failed');
+  return d.status ?? '';
 }
 
 export async function repairRepo(volume: string): Promise<string> {
   const resp = await fetch(`/api/repo/repair?volume=${encodeURIComponent(volume)}`, { method: 'POST' });
-  const d = await resp.json();
-  if (!resp.ok) throw new Error(d.error || 'repair failed');
-  return d.status;
+  const d = await resp.json() as { status?: string; error?: string };
+  if (!resp.ok) throw new Error(d.error ?? 'repair failed');
+  return d.status ?? '';
 }
 
 export async function copyVolume(source: string, target: string, preserveHistory?: boolean): Promise<{ status: string; source_locked?: boolean; source_owner?: string }> {
@@ -164,9 +164,14 @@ async function parseResponse<T>(resp: Response): Promise<T> {
     body = await resp.json() as Record<string, unknown>;
   } catch {
     const text = await resp.text();
-    throw new Error(text || `HTTP ${resp.status}`);
+    throw new Error(text || `HTTP ${String(resp.status)}`);
   }
-  if (!resp.ok) throw new Error(String(body.error ?? '') || `HTTP ${resp.status}`);
+  if (!resp.ok) {
+    const err = body.error;
+    if (typeof err === 'string') throw new Error(err);
+    if (typeof err === 'number') throw new Error(String(err));
+    throw new Error(`HTTP ${String(resp.status)}`);
+  }
   return body as T;
 }
 
@@ -176,6 +181,6 @@ export async function createTestVolume(name: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
-  const d = await resp.json();
-  if (!resp.ok) throw new Error(d.error || `HTTP ${resp.status}`);
+  const d = await resp.json() as { error?: string };
+  if (!resp.ok) throw new Error(d.error ?? `HTTP ${String(resp.status)}`);
 }

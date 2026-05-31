@@ -66,16 +66,24 @@ describe('filterSnapshots', () => {
 describe('sortSnapshots', () => {
   it('sorts newest first', () => {
     const result = sortSnapshots([snapC, snapA, snapB], true);
-    expect(result[0]!.id).toBe('1');
-    expect(result[1]!.id).toBe('2');
-    expect(result[2]!.id).toBe('3');
+    const r0 = result.at(0);
+    const r1 = result.at(1);
+    const r2 = result.at(2);
+    if (!r0 || !r1 || !r2) throw new Error('expected 3 results');
+    expect(r0.id).toBe('1');
+    expect(r1.id).toBe('2');
+    expect(r2.id).toBe('3');
   });
 
   it('sorts oldest first', () => {
     const result = sortSnapshots([snapC, snapA, snapB], false);
-    expect(result[0]!.id).toBe('3');
-    expect(result[1]!.id).toBe('2');
-    expect(result[2]!.id).toBe('1');
+    const r0 = result.at(0);
+    const r1 = result.at(1);
+    const r2 = result.at(2);
+    if (!r0 || !r1 || !r2) throw new Error('expected 3 results');
+    expect(r0.id).toBe('3');
+    expect(r1.id).toBe('2');
+    expect(r2.id).toBe('1');
   });
 
   it('does not mutate the original array', () => {

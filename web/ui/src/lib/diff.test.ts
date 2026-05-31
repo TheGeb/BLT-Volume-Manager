@@ -8,14 +8,18 @@ describe('computeDiff', () => {
     expect(computeDiff([], [])).toEqual([]);
   });
 
-  it('detects added lines', () => {
+it('detects added lines', () => {
     const a = ['line1', 'line2'];
     const b = ['line1', 'line2', 'line3'];
     const hunks = computeDiff(a, b);
     expect(hunks.length).toBeGreaterThan(0);
-    const added = hunks[0]!.lines.filter(l => l.type === 'add');
+    const first = hunks.at(0);
+    if (!first) throw new Error('expected at least one hunk');
+    const added = first.lines.filter(l => l.type === 'add');
     expect(added.length).toBe(1);
-    expect(added[0]!.content).toBe('line3');
+    const firstAdded = added.at(0);
+    if (!firstAdded) throw new Error('expected at least one added line');
+    expect(firstAdded.content).toBe('line3');
   });
 
   it('detects deleted lines', () => {
@@ -60,11 +64,11 @@ describe('computeDiff', () => {
   });
 
   it('groups hunks with context', () => {
-    const a = Array.from({ length: 20 }, (_, i) => `line${i + 1}`);
+    const a = Array.from({ length: 20 }, (_, i) => `line${String(i + 1)}`);
     const b = [
-      ...Array.from({ length: 10 }, (_, i) => `line${i + 1}`),
+      ...Array.from({ length: 10 }, (_, i) => `line${String(i + 1)}`),
       'changed',
-      ...Array.from({ length: 9 }, (_, i) => `line${i + 12}`),
+      ...Array.from({ length: 9 }, (_, i) => `line${String(i + 12)}`),
     ];
     const hunks = computeDiff(a, b);
     expect(hunks.length).toBeGreaterThan(0);
@@ -94,9 +98,9 @@ describe('computeDiff', () => {
   });
 
   it('handles large diff', () => {
-    const a = Array.from({ length: 100 }, (_, i) => `line${i}`);
+    const a = Array.from({ length: 100 }, (_, i) => `line${String(i)}`);
     const b = Array.from({ length: 100 }, (_, i) =>
-      i % 10 === 0 ? `modified${i}` : `line${i}`
+      i % 10 === 0 ? `modified${String(i)}` : `line${String(i)}`
     );
     const hunks = computeDiff(a, b);
     expect(hunks.length).toBeGreaterThan(0);

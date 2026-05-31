@@ -35,7 +35,7 @@ export async function loadVolumes() {
   volumesLoading.set(true);
   try {
     volumes.set(await api.fetchVolumes());
-    fetchAllVolumeLockInfo();
+    void fetchAllVolumeLockInfo();
   } catch {
     setBanner('Cannot reach server', true);
   } finally {
@@ -51,15 +51,17 @@ export async function fetchAllVolumeLockInfo() {
   );
   const info: Record<string, VolumeLockInfo> = {};
   for (let i = 0; i < vols.length; i++) {
-    const r = results[i]!;
+    const r = results[i];
     if (r) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       info[vols[i]!] = {
         locked: r.locked,
-        owner: r.owner || '',
-        expiresIn: r.expires_in || 0,
+        owner: r.owner ?? '',
+        expiresIn: r.expires_in ?? 0,
         status: r.locked ? 'locked' : 'unlocked',
       };
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       info[vols[i]!] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
     }
   }

@@ -3,8 +3,9 @@ export function formatBytes(b: number): string {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
   const i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), units.length - 1);
   const val = b / Math.pow(1024, i);
-  const formatted = val.toFixed(2).replace(/\.?0+$/, '');
-  return `${formatted} ${units[i]}`;
+  const formatted = val.toFixed(2).replace(new RegExp('\\.?0+$'), '');
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return `${formatted} ${units[i]!}`;
 }
 
 export function formatDuration(totalSeconds: number): string {
@@ -14,10 +15,10 @@ export function formatDuration(totalSeconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
   const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0 || days > 0) parts.push(`${hours}h`);
-  if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
-  parts.push(`${secs}s`);
+  if (days > 0) parts.push(`${String(days)}d`);
+  if (hours > 0 || days > 0) parts.push(`${String(hours)}h`);
+  if (minutes > 0 || hours > 0 || days > 0) parts.push(`${String(minutes)}m`);
+  parts.push(`${String(secs)}s`);
   return parts.join(' ') + ' remaining';
 }
 
@@ -27,7 +28,8 @@ export function formatExpiration(totalSeconds: number): string {
   return `Expires: ${expDate.toLocaleString()}`;
 }
 
-export function escapeHtml(s: string): string {
+export function escapeHtml(s: string | undefined): string {
+  if (!s) return '';
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;

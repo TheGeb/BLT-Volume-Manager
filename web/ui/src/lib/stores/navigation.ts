@@ -45,7 +45,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
 
   if (tab === 'snapshots' && params?.snapshotId) {
     viewerOpen.set(true);
-    diffTargetId.set(params.diffId || '');
+    diffTargetId.set(params.diffId ?? '');
     if (params.diffFallbackHash) {
       diffTargetFallbackHash.set(params.diffFallbackHash);
     } else if (!params.diffId) {
@@ -67,20 +67,21 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
 
     if (params?.snapshotId) {
       let snap = get(snapshots).find(s => s.id === params.snapshotId || s.short_id === params.snapshotId);
-      if (!snap && params?.fallbackHash) {
+      if (!snap && params.fallbackHash) {
         snap = get(snapshots).find(s => s.fallbackHash === params.fallbackHash);
       }
       if (snap) {
         snap.fallbackHash = params.fallbackHash ?? '';
         currentSnapshot.set(snap);
       }
-      if (params?.diffId && params?.diffFallbackHash) {
+      if (params.diffId && params.diffFallbackHash) {
         let diffSnap = get(snapshots).find(s => s.id === params.diffId || s.short_id === params.diffId);
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         if (!diffSnap) {
           diffSnap = get(snapshots).find(s => s.fallbackHash === params.diffFallbackHash);
         }
         if (diffSnap) {
-          diffSnap.fallbackHash = params.diffFallbackHash;
+          diffSnap.fallbackHash = diffSnap.fallbackHash ?? params.diffFallbackHash;
           diffTargetFallbackHash.set(params.diffFallbackHash);
           diffTargetId.set(diffSnap.id);
         }
@@ -100,15 +101,15 @@ export async function handleRefresh() {
     ]);
   }
   await loadVolumes();
-  if (vol) loadLockStatus();
+  if (vol) void loadLockStatus();
 }
 
 export function onSelectVolume(vol: string) {
   if (vol === get(selectedVolume)) {
-    loadAll('');
+    void loadAll('');
     return;
   }
-  loadAll(vol);
+  void loadAll(vol);
 }
 
 export function switchTab(tab: 'snapshots' | 'repo') {
@@ -131,7 +132,7 @@ export async function confirmDeleteVolume() {
     viewerOpen.set(false);
     sizes.set({});
     await Promise.all([
-      api.refreshStats().catch(() => {}),
+      api.refreshStats().catch(() => { /* intentionally ignored */ }),
       loadVolumes(),
     ]);
   } catch (e: unknown) {
@@ -146,14 +147,14 @@ export async function handleCreateTestVolume(name: string) {
   try {
     await api.createTestVolume(name);
     testStatus.set('Updating volume list...');
-    await api.refreshStats().catch(() => {});
+    await api.refreshStats().catch(() => { /* intentionally ignored */ });
     await loadVolumes();
     await loadAll(name);
   } catch (e: unknown) { testStatus.set((e as Error).message); }
   finally { creatingTest.set(false); }
 }
 
-export async function onOpenViewer(snapshot: Snapshot) {
+export function onOpenViewer(snapshot: Snapshot) {
   currentSnapshot.set(snapshot);
   viewerOpen.set(true);
   diffTargetId.set('');
@@ -168,11 +169,10 @@ export function onCloseViewer() {
   syncUrl();
 }
 
-export async function setDiffTarget(id: string) {
+export function setDiffTarget(id: string) {
   const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
   if (!snap) return;
-  diffTargetFallbackHash.set(snap.fallbackHash || '');
-  diffTargetFallbackHash.set(snap.fallbackHash || '');
+  diffTargetFallbackHash.set(snap.fallbackHash ?? '');
   diffTargetId.set(snap.id);
   syncUrl();
 }
@@ -184,9 +184,10 @@ function buildUrl(): string {
   const p = new URLSearchParams();
   if (get(activeTab) === 'repo') p.set('tab', 'repo');
   if (get(viewerOpen) && get(currentSnapshot)) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const snap = get(currentSnapshot)!;
     p.set('snapshot', snap.short_id);
-    
+
     if (snap.fallbackHash) {
       p.set('fallbackHash', snap.fallbackHash);
     }
@@ -195,7 +196,7 @@ function buildUrl(): string {
       const dtSnap = get(allSnapshots).find(s => s.id === dtId || s.short_id === dtId);
       if (dtSnap) {
         p.set('diff', dtSnap.short_id);
-        const hash = dtSnap.fallbackHash || get(diffTargetFallbackHash);
+        const hash = dtSnap.fallbackHash ?? get(diffTargetFallbackHash);
         if (hash) {
           p.set('diffFallbackHash', hash);
         }

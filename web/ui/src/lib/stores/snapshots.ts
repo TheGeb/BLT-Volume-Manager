@@ -33,7 +33,7 @@ export function filterSnapshots(snapshots: Snapshot[], typeFilter: string, hostF
     const q = query.toLowerCase();
     return sn.short_id.toLowerCase().includes(q) ||
       sn.tags.some(t => t.toLowerCase().includes(q)) ||
-      sn.hostname?.toLowerCase().includes(q);
+      (typeof sn.hostname === 'string' && sn.hostname.toLowerCase().includes(q));
   });
 }
 
@@ -66,6 +66,7 @@ function reconcileViewerSnapshots() {
   if (!get(viewerOpen) || !get(currentSnapshot)) return;
 
   const $snapshots = get(snapshots);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const $current = get(currentSnapshot)!;
   const $diffId = get(diffTargetId);
 
@@ -105,7 +106,7 @@ export async function loadSnapshots(volume: string) {
   try {
     const result = await api.fetchSnapshots(volume);
     snapshots.set(result.snapshots);
-    restorePointID.set(result.restorePointID || '');
+    restorePointID.set(result.restorePointID ?? '');
   } catch {
     snapshots.set([]);
     restorePointID.set('');
@@ -131,12 +132,13 @@ export async function onAddTag(id: string, tag: string, vol: string) {
   try {
     const result = await api.addTag(id, tag, vol);
     snapshots.set(result.snapshots);
-    restorePointID.set(result.restorePointID || '');
+    restorePointID.set(result.restorePointID ?? '');
     reconcileViewerSnapshots();
   } catch (e) {
-    setBanner(`Failed to add tag: ${e}`, true);
+    setBanner(`Failed to add tag: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     restorePointLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
   }
 }
@@ -146,17 +148,18 @@ export async function onRemoveTag(id: string, tag: string, vol: string) {
   try {
     const result = await api.removeTag(id, tag, vol);
     snapshots.set(result.snapshots);
-    restorePointID.set(result.restorePointID || '');
+    restorePointID.set(result.restorePointID ?? '');
     reconcileViewerSnapshots();
   } catch (e) {
-    setBanner(`Failed to remove tag: ${e}`, true);
+    setBanner(`Failed to remove tag: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     restorePointLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
   }
 }
 
-export async function onDeleteSnapshot(sn: Snapshot) {
+export function onDeleteSnapshot(sn: Snapshot) {
   deletingSnap.set(sn);
   snapDeleteInput.set('');
   deleteSnapModal.set(true);
@@ -181,6 +184,7 @@ export async function handleSizeLoaded(id: string) {
   try {
     const data = await api.fetchSnapshotSizes(vol, [id]);
     if (data[id] != null) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       sizes.update(s => ({ ...s, [id]: formatBytes(data[id]!) }));
     } else {
       sizes.update(s => ({ ...s, [id]: 'err' }));
@@ -188,6 +192,7 @@ export async function handleSizeLoaded(id: string) {
   } catch {
     sizes.update(s => ({ ...s, [id]: 'err' }));
   } finally {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     sizeLoading.update(s => { const n = { ...s }; delete n[id]; return n; });
   }
 }

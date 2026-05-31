@@ -5,11 +5,18 @@ import globals from "globals";
 export default tsEslint.config(
   { ignores: ["node_modules/", "dist/", "public/"] },
   {
-    extends: [...tsEslint.configs.recommended],
+    extends: [
+      ...tsEslint.configs.recommended,
+      ...tsEslint.configs.strictTypeChecked,
+      ...tsEslint.configs.stylisticTypeChecked,
+    ],
     files: ["**/*.ts"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
+      parserOptions: {
+        projectService: true,
+      },
     },
   },
   ...sveltePlugin.configs["flat/recommended"],
@@ -18,6 +25,8 @@ export default tsEslint.config(
     languageOptions: {
       parserOptions: {
         parser: tsEslint.parser,
+        projectService: true,
+        extraFileExtensions: ['.svelte'],
       },
     },
   },
