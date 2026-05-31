@@ -2,7 +2,7 @@
   import { slide } from 'svelte/transition';
   import { formatExpiration } from '../lib/util';
   import type { VolumeLockInfo } from '../lib/types';
-  import { volumes as allVolumes } from '../lib/stores/volumes';
+  import { volumes as allVolumes, openCopyVolModal, openRenameVolModal } from '../lib/stores/volumes';
 
   export let volumes: string[] = [];
   export let loading = false;
@@ -301,8 +301,8 @@
               </span>
               {/if}
             {:else}
-              <a class="tree-volume" href="/?volume={encodeURIComponent(item.path)}" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
-                on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); onSelect(item.path); } }}>
+              <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
+                on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
                 <div style="width:16px;"></div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
                   <ellipse cx="12" cy="5" rx="9" ry="3"/>
@@ -310,7 +310,25 @@
                   <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                 </svg>
                 <span class="tree-name">{item.name}</span>
-              </a>
+                {#if !item.isGroup}
+                <span class="vol-actions">
+                  <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
+                    on:click|stopPropagation={() => openCopyVolModal(item.path)}
+                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openCopyVolModal(item.path); }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </span>
+                  <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
+                    on:click|stopPropagation={() => openRenameVolModal(item.path)}
+                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openRenameVolModal(item.path); }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+                    </svg>
+                  </span>
+                </span>
+                {/if}
+              </button>
               {#if showLockBorders}
               <span class="lock-info" class:has-owner={volumeLockInfo[item.path]?.owner && (!lockStyles[idx] || labelAtIdx[idx])} style:transform={labelOffset[idx] || ''}>
                 {#if volumeLockInfo[item.path]}
@@ -324,8 +342,8 @@
                   {/if}
                 {:else if !loading && !lockStyles[idx]}
                   <span class="lock-badge">—</span>
-                {/if}
-              </span>
+              {/if}
+            </span>
               {/if}
             {/if}
 
@@ -448,6 +466,8 @@
   .lock-mode .tree-group,
   .lock-mode .tree-volume {
     width: 75%;
+    padding-right: 0;
+    box-sizing: border-box;
   }
 
   .tree-row:not(.in-lock) .tree-group:hover,
@@ -463,6 +483,7 @@
   .lock-info {
     display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding-right: 18px;
     position: relative;
+    z-index: 5;
   }
 
   .lock-mode .lock-info {
@@ -495,5 +516,45 @@
   .lock-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
+  .vol-actions {
+    display: none;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .tree-volume {
+    display: flex;
+    align-items: center;
+    overflow: visible;
+  }
+
+  .lock-mode .tree-volume {
+    padding-right: 0;
+  }
+
+  .tree-volume:hover .vol-actions {
+    display: flex;
+  }
+
+  .vol-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .vol-action-btn:hover {
+    background: rgb(255 255 255 / 10%);
+    color: var(--text);
+  }
 
 </style>

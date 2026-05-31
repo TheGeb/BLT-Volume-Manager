@@ -641,6 +641,41 @@ func (m *Manager) Repair() error {
 	return m.runSimple(ctx, "repair", "index")
 }
 
+func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutLong)
+	defer cancel()
+
+	args := []string{"copy", "--repo2", destRepo}
+	args = append(args, snapshotIDs...)
+
+	// restic copy needs the password for both repos. Explicitly pass password-file
+	// for both so it doesn't fail with "empty password" on the destination.
+	if pwFile := os.Getenv("RESTIC_PASSWORD_FILE"); pwFile != "" {
+		args = append(args, "--password-file", pwFile, "--password-file2", pwFile)
+	} else if pw := os.Getenv("RESTIC_PASSWORD"); pw != "" {
+		tmpFile, err := os.CreateTemp("", "restic-pw-*")
+		if err != nil {
+			return fmt.Errorf("create temp password file: %w", err)
+		}
+		tmpName := tmpFile.Name()
+		defer func() { _ = os.Remove(tmpName) }()
+		if _, err := tmpFile.WriteString(pw + "\n"); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write temp password file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			return fmt.Errorf("close temp password file: %w", err)
+		}
+		args = append(args, "--password-file", tmpName, "--password-file2", tmpName)
+	}
+
+	cmd, err := m.resticCommand(ctx, args...)
+	if err != nil {
+		return err
+	}
+	return m.runCommand(cmd)
+}
+
 func (m *Manager) Unlock() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -658,6 +693,7 @@ func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd,
 
 	global = append(global, args...)
 	applog.Debugf("restic_command", "args=%s", strings.Join(global, " "))
+	//nolint:gosec // args constructed from env vars and hardcoded strings only
 	cmd := exec.CommandContext(ctx, "restic", global...)
 	cmd.Env = os.Environ()
 	return cmd, nil

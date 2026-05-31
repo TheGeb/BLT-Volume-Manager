@@ -26,6 +26,26 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasSuffix(path, "/copy") {
+		volumeName := strings.TrimSuffix(path, "/copy")
+		if volumeName == "" || strings.Contains(volumeName, "..") {
+			http.NotFound(w, r)
+			return
+		}
+		s.handleCopyVolume(w, r, volumeName)
+		return
+	}
+
+	if strings.HasSuffix(path, "/rename") {
+		volumeName := strings.TrimSuffix(path, "/rename")
+		if volumeName == "" || strings.Contains(volumeName, "..") {
+			http.NotFound(w, r)
+			return
+		}
+		s.handleRenameVolume(w, r, volumeName)
+		return
+	}
+
 	if !strings.HasSuffix(path, "/"+constants.LocksDir) {
 		if r.Method == http.MethodDelete {
 			s.handleDeleteVolume(w, r, path)
@@ -256,6 +276,231 @@ func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
 	}
 
 	return store.NewS3Store(opts)
+}
+
+func (s *Server) isVolumeLocked(volumeName string) (bool, string, error) {
+	status, err := s.getVolumeLock(volumeName)
+	if err != nil {
+		return false, "", err
+	}
+	if locked, ok := status["locked"].(bool); ok && locked {
+		owner, _ := status["owner"].(string)
+		return true, owner, nil
+	}
+	return false, "", nil
+}
+
+func (s *Server) handleCopyVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
+	if r.Method != http.MethodPost {
+		respondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Target          string `json:"target"`
+		PreserveHistory *bool  `json:"preserve_history"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
+		return
+	}
+	if req.Target == "" {
+		respondError(w, fmt.Errorf("missing target volume name"), http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(req.Target, "..") {
+		respondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
+		return
+	}
+
+	locked, owner, err := s.isVolumeLocked(volumeName)
+	if err != nil {
+		respondError(w, fmt.Errorf("check lock: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Check that the target doesn't already exist
+	existing := s.volumeNames()
+	for _, v := range existing {
+		if v == req.Target {
+			respondError(w, fmt.Errorf("target volume %q already exists", req.Target), http.StatusConflict)
+			return
+		}
+	}
+
+	// Init target repo
+	targetManager := s.volumeManager(req.Target)
+	if err := targetManager.Init(); err != nil {
+		respondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Copy snapshots from source to target
+	sourceManager := s.volumeManager(volumeName)
+	preserveHistory := true
+	if req.PreserveHistory != nil {
+		preserveHistory = *req.PreserveHistory
+	}
+	if preserveHistory {
+		if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
+			respondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		snaps, err := sourceManager.ListSnapshots()
+		if err != nil {
+			respondError(w, fmt.Errorf("list snapshots: %w", err), http.StatusInternalServerError)
+			return
+		}
+		if len(snaps) == 0 {
+			respondError(w, fmt.Errorf("no snapshots to copy"), http.StatusBadRequest)
+			return
+		}
+		if err := sourceManager.CopyTo(targetManager.Repo(), snaps[0].ID); err != nil {
+			respondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Write target volume marker
+	s3, err := s.getOrCreateS3StoreWithPrefix(store.VolumePrefix)
+	if err != nil {
+		respondError(w, fmt.Errorf("create s3 store: %w", err), http.StatusInternalServerError)
+		return
+	}
+	if s3 != nil {
+		if err := s3.WriteVolumeMarker(req.Target); err != nil {
+			respondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	s.refreshStats()
+
+	resp := map[string]any{
+		"status":           fmt.Sprintf("Volume %q copied to %q", volumeName, req.Target),
+		"source_locked":    locked,
+		"preserve_history": preserveHistory,
+	}
+	if locked {
+		resp["source_owner"] = owner
+	}
+	respondJSON(w, resp)
+}
+
+func (s *Server) handleRenameVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
+	if r.Method != http.MethodPost {
+		respondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Target string `json:"target"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
+		return
+	}
+	if req.Target == "" {
+		respondError(w, fmt.Errorf("missing target volume name"), http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(req.Target, "..") {
+		respondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
+		return
+	}
+
+	locked, owner, err := s.isVolumeLocked(volumeName)
+	if err != nil {
+		respondError(w, fmt.Errorf("check lock: %w", err), http.StatusInternalServerError)
+		return
+	}
+	if locked {
+		respondError(w, fmt.Errorf("cannot rename locked volume %q (locked by %q)", volumeName, owner), http.StatusConflict)
+		return
+	}
+
+	// Check that the target doesn't already exist
+	existing := s.volumeNames()
+	for _, v := range existing {
+		if v == req.Target {
+			respondError(w, fmt.Errorf("target volume %q already exists", req.Target), http.StatusConflict)
+			return
+		}
+	}
+
+	// Init target repo
+	targetManager := s.volumeManager(req.Target)
+	if err := targetManager.Init(); err != nil {
+		respondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Copy snapshots from source to target
+	sourceManager := s.volumeManager(volumeName)
+	if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
+		respondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Forget all snapshots in source
+	snapshots, err := sourceManager.ListSnapshots()
+	if err == nil {
+		for _, snap := range snapshots {
+			_ = sourceManager.ForgetSnapshot(snap.ID)
+		}
+	}
+
+	// Write target volume marker
+	s3, err := s.getOrCreateS3StoreWithPrefix(store.VolumePrefix)
+	if err != nil {
+		respondError(w, fmt.Errorf("create s3 store: %w", err), http.StatusInternalServerError)
+		return
+	}
+	if s3 != nil {
+		if err := s3.WriteVolumeMarker(req.Target); err != nil {
+			respondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
+			return
+		}
+		// Delete source volume marker
+		_ = s3.DeleteVolumeMarker(volumeName)
+		// Delete source restore point
+		rpS3, rpErr := s.storeForVolume(volumeName)
+		if rpErr == nil {
+			_ = rpS3.DeleteRestorePoint(volumeName)
+		}
+	}
+
+	// Delete source locks
+	if s.s3Bucket != "" {
+		lockS3, err := s.storeForVolume(volumeName)
+		if err == nil {
+			_ = lockS3.DeleteLockObjects()
+		}
+	}
+
+	// Delete source restic repo data
+	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
+		s3, err := store.NewS3Store(store.S3StoreOpts{
+			S3Bucket:   s.s3Bucket,
+			S3Endpoint: s.s3Endpoint,
+			Region:     s.s3Region,
+		})
+		if err == nil {
+			_ = s3.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/")
+		}
+	}
+	if !strings.HasPrefix(s.resticBase, "s3:") {
+		repoPath := filepath.Join(s.resticBase, constants.ResticDir, volumeName)
+		//nolint:gosec // volumeName is validated above
+		_ = os.RemoveAll(repoPath)
+	}
+
+	s.refreshStats()
+
+	respondJSON(w, map[string]any{
+		"status": fmt.Sprintf("Volume %q renamed to %q", volumeName, req.Target),
+	})
 }
 
 func (s *Server) deleteVolumeLocks(volumeName string) error {

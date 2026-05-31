@@ -16,7 +16,9 @@
   import {
     volumes, selectedVolume, volumeFilter, hostname, volumeLockInfo, volumesLoading, landingShown,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
-    loadVolumes, onFilterChange, openDeleteVolModal
+    copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError, copyPreserveHistory,
+    loadVolumes, onFilterChange, openDeleteVolModal,
+    confirmCopyVolume, confirmRenameVolume
   } from './lib/stores/volumes';
   import {
     snapshots, query, sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
@@ -370,5 +372,60 @@
     <button class="button" style="background:var(--red);color:#fff;"
       disabled={$snapDeleteInput !== 'delete'}
       on:click={confirmDeleteSnapshot}>Delete</button>
+  </div>
+</Modal>
+
+<Modal show={$copyVolModal} onClose={() => $copyVolModal = false}>
+  <h3 style="margin:0 0 12px;">Copy volume</h3>
+  <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
+    Copy snapshots from <strong>{$copyRenameSource}</strong> to a new volume.
+  </p>
+  <p style="margin:0 0 8px;font-size:0.85rem;">
+    New volume name:
+  </p>
+  <input class="input" type="text" placeholder="Enter new volume name"
+    style="width:100%;box-sizing:border-box;margin-bottom:8px;"
+    bind:value={$copyRenameTarget} />
+  <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.85rem;cursor:pointer;">
+    <input type="checkbox" bind:checked={$copyPreserveHistory} />
+    Preserve snapshot history
+  </label>
+  {#if $copyRenameError}
+    <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
+  {/if}
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button class="button button-secondary" on:click={() => $copyVolModal = false}>Cancel</button>
+    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading}
+      on:click={confirmCopyVolume}>
+      {$copyRenameLoading ? 'Copying...' : 'Copy'}
+    </button>
+  </div>
+</Modal>
+
+<Modal show={$renameVolModal} onClose={() => $renameVolModal = false}>
+  <h3 style="margin:0 0 12px;">Rename volume</h3>
+  <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
+    Rename <strong>{$copyRenameSource}</strong> to a new name.
+    {#if $volumeLockInfo[$copyRenameSource]?.locked}
+      <span style="color:var(--red);display:block;margin-top:6px;">
+        This volume is locked and cannot be renamed. Unlock it first.
+      </span>
+    {/if}
+  </p>
+  <p style="margin:0 0 8px;font-size:0.85rem;">
+    New volume name:
+  </p>
+  <input class="input" type="text" placeholder="Enter new volume name"
+    style="width:100%;box-sizing:border-box;margin-bottom:8px;"
+    bind:value={$copyRenameTarget} />
+  {#if $copyRenameError}
+    <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
+  {/if}
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button class="button button-secondary" on:click={() => $renameVolModal = false}>Cancel</button>
+    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeLockInfo[$copyRenameSource]?.locked}
+      on:click={confirmRenameVolume}>
+      {$copyRenameLoading ? 'Renaming...' : 'Rename'}
+    </button>
   </div>
 </Modal>
