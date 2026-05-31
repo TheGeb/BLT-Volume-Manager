@@ -70,7 +70,7 @@
                   {#each ['all', 'hot', 'cold'] as opt (opt)}
                     <button class="filter-opt" class:selected={typeFilter === opt}
                       on:click={() => { onTypeFilter(opt); openFilter = null; }}>
-                      {opt === 'all' ? 'All' : opt}
+                      {opt === 'all' ? 'All' : opt.charAt(0).toUpperCase() + opt.slice(1)}
                     </button>
                   {/each}
                 </div>
@@ -181,23 +181,22 @@
           </tr>
         {/each}
       </tbody>
-      <tfoot>
-        <tr class="bulk-row">
-          <td class="snap-total" style="text-align:center;">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</td>
-          <td colspan="4"></td>
-          <td class="bulk-count">
-            <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>{selectedForDeletion.size || 1} selected</span>
-          </td>
-          <td>
-            <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
-              <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
-                Delete selected
-              </button>
-            </span>
-          </td>
-        </tr>
-      </tfoot>
     </table>
+  </div>
+  <div class="bulk-bar">
+    <span class="snap-total">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <span class="slide-wrap">
+        <span class="slide-inner bulk-count" class:bulk-hidden={selectedForDeletion.size === 0}>{selectedForDeletion.size || 1} selected</span>
+      </span>
+      <span class="slide-wrap">
+        <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
+          <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
+            Delete selected
+          </button>
+        </span>
+      </span>
+    </div>
   </div>
 </section>
 
@@ -392,20 +391,35 @@
     background: rgb(255 80 80 / 14%);
   }
 
-  .bulk-row td {
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 24px;
+    padding-right: 42px;
+    height: 44px;
     background: var(--surface);
-    border-bottom: none;
+    border-radius: 0 0 24px 24px;
+    margin-left: -24px;
+    margin-right: -24px;
+    margin-bottom: -24px;
+  }
+
+  .slide-wrap {
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    align-self: stretch;
+    vertical-align: middle;
   }
 
   .slide-inner {
     display: inline-block;
-    max-height: 40px;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
+    transition: transform 0.3s ease, opacity 0.3s ease;
   }
 
   .bulk-hidden {
-    max-height: 0;
+    transform: translateY(-100%);
     opacity: 0;
     pointer-events: none;
   }
@@ -418,7 +432,6 @@
   .bulk-count {
     font-size: 0.85rem;
     color: var(--muted);
-    text-align: right !important;
   }
 
   .del-confirm-btn {

@@ -408,7 +408,7 @@
       {#if compareSnaps.length > 0}
         <select bind:value={selectedCompareId}>
           {#each compareSnaps as cs (cs.id)}
-            <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()} {new Date(cs.time).toLocaleTimeString()} | {cs.hostname})</option>
+            <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()} {new Date(cs.time).toLocaleTimeString()} -  {cs.hostname})</option>
           {/each}
         </select>
         <button class="button button-xs" style="margin-left:6px;padding:8px 12px;font-size:0.85rem;border-radius:10px;" on:click={() => doDiff()}>Diff</button>
