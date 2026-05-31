@@ -181,22 +181,30 @@
           </tr>
         {/each}
       </tbody>
+      <tfoot>
+        <tr>
+          <td class="snap-total">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td class="bulk-count">
+            <span class="slide-wrap">
+              <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>{selectedForDeletion.size || 1} selected</span>
+            </span>
+          </td>
+          <td>
+            <span class="slide-wrap">
+              <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
+                <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
+                  Delete selected
+                </button>
+              </span>
+            </span>
+          </td>
+        </tr>
+      </tfoot>
     </table>
-  </div>
-  <div class="bulk-bar">
-    <span class="snap-total">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-      <span class="slide-wrap">
-        <span class="slide-inner bulk-count" class:bulk-hidden={selectedForDeletion.size === 0}>{selectedForDeletion.size || 1} selected</span>
-      </span>
-      <span class="slide-wrap">
-        <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
-          <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
-            Delete selected
-          </button>
-        </span>
-      </span>
-    </div>
   </div>
 </section>
 
@@ -391,25 +399,29 @@
     background: rgb(255 80 80 / 14%);
   }
 
-  .bulk-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 24px;
-    padding-right: 42px;
-    height: 44px;
+  .data-table tfoot td {
+    padding: 10px 18px;
     background: var(--surface);
-    border-radius: 0 0 24px 24px;
-    margin-left: -24px;
-    margin-right: -24px;
-    margin-bottom: -24px;
+    border-bottom: none;
+  }
+
+  .data-table tfoot td:first-child {
+    border-radius: 0 0 0 24px;
+  }
+
+  .data-table tfoot td:last-child {
+    border-radius: 0 0 24px;
+  }
+
+  .data-table tfoot .snap-total {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
   }
 
   .slide-wrap {
     overflow: hidden;
-    display: inline-flex;
-    align-items: center;
-    align-self: stretch;
+    display: inline-block;
     vertical-align: middle;
   }
 
@@ -422,11 +434,6 @@
     transform: translateY(-100%);
     opacity: 0;
     pointer-events: none;
-  }
-
-  .snap-total {
-    font-size: 0.85rem;
-    color: var(--muted);
   }
 
   .bulk-count {
