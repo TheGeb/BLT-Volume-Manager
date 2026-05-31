@@ -11,15 +11,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/locker"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/volumepath"
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/constants"
-	"github.com/example/blt-volume-manager/internal/locker"
-	"github.com/example/blt-volume-manager/internal/restic"
-	"github.com/example/blt-volume-manager/internal/snapshot"
-	"github.com/example/blt-volume-manager/internal/store"
-	"github.com/example/blt-volume-manager/internal/volumepath"
 )
 
 type volumeConfig struct {

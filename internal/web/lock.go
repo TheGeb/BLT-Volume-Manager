@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/constants"
-	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
 )
 
 func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
 )
 
 type ErrorCode int

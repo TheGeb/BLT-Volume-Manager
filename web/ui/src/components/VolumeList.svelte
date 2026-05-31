@@ -462,7 +462,7 @@
     width: 100%; box-sizing: border-box; text-decoration: none;
     margin-right: 10px;
     overflow: hidden;
-    transition: width 0.3s ease, margin 0.3s ease, background 0.15s ease;
+    transition: background 0.15s ease;
   }
 
   section:not(.lock-mode) .tree-group,
@@ -497,7 +497,6 @@
     display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding-right: 18px;
     position: relative;
     z-index: 5;
-    transition: padding 0.25s ease;
   }
 
   .lock-mode .lock-info {
@@ -508,7 +507,6 @@
     background: var(--surface);
     padding: 4px 18px 4px 6px;
     border-radius: 4px;
-    transition: padding 0.25s ease;
   }
 
   .lock-info.has-owner::before {
@@ -540,23 +538,14 @@
     width: 0;
     opacity: 0;
     overflow: hidden;
+    pointer-events: none;
     transition: width 0.2s ease, opacity 0.2s ease;
-  }
-
-  .tree-volume {
-    display: flex;
-    align-items: center;
-    overflow: visible;
-  }
-
-  .lock-mode .tree-volume {
-    padding-right: 0;
-    transition: padding 0.25s ease;
   }
 
   .tree-volume:hover .vol-actions {
     width: 60px;
     opacity: 1;
+    pointer-events: auto;
   }
 
   .vol-action-btn {

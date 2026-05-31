@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/example/blt-volume-manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
 )
 
 // VolumePath returns the filesystem path for a volume's data directory.

@@ -355,7 +355,7 @@
 </script>
 
 <section class="panel" style="margin-bottom:16px;position:relative;" bind:this={panelEl}>
-  <button class="button button-secondary button-xs" on:click={onClose} style="position:absolute;top:24px;right:24px;">Close</button>
+  <button class="button button-secondary" on:click={onClose} style="position:absolute;top:24px;right:24px;padding:10px 16px;font-size:0.9rem;border-radius:10px;">Close</button>
 
   <div style="display:flex;gap:12px;margin-bottom:20px;padding-right:70px;">
     <div style="flex:1;min-width:0;">
@@ -408,10 +408,10 @@
       {#if compareSnaps.length > 0}
         <select bind:value={selectedCompareId}>
           {#each compareSnaps as cs (cs.id)}
-            <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()})</option>
+            <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()} {new Date(cs.time).toLocaleTimeString()} | {cs.hostname})</option>
           {/each}
         </select>
-        <button class="button button-xs" style="margin-left:6px;" on:click={() => doDiff()}>Diff</button>
+        <button class="button button-xs" style="margin-left:6px;padding:8px 12px;font-size:0.85rem;border-radius:10px;" on:click={() => doDiff()}>Diff</button>
       {/if}
       {#if currentDiffResult}
         <button class="button button-secondary button-xs" style="margin-left:6px;" on:click={clearDiff}>Clear diff</button>

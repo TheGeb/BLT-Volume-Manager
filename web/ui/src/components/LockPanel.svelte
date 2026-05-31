@@ -5,22 +5,9 @@
 
   export let lockStatus: LockStatus | null = null;
   export let volume = '';
-  export let hostname = '';
-  export let onLockCreated: () => void = () => {};
   export let onLocksDeleted: () => void = () => {};
 
-  let creating = false;
   let deleting = false;
-
-  async function createLock() {
-    creating = true;
-    const ownerName = prompt('Lock owner name:', hostname);
-    if (!ownerName) { creating = false; return; }
-    try {
-      await api.createLock(volume, ownerName);
-      onLockCreated();
-    } catch {} finally { creating = false; }
-  }
 
   async function deleteLocks() {
     deleting = true;
@@ -46,11 +33,8 @@
       {/if}
     </div>
     <div class="lock-actions">
-      <button class="button button-block" on:click={createLock} disabled={creating || lockStatus.locked}>
-        {creating ? 'Creating...' : 'Create lock'}
-      </button>
-      <button class="button button-secondary button-block" on:click={deleteLocks} disabled={deleting || !lockStatus.locked}>
-        {deleting ? 'Deleting...' : 'Delete locks'}
+      <button class="button button-block" style="background:var(--red);color:#fff;" on:click={deleteLocks} disabled={deleting || !lockStatus.locked}>
+        {deleting ? 'Deleting...' : 'Delete lock'}
       </button>
     </div>
   {:else}
@@ -74,5 +58,6 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    margin-top: auto;
   }
 </style>

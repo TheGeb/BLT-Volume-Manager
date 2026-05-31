@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
 )
 
 func s3LogFn() func(op, bucket, key string, dur time.Duration, err error) {
@@ -37,6 +37,13 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			Status:     lw.status,
 			DurationMs: dur.Milliseconds(),
 		})
+	})
+}
+
+func nosniffMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
 	})
 }
 

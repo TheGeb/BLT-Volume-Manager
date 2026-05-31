@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/constants"
-	"github.com/example/blt-volume-manager/internal/volumepath"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/volumepath"
 )
 
 func TestHasTag(t *testing.T) {

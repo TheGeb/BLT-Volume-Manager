@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
 )
 
 func (s *Server) refreshStats() {

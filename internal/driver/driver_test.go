@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/snapshot"
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/snapshot"
 )
 
 func TestTypeFromString(t *testing.T) {

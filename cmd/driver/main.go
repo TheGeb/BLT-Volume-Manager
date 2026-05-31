@@ -8,10 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/version"
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/driver"
 )
 
 func main() {
@@ -24,9 +25,16 @@ func run() int {
 
 	var dataDir string
 	var socketPath string
+	var showVersion bool
 	flag.StringVar(&dataDir, "data-dir", "/var/lib/docker-volumes", "root directory for volumes")
 	flag.StringVar(&socketPath, "socket", "/run/docker/plugins/blt-volume-manager.sock", "unix socket for docker plugin")
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println(version.String())
+		return 0
+	}
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		applog.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)

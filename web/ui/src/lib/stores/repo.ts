@@ -14,6 +14,15 @@ export const stats = writable<StatsResponse | null>(null);
 export const statsLoading = writable(false);
 export const checking = writable(false);
 export const repairing = writable(false);
+export const devMode = writable(false);
+
+export async function loadDevMode() {
+  try {
+    devMode.set(await api.fetchDevMode());
+  } catch {
+    devMode.set(false);
+  }
+}
 
 export function toggleTheme() {
   themeDark.update(v => !v);

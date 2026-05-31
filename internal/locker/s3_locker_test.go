@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
 )
 
 func isLockOwned(err error) bool {

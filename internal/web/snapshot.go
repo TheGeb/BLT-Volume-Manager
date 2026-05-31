@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/example/blt-volume-manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 type SnapshotWithVolume struct {

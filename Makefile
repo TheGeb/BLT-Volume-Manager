@@ -11,6 +11,15 @@ all: lint build
 # Configurable run arguments (override from command line)
 ARGS ?=
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+
+LDFLAGS = -s -w \
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Version=$(VERSION)' \
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Commit=$(COMMIT)' \
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Date=$(DATE)'
+
 # Format Go code automatically
 format:
 	golangci-lint fmt ./...
@@ -74,23 +83,23 @@ tidy:
 
 # Build driver binary
 build-driver: tidy format
-	go build -o blt-volume-manager-plugin ./cmd/driver
+	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver
 
 # Build web binary
 build-web: tidy format ui
-	go build -o blt-volume-manager-web ./cmd/web
+	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-web ./cmd/web
 
 # Build both binaries (includes UI build)
 build: build-driver build-web
 
 # Run all tests
 test:
-	go test ./... -short
+	go test -race ./... -short
 	cd web/ui && npm test
 
 # Run Go tests only
 test-go:
-	go test ./... -short
+	go test -race ./... -short
 
 # Run UI tests only
 test-ui:
@@ -105,7 +114,7 @@ lint: format
 clean:
 	rm -f blt-volume-manager blt-volume-manager-web blt-volume-manager-plugin
 	go clean -cache
-	rm -rf web/ui/node_modules
+	rm -rf web/ui/node_modules 2>/dev/null || true
 	rm -rf web/static/*
 	rm -rf internal/web/static/*
 

@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/testutil"
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/driver"
-	"github.com/example/blt-volume-manager/internal/testutil"
 )
 
 // setupPluginTest starts Garage, creates a Driver backed by real S3, and

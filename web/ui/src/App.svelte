@@ -9,6 +9,7 @@
   import StatsGrid from './components/StatsGrid.svelte';
   import LockPanel from './components/LockPanel.svelte';
   import TroubleshootPanel from './components/TroubleshootPanel.svelte';
+  import DevTools from './components/DevTools.svelte';
   import Modal from './components/Modal.svelte';
   import type { Snapshot } from './lib/types';
   import { get } from 'svelte/store';
@@ -31,7 +32,7 @@
   } from './lib/stores/snapshots';
   import {
     prevStats, themeDark, loading, activeTab, lockStatus, stats, statsLoading, checking, repairing,
-    toggleTheme, loadLockStatus, loadStats, handleCheck, handleRepair
+    devMode, toggleTheme, loadLockStatus, loadDevMode, loadStats, handleCheck, handleRepair
   } from './lib/stores/repo';
   import {
     creatingTest, testStatus,
@@ -42,6 +43,7 @@
   let initialSyncDone = false;
 
   onMount(async () => {
+    loadDevMode();
     const saved = localStorage.getItem('themeDark');
     if (saved !== null) {
       themeDark.set(JSON.parse(saved));
@@ -242,6 +244,9 @@
   <header class="topbar">
     <h1>BLT Volume Manager</h1>
     <div class="topbar-actions">
+      {#if $devMode}
+        <DevTools volume={$selectedVolume} onAction={handleRefresh} />
+      {/if}
       <button class="button-icon" title="Refresh" on:click={handleRefresh}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
@@ -369,8 +374,6 @@
             <LockPanel
               lockStatus={$lockStatus}
               volume={$selectedVolume}
-              hostname={$hostname}
-              onLockCreated={() => loadLockStatus()}
               onLocksDeleted={() => loadLockStatus()}
             />
             <TroubleshootPanel
@@ -416,7 +419,6 @@
   <div style="margin-bottom:16px;font-size:0.85rem;color:var(--muted);">
     {$selectedDeletionCount} snapshot{$selectedDeletionCount !== 1 ? 's' : ''} selected for deletion.
   </div>
-  <p style="margin:0 0 8px;font-size:0.85rem;">Type <strong>delete</strong> to confirm:</p>
   <input class="input" type="text" placeholder='Type "delete" to confirm'
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
     bind:value={$snapDeleteInput} />
@@ -424,7 +426,7 @@
     <button class="button button-secondary" on:click={() => $deleteSnapModal = false}>Cancel</button>
     <button class="button" style="background:var(--red);color:#fff;"
       disabled={$snapDeleteInput !== 'delete'}
-      on:click={confirmDeleteSnapshot}>Delete {$selectedDeletionCount}</button>
+      on:click={confirmDeleteSnapshot}>Delete</button>
   </div>
 </Modal>
 

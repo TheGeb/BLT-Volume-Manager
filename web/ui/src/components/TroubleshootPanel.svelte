@@ -26,6 +26,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 12px;
+    margin-top: auto;
   }
 </style>

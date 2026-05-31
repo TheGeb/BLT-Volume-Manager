@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/example/blt-volume-manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
 )
 
 func btrfsCreate(source, dest string) error {

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/example/blt-volume-manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
 )
 
 func zfsDataset(path string) (string, error) {

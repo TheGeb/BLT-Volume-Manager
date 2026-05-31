@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Snapshot } from '../lib/types';
-  import { slide } from 'svelte/transition';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
@@ -131,12 +130,15 @@
               on:click={() => { navigator.clipboard.writeText(sn.id); }}>
               {sn.short_id.slice(0, 8)}…
             </td>
-            <td style="color:var(--muted);font-size:0.9rem;">
-              {#each ['hot', 'cold'] as t (t)}
-                {#if sn.tags.includes(t)}{t}{#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}{/if}
-              {:else}—
-              {/each}
-            </td>
+             <td style="color:var(--muted);font-size:0.9rem;">
+               {#each ['hot', 'cold'] as t (t)}
+                 {#if sn.tags.includes(t)}
+                   <span class="type-badge">{t}</span>
+                   {#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}
+                 {/if}
+               {:else}—
+               {/each}
+             </td>
             <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
               {#if sizes[sn.id]}
                 {sizes[sn.id]}
@@ -179,16 +181,24 @@
           </tr>
         {/each}
       </tbody>
+      <tfoot>
+        <tr class="bulk-row">
+          <td class="snap-total" style="text-align:center;">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</td>
+          <td colspan="4"></td>
+          <td class="bulk-count">
+            <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>{selectedForDeletion.size || 1} selected</span>
+          </td>
+          <td>
+            <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
+              <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
+                Delete selected
+              </button>
+            </span>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
-  {#if selectedForDeletion.size > 0}
-    <div class="bulk-bar" transition:slide={{ duration: 200 }}>
-      <span class="bulk-count">{selectedForDeletion.size} snapshot{selectedForDeletion.size !== 1 ? 's' : ''} selected</span>
-      <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
-        Delete selected
-      </button>
-    </div>
-  {/if}
 </section>
 
 <style>
@@ -213,6 +223,7 @@
   }
 
   .data-table tbody tr {
+    background: var(--surface);
     transition: background 0.15s ease;
   }
 
@@ -371,42 +382,68 @@
     background: color-mix(in srgb, var(--red) 80%, #000);
   }
 
-  tr.del-row {
+  .data-table tbody tr.del-row {
     background: rgb(255 80 80 / 6%);
     outline: 1px solid rgb(255 80 80 / 15%);
     outline-offset: -1px;
   }
 
-  .bulk-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
+  .data-table tbody tr.del-row:hover {
+    background: rgb(255 80 80 / 14%);
+  }
+
+  .bulk-row td {
     background: var(--surface);
-    border-top: 1px solid var(--border);
-    border-radius: 0 0 8px 8px;
-    position: sticky;
-    bottom: 0;
+    border-bottom: none;
+  }
+
+  .slide-inner {
+    display: inline-block;
+    max-height: 40px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+
+  .bulk-hidden {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .snap-total {
+    font-size: 0.85rem;
+    color: var(--muted);
   }
 
   .bulk-count {
     font-size: 0.85rem;
     color: var(--muted);
+    text-align: right !important;
   }
 
   .del-confirm-btn {
     background: var(--red);
     color: #fff;
     border: none;
-    padding: 6px 18px;
-    border-radius: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
   }
 
   .del-confirm-btn:hover {
     background: color-mix(in srgb, var(--red) 80%, #000);
+  }
+
+  .type-badge {
+    background: color-mix(in srgb, var(--muted) 20%, transparent);
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: capitalize;
   }
 
   @media (width <= 900px) {

@@ -3,8 +3,8 @@ package web
 import (
 	"testing"
 
-	"github.com/example/blt-volume-manager/internal/store"
-	"github.com/example/blt-volume-manager/internal/volumepath"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/volumepath"
 )
 
 func TestVolumeNameFromPath(t *testing.T) {

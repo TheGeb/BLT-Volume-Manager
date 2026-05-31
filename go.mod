@@ -1,4 +1,4 @@
-module github.com/example/blt-volume-manager
+module github.com/TheGeb/BLT-Volume-Manager
 
 go 1.26.3
 

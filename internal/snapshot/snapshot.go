@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
 )
 
 type Type int

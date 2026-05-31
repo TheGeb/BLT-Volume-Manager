@@ -199,3 +199,19 @@ export async function createTestVolume(name: string): Promise<void> {
   const d = await resp.json() as { error?: string };
   if (!resp.ok) throw new Error(d.error ?? `HTTP ${String(resp.status)}`);
 }
+
+export async function createTestSnapshot(volume: string): Promise<void> {
+  const resp = await fetch('/api/dummy-snapshot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume }),
+  });
+  const d = await resp.json() as { error?: string };
+  if (!resp.ok) throw new Error(d.error ?? `HTTP ${String(resp.status)}`);
+}
+
+export async function fetchDevMode(): Promise<boolean> {
+  const resp = await fetch('/api/dev-mode');
+  const data = await resp.json() as { enabled?: boolean };
+  return data.enabled ?? false;
+}

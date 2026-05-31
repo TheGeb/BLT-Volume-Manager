@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/store"
-	"github.com/example/blt-volume-manager/internal/testutil"
-	"github.com/example/blt-volume-manager/internal/web"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/testutil"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
 )
 
 // setupAPITest starts Garage, creates a driver + web server backed by real S3,
@@ -30,7 +30,7 @@ func setupAPITest(t *testing.T) (*httptest.Server, *testutil.GarageServer) {
 	t.Setenv("RESTIC_PASSWORD", "test-password")
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
-	t.Setenv("BLT_ENABLE_DUMMY_VOLUME", "1")
+	t.Setenv("BLT_TEST_MODE", "1")
 
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 

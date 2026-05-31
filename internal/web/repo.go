@@ -3,7 +3,7 @@ package web
 import (
 	"net/http"
 
-	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
 )
 
 func (s *Server) handleRepoStatus(w http.ResponseWriter, r *http.Request) {

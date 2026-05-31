@@ -23,16 +23,21 @@
               ${pkgs.gnumake}/bin/make ui
             '';
 
-            vendorHash = pkgs.lib.fakeSha256;
-            ldflags = [ "-s" "-w" ];
+            vendorHash = "sha256-kcrWUcjfR5O1k73qhVba8EQXR6xMyDCeYCaA9A5mGZg=";
+            ldflags = [
+              "-s"
+              "-w"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Version=0.1.0"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Commit=nix"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Date=unknown"
+            ];
             CGO_ENABLED = 0;
 
             nativeBuildInputs = [ pkgs.gnumake pkgs.nodejs ];
 
             meta = with pkgs.lib; {
               inherit meta-description;
-              homepage = "https://github.com/example/blt-volume-manager";
-              license = licenses.mit;
+              homepage = "https://github.com/TheGeb/BLT-Volume-Manager";
               platforms = platforms.linux;
             };
           };

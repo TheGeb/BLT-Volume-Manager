@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/example/blt-volume-manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
 )
 
 func TestTypeString(t *testing.T) {

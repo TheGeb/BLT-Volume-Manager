@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/restic"
-	"github.com/example/blt-volume-manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
 )
 
 //go:embed static/*
@@ -133,8 +133,17 @@ func (s *Server) volumeNames() []string {
 	return nil
 }
 
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if s.resticBase == "" {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) Register(mux *http.ServeMux) {
 	inner := http.NewServeMux()
+	inner.HandleFunc("/api/health", s.handleHealth)
 	inner.HandleFunc("/api/repo/init", s.handleRepoInit)
 	inner.HandleFunc("/api/repo/status", s.handleRepoStatus)
 	inner.HandleFunc("/api/snapshots", s.handleSnapshots)
@@ -147,8 +156,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/volumes", s.handleVolumes)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
-	if os.Getenv("BLT_ENABLE_DUMMY_VOLUME") != "" {
+	inner.HandleFunc("/api/dev-mode", s.handleDevMode)
+	if os.Getenv("BLT_TEST_MODE") != "" {
 		inner.HandleFunc("/api/dummy-volume", s.handleDummyVolume)
+		inner.HandleFunc("/api/dummy-snapshot", s.handleDummySnapshot)
 	}
 
 	verifyStaticFiles()
@@ -192,5 +203,5 @@ func (s *Server) Register(mux *http.ServeMux) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)
 	})
 
-	mux.Handle("/", loggingMiddleware(inner))
+	mux.Handle("/", nosniffMiddleware(loggingMiddleware(inner)))
 }

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/example/blt-volume-manager/internal/constants"
-	"github.com/example/blt-volume-manager/internal/restic"
-	"github.com/example/blt-volume-manager/internal/store"
-	"github.com/example/blt-volume-manager/internal/testutil"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/testutil"
 )
 
 func TestResticBackupRestoreWithGarage(t *testing.T) {

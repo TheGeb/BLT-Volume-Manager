@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/appconfig"
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/web"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/version"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
 )
 
 func main() {
@@ -24,8 +25,15 @@ func run() int {
 	defer stop()
 
 	var httpAddr string
+	var showVersion bool
 	flag.StringVar(&httpAddr, "http-addr", ":8080", "HTTP address for the BLT Volume Manager UI")
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println(version.String())
+		return 0
+	}
 
 	cfg, err := appconfig.FromEnv("/var/lib/docker-volumes")
 	if err != nil {
@@ -47,7 +55,9 @@ func run() int {
 	srv := &http.Server{
 		Addr:              httpAddr,
 		Handler:           mux,
+		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {

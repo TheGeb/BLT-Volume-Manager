@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/constants"
-	"github.com/example/blt-volume-manager/internal/store"
-	"github.com/example/blt-volume-manager/internal/volumepath"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/volumepath"
 )
 
 // FindSnapshotByHash searches for a snapshot matching the criteria derived from host + time + paths.
