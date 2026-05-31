@@ -46,6 +46,11 @@ type Server struct {
 	statsMu      sync.RWMutex
 	statsCache   *statsCache
 	statsCacheAt time.Time
+	wg           sync.WaitGroup
+}
+
+func (s *Server) Shutdown() {
+	s.wg.Wait()
 }
 
 func NewServer(cfg appconfig.Config) *Server {

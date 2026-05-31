@@ -76,7 +76,9 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing path query parameter", http.StatusBadRequest)
 			return
 		}
+		s.wg.Add(1)
 		go func() {
+			defer s.wg.Done()
 			if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
 				logInfo("restore_failed: " + err.Error())
 			} else {

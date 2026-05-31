@@ -56,9 +56,7 @@ func TestLockFolder(t *testing.T) {
 }
 
 func TestNewS3Locker(t *testing.T) {
-	t.Setenv("S3_LOCK_MAX_MINS", "30")
-
-	l, err := NewS3Locker("my-bucket", "http://localhost:9000", "us-east-1")
+	l, err := NewS3Locker("my-bucket", "http://localhost:9000", "us-east-1", 30)
 	if err != nil {
 		t.Fatalf("NewS3Locker failed: %v", err)
 	}
@@ -82,9 +80,7 @@ func TestNewS3Locker(t *testing.T) {
 }
 
 func TestNewS3LockerDefaultMaxMins(t *testing.T) {
-	t.Setenv("S3_LOCK_MAX_MINS", "")
-
-	l, err := NewS3Locker("bucket", "", "")
+	l, err := NewS3Locker("bucket", "", "", 10)
 	if err != nil {
 		t.Fatalf("NewS3Locker failed: %v", err)
 	}
@@ -96,9 +92,7 @@ func TestNewS3LockerDefaultMaxMins(t *testing.T) {
 }
 
 func TestNewS3LockerInvalidEnv(t *testing.T) {
-	t.Setenv("S3_LOCK_MAX_MINS", "invalid")
-
-	l, err := NewS3Locker("bucket", "", "")
+	l, err := NewS3Locker("bucket", "", "", 10)
 	if err != nil {
 		t.Fatalf("NewS3Locker failed: %v", err)
 	}
@@ -110,9 +104,7 @@ func TestNewS3LockerInvalidEnv(t *testing.T) {
 }
 
 func TestNewS3LockerZeroMaxMins(t *testing.T) {
-	t.Setenv("S3_LOCK_MAX_MINS", "0")
-
-	l, err := NewS3Locker("bucket", "", "")
+	l, err := NewS3Locker("bucket", "", "", 10)
 	if err != nil {
 		t.Fatalf("NewS3Locker failed: %v", err)
 	}

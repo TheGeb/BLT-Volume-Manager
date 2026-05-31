@@ -6,11 +6,11 @@ import type { FileNode } from '../lib/types';
 afterEach(cleanup);
 
 function makeDir(name: string, path: string, children?: Record<string, FileNode>): FileNode {
-  return { name, type: 'dir', path, children, full_path: path };
+  return { name, type: 'dir', path, ...(children ? { children } : {}), full_path: path };
 }
 
 function makeFile(name: string, path: string, size?: number): FileNode {
-  return { name, type: 'file', path, full_path: path, size };
+  return { name, type: 'file', path, full_path: path, ...(size != null ? { size } : {}) };
 }
 
 describe('FileTreeNode search', () => {
@@ -22,7 +22,7 @@ describe('FileTreeNode search', () => {
       depth: 1,
       searchResults: ['/src/config.ts'],
       searchActivePath: '',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const dirBg = container.querySelector('[style*="color-mix(in srgb, var(--accent) 5%, transparent)"]');
@@ -37,7 +37,7 @@ describe('FileTreeNode search', () => {
       depth: 1,
       searchResults: ['/src/config.ts'],
       searchActivePath: '/src/config.ts',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const activeBg = container.querySelector('[style*="color-mix(in srgb, var(--accent) 14%, transparent)"]');
@@ -54,7 +54,7 @@ describe('FileTreeNode search', () => {
       depth: 1,
       searchResults: ['/src/config.ts'],
       searchActivePath: '',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const hl = container.querySelector('[style*="color-mix"]');
@@ -90,7 +90,7 @@ describe('FileTreeNode search', () => {
       expanded: false,
       searchResults: ['/src/config.ts'],
       searchActivePath: '/src/config.ts',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const slideGrid = container.querySelector('.slide-grid');
@@ -107,7 +107,7 @@ describe('FileTreeNode search', () => {
       depth: 0,
       searchResults: ['/src'],
       searchActivePath: '',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const dirBg = container.querySelector('[style*="color-mix(in srgb, var(--accent) 5%, transparent)"]');
@@ -156,7 +156,7 @@ describe('FileTreeNode search', () => {
       depth: 1,
       searchResults: [],
       searchActivePath: '',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const el = container.querySelector('[data-tree-path="/src/config.ts"]');
@@ -176,7 +176,7 @@ describe('FileTreeNode search', () => {
       depth: 1,
       searchResults: [],
       searchActivePath: '',
-      searchAncestorPaths: new Set(),
+      searchAncestorPaths: new Set<string>(),
     });
 
     const el = container.querySelector('[data-tree-path="/src/config.ts"]');

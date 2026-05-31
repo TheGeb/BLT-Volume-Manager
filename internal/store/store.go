@@ -53,6 +53,7 @@ type S3StoreConfig struct {
 	S3VolumePrefix string
 	S3Endpoint     string
 	Region         string
+	ForcePathStyle *bool
 	Logger         func(op, bucket, key string, dur time.Duration, err error)
 }
 
@@ -99,7 +100,14 @@ func NewS3Store(cfg S3StoreConfig) (S3Store, error) {
 			o.UsePathStyle = true
 		})
 	}
-	if pathStyle := os.Getenv("S3_FORCE_PATH_STYLE"); strings.EqualFold(pathStyle, "1") || strings.EqualFold(pathStyle, "true") {
+	forcePathStyle := cfg.ForcePathStyle
+	if forcePathStyle == nil {
+		if v := os.Getenv("S3_FORCE_PATH_STYLE"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") {
+			t := true
+			forcePathStyle = &t
+		}
+	}
+	if forcePathStyle != nil && *forcePathStyle {
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.UsePathStyle = true
 		})

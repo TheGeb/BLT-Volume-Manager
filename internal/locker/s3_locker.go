@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/example/blt-volume-manager/internal/applog"
-	"github.com/example/blt-volume-manager/internal/constants"
 	"github.com/example/blt-volume-manager/internal/store"
 )
 
@@ -41,13 +39,7 @@ type s3Lock struct {
 	myKey string
 }
 
-func NewS3Locker(bucket string, endpoint string, region string) (Locker, error) {
-	maxMins := constants.DefaultLockMaxHoldMins
-	if mv := os.Getenv("S3_LOCK_MAX_MINS"); mv != "" {
-		if v, err := strconv.Atoi(mv); err == nil && v > 0 {
-			maxMins = v
-		}
-	}
+func NewS3Locker(bucket string, endpoint string, region string, maxHoldMins int) (Locker, error) {
 	s3, err := store.NewS3Store(store.S3StoreConfig{
 		S3Bucket:   bucket,
 		S3Endpoint: endpoint,
@@ -57,7 +49,7 @@ func NewS3Locker(bucket string, endpoint string, region string) (Locker, error) 
 	if err != nil {
 		return nil, fmt.Errorf("create s3 store for locker: %w", err)
 	}
-	return &s3Locker{bucket: bucket, maxHoldMins: maxMins, endpoint: endpoint, region: region, store: s3}, nil
+	return &s3Locker{bucket: bucket, maxHoldMins: maxHoldMins, endpoint: endpoint, region: region, store: s3}, nil
 }
 
 func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {

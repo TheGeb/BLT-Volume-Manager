@@ -49,7 +49,7 @@ func NewDriver(cfg appconfig.Config) *Driver {
 	root := cfg.DataDir
 	var l locker.Locker
 	if cfg.S3Bucket != "" {
-		if sl, err := locker.NewS3Locker(cfg.S3Bucket, cfg.S3Endpoint, cfg.S3Region); err == nil {
+		if sl, err := locker.NewS3Locker(cfg.S3Bucket, cfg.S3Endpoint, cfg.S3Region, cfg.S3LockMaxMins); err == nil {
 			l = sl
 		} else {
 			applog.Errorf("s3_locker_init_failed", err, "falling back to file locker")

@@ -55,9 +55,11 @@ func run() int {
 
 	drv := driver.NewDriver(cfg)
 	var srv *http.Server
+	var webSrv *web.Server
 	if httpAddr != "" {
 		mux := http.NewServeMux()
-		web.NewServer(cfg).Register(mux)
+		webSrv = web.NewServer(cfg)
+		webSrv.Register(mux)
 		srv = &http.Server{
 			Addr:              httpAddr,
 			Handler:           mux,
@@ -80,6 +82,9 @@ func run() int {
 		defer cancel()
 		if srv != nil {
 			_ = srv.Shutdown(shutdownCtx)
+		}
+		if webSrv != nil {
+			webSrv.Shutdown()
 		}
 		return 0
 	}
@@ -104,6 +109,9 @@ func run() int {
 		defer cancel()
 		if srv != nil {
 			_ = srv.Shutdown(shutdownCtx)
+		}
+		if webSrv != nil {
+			webSrv.Shutdown()
 		}
 	}
 

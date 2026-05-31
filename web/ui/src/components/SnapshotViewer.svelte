@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { tick } from 'svelte';
   import type { Snapshot, FileNode, DiffResult } from '../lib/types';
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
   import { formatBytes } from '../lib/util';
+  import { collectAllPaths, buildDiffMap, buildTree } from '../lib/tree-utils';
+  import { colResize, rowResize } from '../lib/resize';
   import * as api from '../lib/api';
 
   import FileTreeNode from './FileTreeNode.svelte';
+  import FileDiff from './FileDiff.svelte';
 
   export let snapshot: Snapshot;
   export let allSnapshots: Snapshot[] = [];
@@ -57,22 +60,6 @@
   let searchNavCount = 0;
   let searchJustNavigated = false;
   let treeSearchFullPath = false;
-
-  function collectAllPaths(node: any): string[] {
-    const paths: string[] = [];
-    const p = node.full_path || node.path;
-    if (p) paths.push(p);
-    if (node.children) {
-      const sorted = Object.values(node.children).sort((a: any, b: any) => {
-        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
-      for (const child of sorted) {
-        paths.push(...collectAllPaths(child));
-      }
-    }
-    return paths;
-  }
 
   $: allTreePaths = rootNode ? collectAllPaths(rootNode) : [];
   $: treeSearchResults = treeSearchQuery
@@ -169,98 +156,6 @@
     : fileContentDiffType === 'modified' ? 'var(--yellow)' : '';
   $: if (snapshot) loadSnapSize(snapshot.id);
   $: if (diffOtherId) loadSnapSize(diffOtherId);
-
-  function buildDiffMap(diff: DiffResult): Map<string, string> {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const m = new Map<string, string>();
-    for (const cs of diff.change_sets || []) {
-      for (const p of cs.paths || []) {
-        m.set(p, cs.type);
-        const norm = p.replace(/^\.\//, '').replace(/^\//, '');
-        m.set(norm, cs.type);
-        if (norm.includes('/')) {
-          const parentRel = norm.split('/').slice(1).join('/');
-          if (parentRel) m.set(parentRel, cs.type);
-        }
-      }
-    }
-    return m;
-  }
-
-  function buildTree(allNodes: FileNode[], diff: DiffResult | null): any {
-    let nodes = allNodes;
-    if (diff) {
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const existingPaths = new Set<string>();
-      for (const n of nodes) {
-        if (n.path) existingPaths.add(n.path.replace(/^\//, ''));
-      }
-      for (const cs of diff.change_sets || []) {
-        if (cs.type !== 'added') continue;
-        for (const p of cs.paths || []) {
-          const norm = p.replace(/^\.\//, '').replace(/^\//, '');
-          if (!norm || existingPaths.has(norm)) continue;
-          nodes = [...nodes, {
-            name: norm.split('/').pop() || norm,
-            type: 'file',
-            path: '/' + norm,
-            full_path: p,
-          }];
-          existingPaths.add(norm);
-        }
-      }
-    }
-    const root: any = { name: '/', type: 'dir', children: {} };
-    for (const n of nodes) {
-      if (!n.path || n.path === '/') continue;
-      const parts = n.path.replace(/^\//, '').split('/');
-      let cur = root;
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i]!;
-        if (p === '') continue;
-        if (i === parts.length - 1) {
-          (n as any).children = undefined;
-          cur.children[p] = n;
-        } else {
-          if (!cur.children[p]) {
-            cur.children[p] = { name: p, type: 'dir', path: '/' + parts.slice(0, i + 1).join('/'), children: {} };
-          } else if (!cur.children[p]!.children) {
-            cur.children[p]!.children = {};
-          }
-          cur = cur.children[p]!;
-        }
-      }
-    }
-    computeDirDiffTypes(root, diff ? buildDiffMap(diff) : null);
-    return root;
-  }
-
-  function computeDirDiffTypes(node: any, dm: Map<string, string> | null): void {
-    if (!node.children) return;
-    for (const child of Object.values(node.children) as any[]) {
-      if (child.children) computeDirDiffTypes(child, dm);
-    }
-    let result: string | null = null;
-    let hasChildWithType = false;
-    for (const child of Object.values(node.children) as any[]) {
-      let childType: string | null = null;
-      if (child.children) {
-        childType = child.dirDiffType ?? null;
-      } else {
-        const t = dm?.get(child.full_path ?? '') ?? dm?.get((child.path ?? '').replace(/^\//, '')) ?? '';
-        childType = t || null;
-      }
-      if (childType === null) continue;
-      hasChildWithType = true;
-      if (result === null) {
-        result = childType;
-      } else if (result !== childType) {
-        result = null;
-        break;
-      }
-    }
-    node.dirDiffType = hasChildWithType ? result : null;
-  }
 
   async function open() {
     loading = true;
@@ -449,106 +344,7 @@
     expandToggle++;
   }
 
-  let colDragging = false;
-  let rowDragging = false;
-  let atBottom = false;
-  let atBottomStartHeight = 0;
   let panelEl: HTMLElement;
-  let tabPanelEl: HTMLElement | null = null;
-  let startX = 0;
-  let startY = 0;
-  let startWidth = 0;
-  let startHeight = 0;
-  let startMaxHeight = 0;
-
-  function startColDrag(e: MouseEvent) {
-    e.preventDefault();
-    colDragging = true;
-    startX = e.pageX;
-    startWidth = treePanelEl ? treePanelEl.offsetWidth : 300;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }
-
-  function startRowDrag(e: MouseEvent) {
-    e.preventDefault();
-    rowDragging = true;
-    if (tabPanelEl) tabPanelEl.style.marginBottom = '';
-    tabPanelEl = panelEl.closest('.tab-panel') as HTMLElement | null;
-    startY = e.clientY;
-    startHeight = contentEl!.offsetHeight;
-    startMaxHeight = window.innerHeight - contentEl!.getBoundingClientRect().top - 40;
-    atBottom = false;
-    atBottomStartHeight = startHeight;
-    document.body.style.overflow = 'hidden';
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  }
-
-  function onMouseMove(e: MouseEvent) {
-    if (colDragging && treePanelEl && contentEl) {
-      const rect = contentEl.getBoundingClientRect();
-      const minW = 200;
-      const maxW = rect.width - 200;
-      const deltaX = e.pageX - startX;
-      let w = startWidth + deltaX;
-      if (w < minW) w = minW;
-      if (w > maxW) w = maxW;
-      treePanelEl.style.minWidth = '0';
-      treePanelEl.style.flex = `0 0 ${w}px`;
-    }
-    if (rowDragging && contentEl) {
-      const deltaY = e.clientY - startY;
-      const minH = 200;
-      let h = startHeight + deltaY;
-      if (h < minH) h = minH;
-      if (h > startMaxHeight) h = startMaxHeight;
-      contentEl.style.height = h + 'px';
-      if (h < startHeight) {
-        if (!atBottom && window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1) {
-          atBottom = true;
-          atBottomStartHeight = h;
-        }
-        if (atBottom && h < atBottomStartHeight && tabPanelEl) {
-          tabPanelEl.style.marginBottom = (atBottomStartHeight - h) + 'px';
-        }
-      } else if (atBottom) {
-        atBottom = false;
-        if (tabPanelEl) tabPanelEl.style.marginBottom = '';
-      }
-    }
-  }
-
-  function onMouseUp() {
-    if (colDragging) {
-      colDragging = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-    if (rowDragging) {
-      rowDragging = false;
-      atBottom = false;
-      document.body.style.overflow = '';
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-  }
-
-  function shrinkMarginOnScroll() {
-    if (tabPanelEl) {
-      const s = tabPanelEl.style.marginBottom;
-      if (s && s !== '' && s !== '0px' && s !== '0') {
-        const m = parseFloat(s);
-        if (m > 0) {
-          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const distFromBottom = maxScroll - window.scrollY;
-          if (distFromBottom > 0) {
-            tabPanelEl.style.marginBottom = Math.max(0, m - distFromBottom) + 'px';
-          }
-        }
-      }
-    }
-  }
 
   $: if (snapshot) {
     currentDiffResult = null;
@@ -556,19 +352,6 @@
     // eslint-disable-next-line svelte/infinite-reactive-loop
     open();
   }
-
-  onMount(() => {
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    window.addEventListener('scroll', shrinkMarginOnScroll);
-  });
-
-  onDestroy(() => {
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-    window.removeEventListener('scroll', shrinkMarginOnScroll);
-    if (tabPanelEl) tabPanelEl.style.marginBottom = '';
-  });
 </script>
 
 <section class="panel" style="margin-bottom:16px;position:relative;" bind:this={panelEl}>
@@ -697,16 +480,15 @@
               <div style="color:var(--muted);font-size:0.85rem;margin-top:8px;">Computing diff...</div>
             </div>
           {:else}
-            <FileTreeNode node={rootNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
+            <FileTreeNode node={rootNode as FileNode} depth={0} {diffMap} otherId={diffOtherId} currentSnapId={snapshot.id}
               onViewFile={viewFile} onViewFileFromId={viewFileFromId} onShowFileDiff={showFileDiff}
               expanded={rootExpanded} expandKey={expandToggle} activePath={fileContentPath}
               searchResults={treeSearchResults} searchActivePath={searchActivePath} searchAncestorPaths={searchAncestorPaths} />
           {/if}
         </div>
       </div>
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div style="width:12px;cursor:col-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
-        on:mousedown={startColDrag}>
+        use:colResize={{treePanelEl, contentEl}}>
         <div style="width:3px;height:32px;border-radius:2px;background:var(--border);"></div>
       </div>
       <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;font-family:monospace;">
@@ -722,68 +504,12 @@
             {fileContentPath.replace(/^\//, '')}
           </div>
           {#if currentDiffHunks.length > 0}
-            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
-              <span style="font-size:0.85rem;color:var(--muted);">Diff: {snapshot.short_id.slice(0, 8)} vs {diffOtherId.slice(0, 8)}</span>
-              <button class="button button-secondary button-xs" style="margin-left:auto;" on:click={toggleDiffLayout}>
-                {sideBySide ? 'Inline' : 'Side-by-side'}
-              </button>
-            </div>
-            {#if sideBySide}
-              <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-                <div style="flex:1;overflow-x:auto;border-right:1px solid var(--border);">
-                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">Old ({diffOtherId.slice(0, 8)})</div>
-                  {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
-                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--border);font-family:monospace;">
-                      @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-                    </div>
-                    {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
-                      {#if entry.type === 'add'}
-                        <div style="padding:0 4px;font-size:0.85rem;background:var(--green-bg);">&nbsp;</div>
-                      {:else}
-                        <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'del' ? 'var(--red-bg)' : ''};">
-                          <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.oldLineNo || ''}</span>
-                          <span style="width:1ch;flex-shrink:0;color:{entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'del' ? '-' : ' '}</span>
-                          <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                        </div>
-                      {/if}
-                    {/each}
-                  {/each}
-                </div>
-                <div style="flex:1;overflow-x:auto;">
-                  <div style="padding:4px 8px;font-size:0.75rem;color:var(--muted);border-bottom:1px solid var(--border);background:rgb(255 255 255 / 3%);">New ({snapshot.short_id.slice(0, 8)})</div>
-                  {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
-                    <div style="padding:2px 8px;font-size:0.75rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--border);font-family:monospace;">
-                      @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-                    </div>
-                    {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
-                      {#if entry.type === 'del'}
-                        <div style="padding:0 4px;font-size:0.85rem;background:var(--red-bg);">&nbsp;</div>
-                      {:else}
-                        <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : ''};">
-                          <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.newLineNo || ''}</span>
-                          <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
-                          <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                        </div>
-                      {/if}
-                    {/each}
-                  {/each}
-                </div>
-              </div>
-            {:else}
-              {#each currentDiffHunks as hunk (hunk.oldStart + '-' + hunk.newStart)}
-                <div style="padding:2px 8px;margin:4px 0;font-size:0.8rem;color:var(--muted);background:rgb(255 255 255 / 3%);border-radius:4px;font-family:monospace;">
-                  @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
-                </div>
-                {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
-                  <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
-                    <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
-                    <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
-                    <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
-                    <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
-                  </div>
-                {/each}
-              {/each}
-            {/if}
+            <FileDiff
+              diffHunks={currentDiffHunks}
+              {sideBySide}
+              oldLabel={diffOtherId.slice(0, 8)}
+              newLabel={snapshot.short_id.slice(0, 8)}
+              onToggleLayout={toggleDiffLayout} />
           {:else if fileContent}<div style="white-space:pre-wrap;">{fileContent.trimStart()}</div>
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
@@ -800,9 +526,8 @@
         {/if}
         </div>
       </div>
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div style="height:10px;cursor:row-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;"
-        on:mousedown={startRowDrag}>
+        use:rowResize={{contentEl, panelEl}}>
         <div style="width:40px;height:3px;border-radius:2px;background:var(--border);"></div>
       </div>
     </div>
