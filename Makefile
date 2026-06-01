@@ -1,12 +1,9 @@
 # BLT Volume Manager - Makefile
 # Usage: make [target]
-# Override args: make dev ARGS="--http-addr :9090"
+# Override args: make dev-driver ARGS="--http-addr :9090"
 
-.PHONY: all dev dev-web build test lint lint-go format clean coverage check hadolint ui ui-dev run run-web watch tidy
+.PHONY: all dev-driver dev-web build test lint lint-go format clean coverage check hadolint ui ui-dev-build run-driver tidy
 .PHONY: build-driver build-web docker-driver docker-web
-
-# Default target
-all: lint build
 
 # Configurable run arguments (override from command line)
 ARGS ?=
@@ -20,38 +17,35 @@ LDFLAGS = -s -w \
 	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Commit=$(COMMIT)' \
 	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Date=$(DATE)'
 
-# Format Go code automatically
+# Default target
+all: lint build
+
+# === Utility ===
+
 format:
 	golangci-lint fmt ./...
 
-# Go lint (format first for consistency, then lint)
+tidy:
+	go mod tidy
+
+clean:
+	rm -f blt-volume-manager blt-volume-manager-web blt-volume-manager-plugin
+	go clean -cache
+	rm -rf web/ui/node_modules 2>/dev/null || true
+	rm -f web/ui/node_modules/.install-stamp
+	rm -rf web/static/*
+	rm -rf internal/web/static/*
+
+# === Lint ===
+
 lint-go:
 	golangci-lint fmt ./...
 	golangci-lint run ./...
 
-# Development: full lint, build, and run (driver)
-# Independent checks (lint-go, hadolint, ui-dev) run in parallel with: make -j dev
-dev: lint-go hadolint ui-dev
-	go run ./cmd/driver $(ARGS)
+lint: format
+	golangci-lint run ./...
+	cd web/ui && npm run lint
 
-# Development: run the web server (full lint to catch regressions)
-dev-web: lint-go hadolint ui-dev
-	go run ./cmd/web $(ARGS)
-
-dev-ui: ui-dev
-	cd web/ui && npm run dev
-
-# CI / full check (includes tests and coverage)
-check: tidy lint-go coverage hadolint ui-dev
-
-# Go test coverage report
-coverage:
-	golangci-lint fmt ./...
-	go test ./... -coverprofile=coverage.out -short
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
-
-# Dockerfile lint via Docker (falls back to podman)
 hadolint:
 	@echo "--- Dockerfile lint ---"
 	@DOCKER=$$(command -v docker 2>/dev/null || command -v podman 2>/dev/null); \
@@ -61,79 +55,69 @@ hadolint:
 	fi; \
 	$$DOCKER run --rm -i hadolint/hadolint < Dockerfile
 
-# Build the UI only
+# === Test ===
+
+test:
+	go test -race ./... -short
+	cd web/ui && npm test
+
+test-go:
+	go test -race ./... -short
+
+test-ui:
+	cd web/ui && npm test
+
+coverage:
+	golangci-lint fmt ./...
+	go test ./... -coverprofile=coverage.out -short
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# === Build ===
+
 ui:
 	cd web/ui && npm install
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
 
-# UI development build (includes typecheck and lint:fix)
-ui-dev:
+web/ui/node_modules/.install-stamp: web/ui/package.json web/ui/package-lock.json
 	cd web/ui && npm install
-	cd web/ui && npm run check
+	touch $@
+
+ui-dev-build: web/ui/node_modules/.install-stamp
+	cd web/ui && npx svelte-check
 	cd web/ui && npm run lint:fix
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
 
-# Tidy Go module dependencies
-tidy:
-	go mod tidy
-
-# Build driver binary
 build-driver: tidy format
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver
 
-# Build web binary
 build-web: tidy format ui
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-web ./cmd/web
 
-# Build both binaries (includes UI build)
 build: build-driver build-web
 
-# Run all tests
-test:
-	go test -race ./... -short
-	cd web/ui && npm test
+# === Docker ===
 
-# Run Go tests only
-test-go:
-	go test -race ./... -short
-
-# Run UI tests only
-test-ui:
-	cd web/ui && npm test
-
-# Run linting
-lint: format
-	golangci-lint run ./...
-	cd web/ui && npm run lint
-
-# Clean build artifacts
-clean:
-	rm -f blt-volume-manager blt-volume-manager-web blt-volume-manager-plugin
-	go clean -cache
-	rm -rf web/ui/node_modules 2>/dev/null || true
-	rm -rf web/static/*
-	rm -rf internal/web/static/*
-
-# Docker build (web image)
-docker: docker-web
-
-# Docker web image
 docker-web:
 	docker build --target web -t blt-volume-manager-web:local .
 
-# Docker driver image
 docker-driver:
 	docker build --target plugin -t blt-volume-manager-plugin:local .
 
-# Quick run (driver — assumes UI is already built if running driver locally)
-run:
+# === Development ===
+
+dev-web:
+	@$(MAKE) -j3 lint-go hadolint ui-dev-build
+	go run ./cmd/web $(ARGS)
+
+# Independent checks (lint-go, hadolint, ui-dev-build) run in parallel with: make -j dev-driver
+dev-driver: lint-go hadolint ui-dev-build
 	go run ./cmd/driver $(ARGS)
 
-# Watch mode for development (requires entr or similar)
-watch:
-	@echo "Install entr: sudo apt install entr"
-	find . -name '*.go' | entr -r go run ./cmd/driver $(ARGS)
+# === CI ===
+
+check: tidy lint-go coverage hadolint ui-dev-build
