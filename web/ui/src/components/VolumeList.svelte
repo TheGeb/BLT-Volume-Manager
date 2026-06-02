@@ -241,12 +241,14 @@
 
   function handleOutroStart(e: Event) {
     const el = e.target as HTMLElement;
+    el.setAttribute('data-fading', 'true');
     const row = el.querySelector('.tree-row');
     if (row) row.setAttribute('data-fading', 'true');
   }
 
   function handleIntroEnd(e: Event) {
     const el = e.target as HTMLElement;
+    el.removeAttribute('data-fading');
     const row = el.querySelector('.tree-row');
     if (row) row.removeAttribute('data-fading');
   }
@@ -302,49 +304,8 @@
   {:else}
     <div class="tree">
       {#each flatItems as item, idx (item.path)}
-        <div transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
-          <div class="tree-row" data-lock={showLockBorders ? lockStyles[idx] || '' : ''} data-fading="false">
-            {#if lockStyles[idx]}
-              {@const clipPath = lockStyles[idx] === 'start' ? 'inset(0 round 6px 6px 0 0)' : lockStyles[idx] === 'end' ? 'inset(0 round 0 0 6px 6px)' : lockStyles[idx] === 'single' ? 'inset(0 round 6px)' : 'none'}
-              <svg class="lock-border-svg" style="left:0;top:0;width:calc(75% - 2px);height:36px;clip-path:{clipPath};opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease;">
-                <rect x="0" y="0" width="100%" height="100%" fill="color-mix(in srgb, var(--green) 8%, transparent)"/>
-                {#if lockStyles[idx] === 'start'}
-                  <rect x="0" y="0" width="2" height="100%" fill="var(--green)"/>
-                  <rect x="0" y="0" width="100%" height="2" fill="var(--green)"/>
-                  <rect x="100%" y="0" width="2" height="100%" fill="var(--green)" transform="translate(-2,0)"/>
-                {:else if lockStyles[idx] === 'end'}
-                  <rect x="0" y="0" width="2" height="100%" fill="var(--green)"/>
-                  <rect x="0" y="100%" width="100%" height="2" fill="var(--green)" transform="translate(0,-2)"/>
-                  <rect x="100%" y="0" width="2" height="100%" fill="var(--green)" transform="translate(-2,0)"/>
-                {:else if lockStyles[idx] === 'middle'}
-                  <rect x="0" y="0" width="2" height="100%" fill="var(--green)"/>
-                  <rect x="100%" y="0" width="2" height="100%" fill="var(--green)" transform="translate(-2,0)"/>
-                {:else if lockStyles[idx] === 'single'}
-                  <rect x="0" y="0" width="2" height="100%" fill="var(--green)"/>
-                  <rect x="0" y="0" width="100%" height="2" fill="var(--green)"/>
-                  <rect x="0" y="100%" width="100%" height="2" fill="var(--green)" transform="translate(0,-2)"/>
-                  <rect x="100%" y="0" width="2" height="100%" fill="var(--green)" transform="translate(-2,0)"/>
-                {/if}
-              </svg>
-              {#if lockStyles[idx] !== 'middle'}
-                <svg class="lock-border-svg" style="left:0;top:0;width:12px;height:36px;opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease;overflow:visible">
-                  {#if lockStyles[idx] === 'start' || lockStyles[idx] === 'single'}
-                    <path d="M 1 7 A 6 6 0 0 1 7 1" fill="none" stroke="var(--green)" stroke-width="2"/>
-                  {/if}
-                  {#if lockStyles[idx] === 'end' || lockStyles[idx] === 'single'}
-                    <path d="M 1 29 A 6 6 0 0 0 7 35" fill="none" stroke="var(--green)" stroke-width="2"/>
-                  {/if}
-                </svg>
-                <svg class="lock-border-svg" style="left:calc(75% - 14px);top:0;width:12px;height:36px;opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease;overflow:visible">
-                  {#if lockStyles[idx] === 'start' || lockStyles[idx] === 'single'}
-                    <path d="M 11 7 A 6 6 0 0 0 5 1" fill="none" stroke="var(--green)" stroke-width="2"/>
-                  {/if}
-                  {#if lockStyles[idx] === 'end' || lockStyles[idx] === 'single'}
-                    <path d="M 11 29 A 6 6 0 0 1 5 35" fill="none" stroke="var(--green)" stroke-width="2"/>
-                  {/if}
-                </svg>
-              {/if}
-            {/if}
+        <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
+          <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
             {#if item.isGroup}
               <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
               <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -358,16 +319,6 @@
                 </svg>
                 <span class="tree-name">{item.name}</span>
               </button>
-              <span class="lock-info" class:has-owner={folderLocks[item.path] && labelAtIdx[idx]} style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease;transform:{labelOffset[idx] || ''}">
-                {#if folderLocks[item.path]}
-                  <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
-                    <span class="lock-badge lock-locked">
-                      <span class="lock-text">Locked:</span>
-                    </span>
-                    <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
-                  </span>
-                {/if}
-              </span>
             {:else}
               <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
                 on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
@@ -398,23 +349,35 @@
                 </span>
                 {/if}
               </button>
-              <span class="lock-info" class:has-owner={volumeLockInfo[item.path]?.owner && (!lockStyles[idx] || labelAtIdx[idx])} style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease;transform:{labelOffset[idx] || ''}">
-                {#if volumeLockInfo[item.path]}
-                  {#if !lockStyles[idx] || labelAtIdx[idx]}
-                    <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
-                      <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
-                    </span>
-                    {#if volumeLockInfo[item.path]!.owner}
-                      <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
-                    {/if}
-                  {/if}
-                {:else if !loading && !lockStyles[idx]}
-                  <span class="lock-badge">—</span>
+            {/if}
+          </div>
+          {#if item.isGroup}
+            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease;transform:{labelOffset[idx] || ''}">
+              {#if folderLocks[item.path]}
+                <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
+                  <span class="lock-badge lock-locked">
+                    <span class="lock-text">Locked:</span>
+                  </span>
+                  <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
+                </span>
               {/if}
             </span>
-            {/if}
-
-          </div>
+          {:else}
+            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease;transform:{labelOffset[idx] || ''}">
+              {#if volumeLockInfo[item.path]}
+                {#if !lockStyles[idx] || labelAtIdx[idx]}
+                  <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
+                    <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                  </span>
+                  {#if volumeLockInfo[item.path]!.owner}
+                    <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
+                  {/if}
+                {/if}
+              {:else if !loading && !lockStyles[idx]}
+                <span class="lock-badge">—</span>
+              {/if}
+            </span>
+          {/if}
         </div>
       {/each}
     </div>
@@ -455,24 +418,56 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; contain: layout style; }
+  .tree { display: flex; flex-direction: column; contain: layout style; padding-top: 2px; }
 
-.tree-row {
+  .tree-row-wrap { position: relative; display: block; }
+
+  .tree-row {
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
-    contain: layout style; transition: margin-bottom 0.25s ease;
+    contain: layout style; border: 2px solid transparent; background: transparent;
+    border-radius: 0; overflow: hidden;
+    margin-top: -2px;
+    width: 100%;
+    transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, margin-top 0.25s ease, border-radius 0.25s ease;
   }
 
-  .lock-border-svg {
-    position: absolute;
-    left: 0;
-    top: 0;
-    pointer-events: none;
-    z-index: 1;
+  :global(.lock-mode) .tree-row { width: 75%; }
+
+  .panel:not(:global(.lock-mode)) .tree-row[data-lock] {
+    border-color: transparent;
+    background: transparent;
   }
 
-  :global(.tree-row[data-fading="true"]) .lock-border-svg {
-    opacity: 0 !important;
-    pointer-events: none !important;
+  :global(.tree-row[data-lock="start"]) {
+    border-color: var(--green);
+    border-bottom: 0;
+    background: var(--green-bg);
+    border-radius: 8px 8px 0 0;
+  }
+
+  :global(.tree-row[data-lock="middle"]) {
+    border-left: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+    background: var(--green-bg);
+    border-radius: 0;
+  }
+
+  :global(.tree-row[data-lock="end"]) {
+    border-color: var(--green);
+    background: var(--green-bg);
+    border-radius: 0 0 8px 8px;
+    border-top: 0;
+  }
+
+  :global(.tree-row[data-lock="single"]) {
+    border-color: var(--green);
+    background: var(--green-bg);
+    border-radius: 8px;
+  }
+
+  :global(.tree-row[data-fading="true"]) {
+    border-color: transparent !important;
+    background: transparent !important;
   }
 
 .tree-row > * { flex-shrink: 0; }
@@ -482,8 +477,7 @@
     padding: 6px 10px; border: none; border-radius: 8px;
     background: none; color: var(--text); font-size: 0.9rem;
     font-family: inherit; cursor: pointer; text-align: left;
-    width: 75%; box-sizing: border-box; text-decoration: none;
-    margin-right: 10px;
+    width: 100%; box-sizing: border-box; text-decoration: none;
     overflow: hidden;
     transition: background 0.15s ease;
   }
@@ -495,7 +489,7 @@
 
   .tree-row:not([data-lock=""]) .tree-group:hover,
   .tree-row:not([data-lock=""]) .tree-volume:hover {
-    background: color-mix(in srgb, var(--green) 12%, rgb(255 255 255 / 6%));
+    background: color-mix(in srgb, var(--green-bg), rgb(255 255 255 / 10%));
   }
 
   .tree-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -503,13 +497,17 @@
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
   .lock-info {
-    display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
-    position: relative;
-    z-index: 5;
+    display: none; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
+    position: absolute; left: 75%; top: 0; height: 36px;
+    z-index: 10;
     transition: opacity 0.25s ease;
   }
 
-  :global(.tree-row[data-fading="true"]) .lock-info {
+  :global(.lock-mode) .lock-info {
+    display: flex;
+  }
+
+  :global(.tree-row-wrap[data-fading="true"]) .lock-info {
     opacity: 0 !important;
   }
 
@@ -520,29 +518,6 @@
 
   .lock-label-content.visible {
     opacity: 1;
-  }
-
-  .lock-info.has-owner {
-    background: var(--surface);
-    padding: 4px 18px 4px 6px;
-    border-radius: 4px;
-    transition: background 0.25s ease, padding 0.25s ease, border-radius 0.25s ease;
-  }
-
-  .lock-info.has-owner::before {
-    content: '';
-    position: absolute;
-    left: -8px;
-    top: 50%;
-    width: 6px;
-    height: 2px;
-    background: var(--green);
-    transform: translateY(-50%);
-    transition: opacity 0.25s ease;
-  }
-
-  :global(.tree-row[data-fading="true"]) .lock-info.has-owner::before {
-    opacity: 0 !important;
   }
 
   .lock-badge {
