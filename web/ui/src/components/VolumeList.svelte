@@ -430,7 +430,7 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; }
+  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; padding-bottom: 2px; }
 
   .tree-row-wrap { position: relative; display: block; padding-bottom: 6px; margin-bottom: -8px; }
 
