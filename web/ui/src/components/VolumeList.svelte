@@ -80,7 +80,19 @@
       }
     }
     function toNodes(obj: any, prefix: string): TreeNode[] {
-      return Object.keys(obj).sort().map(k => {
+      const keys = Object.keys(obj);
+      const folders: string[] = [];
+      const volumes: string[] = [];
+      for (const k of keys) {
+        if (obj[k]._leaf && Object.keys(obj[k]._children).length === 0) {
+          volumes.push(k);
+        } else {
+          folders.push(k);
+        }
+      }
+      folders.sort();
+      volumes.sort();
+      return [...folders, ...volumes].map(k => {
         const full = prefix ? `${prefix}/${k}` : k;
         const n = obj[k];
         const childNodes = toNodes(n._children, full);
@@ -273,7 +285,6 @@
     {/if}
   </div>
   <div class="tree-toolbar">
-    <span class="tree-count">{filtered.length} volume{filtered.length !== 1 ? 's' : ''}</span>
     <div class="tree-actions">
       <button class="button button-secondary button-xs btn-icon-sm" on:click={expandAllGroups}>
         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -287,6 +298,7 @@
         {showLockBorders ? 'Hide' : 'Show'} locks
       </button>
     </div>
+    <span class="tree-count">{filtered.length} volume{filtered.length !== 1 ? 's' : ''}</span>
   </div>
 
   {#if loading && volumes.length === 0}
@@ -409,7 +421,7 @@
   .vol-filter-select option { background: var(--surface); color: var(--text); }
 
   .tree-toolbar {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; gap: 8px;
     margin-bottom: 12px;
   }
   .tree-count { color: var(--muted); font-size: 0.85rem; }
