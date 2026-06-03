@@ -420,13 +420,12 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; }
 
-  .tree-row-wrap { position: relative; display: block; }
+  .tree-row-wrap { position: relative; display: block; padding-bottom: 6px; margin-bottom: -8px; }
 
   .tree-row {
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
     contain: layout style; border: 2px solid transparent; background: transparent;
     border-radius: 0; overflow: hidden;
-    margin-bottom: -2px;
     width: 100%;
     transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, border-radius 0.25s ease;
   }
