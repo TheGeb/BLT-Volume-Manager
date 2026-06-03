@@ -352,7 +352,7 @@
             {/if}
           </div>
           {#if item.isGroup}
-            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease;transform:{labelOffset[idx] || ''}">
+            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
               {#if folderLocks[item.path]}
                 <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
                   <span class="lock-badge lock-locked">
@@ -363,7 +363,7 @@
               {/if}
             </span>
           {:else}
-            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease;transform:{labelOffset[idx] || ''}">
+            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
               {#if volumeLockInfo[item.path]}
                 {#if !lockStyles[idx] || labelAtIdx[idx]}
                   <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
@@ -418,7 +418,7 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; contain: layout style; padding-top: 2px; }
+  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; }
 
   .tree-row-wrap { position: relative; display: block; }
 
@@ -426,16 +426,16 @@
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
     contain: layout style; border: 2px solid transparent; background: transparent;
     border-radius: 0; overflow: hidden;
-    margin-top: -2px;
+    margin-bottom: -2px;
     width: 100%;
-    transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, margin-top 0.25s ease, border-radius 0.25s ease;
+    transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, border-radius 0.25s ease;
   }
 
   :global(.lock-mode) .tree-row { width: 75%; }
 
-  .panel:not(:global(.lock-mode)) .tree-row[data-lock] {
-    border-color: transparent;
-    background: transparent;
+  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) {
+    border-color: var(--surface);
+    background: var(--surface);
   }
 
   :global(.tree-row[data-lock="start"]) {
@@ -466,8 +466,8 @@
   }
 
   :global(.tree-row[data-fading="true"]) {
-    border-color: transparent !important;
-    background: transparent !important;
+    border-color: var(--surface);
+    background: var(--surface);
   }
 
 .tree-row > * { flex-shrink: 0; }
@@ -497,14 +497,17 @@
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
   .lock-info {
-    display: none; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
-    position: absolute; left: 75%; top: 0; height: 36px;
+    display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
+    position: absolute; left: 100%; top: 0; height: 36px;
     z-index: 10;
-    transition: opacity 0.25s ease;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, left 0.25s ease;
   }
 
   :global(.lock-mode) .lock-info {
-    display: flex;
+    left: 75%;
+    pointer-events: auto;
   }
 
   :global(.tree-row-wrap[data-fading="true"]) .lock-info {
