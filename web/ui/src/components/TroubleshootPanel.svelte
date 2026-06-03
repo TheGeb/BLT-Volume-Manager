@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
+
   export let checking = false;
   export let repairing = false;
   export let onCheck: () => void = () => {};
@@ -9,15 +11,15 @@
 <section class="panel panel-layout">
   <h2 class="panel-title">Management</h2>
   <div class="troubleshoot-actions">
-    <button class="button button-secondary button-block" title="Check repository integrity" on:click={onCheck} disabled={checking}>
+    <Button.Root class="button button-secondary button-block" title="Check repository integrity" onclick={onCheck} disabled={checking}>
       {checking ? 'Checking...' : 'Check'}
-    </button>
-    <button class="button button-secondary button-block" title="Unlock and rebuild repository index" on:click={onRepair} disabled={repairing}>
+    </Button.Root>
+    <Button.Root class="button button-secondary button-block" title="Unlock and rebuild repository index" onclick={onRepair} disabled={repairing}>
       {repairing ? 'Repairing...' : 'Repair'}
-    </button>
-    <button class="button button-block" style="background:var(--red);color:#fff;" on:click={onDeleteVolume}>
+    </Button.Root>
+    <Button.Root class="button button-block" style="background:var(--red);color:#fff;" onclick={onDeleteVolume}>
       Delete volume
-    </button>
+    </Button.Root>
   </div>
 </section>
 

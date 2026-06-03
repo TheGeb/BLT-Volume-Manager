@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import { escapeHtml } from '../lib/util';
 
   let { diff = [], path = '', sideBySide = false, onToggleLayout = () => {} }: {
@@ -91,9 +92,9 @@
 
 <div style="margin-bottom:8px;font-weight:700;display:flex;align-items:center;gap:8px;">
   <span>Diff: {escapeHtml(path)}</span>
-  <button style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onclick={onToggleLayout}>
+  <Button.Root style="font-size:0.75rem;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onclick={onToggleLayout}>
     {sideBySide ? 'Side by side' : 'Inline'}
-  </button>
+  </Button.Root>
 </div>
 
 {#if sideBySide}

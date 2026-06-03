@@ -1,39 +1,31 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { Dialog } from 'bits-ui';
 
   export let show = false;
   export let onClose: () => void = () => {};
   export let wide = false;
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && show) onClose();
+  function handleOpenChange(open: boolean) {
+    if (!open) onClose();
   }
-
-  function handleOverlayClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) onClose();
-  }
-
-  onMount(() => document.addEventListener('keydown', handleKeydown));
-  onDestroy(() => document.removeEventListener('keydown', handleKeydown));
 </script>
 
-{#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-overlay" on:click={handleOverlayClick}>
-    <div class="modal" class:modal-wide={wide}>
+<Dialog.Root open={show} onOpenChange={handleOpenChange}>
+  <Dialog.Portal>
+    <Dialog.Overlay class="modal-overlay" />
+    <Dialog.Content class="modal {wide ? 'modal-wide' : ''}">
       <slot />
-    </div>
-  </div>
-{/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
 
 <style>
-  .modal-overlay {
+  :global(.modal-overlay) {
     position: fixed; inset: 0; z-index: 1000;
     background: rgb(0 0 0 / 60%);
-    display: flex; align-items: center; justify-content: center;
   }
 
-  .modal {
+  :global(.modal) {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 24px;
@@ -41,10 +33,16 @@
     max-width: 440px;
     width: 90%;
     box-shadow: var(--shadow);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1001;
     transition: max-width 0.25s ease;
+    outline: none;
   }
 
-  .modal-wide {
+  :global(.modal-wide) {
     max-width: 600px;
   }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import type { DiffHunk } from '../lib/diff';
 
   let {
@@ -18,9 +19,9 @@
 
 <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
   <span style="font-size:0.85rem;color:var(--muted);">Diff: {oldLabel} vs {newLabel}</span>
-  <button class="button button-secondary button-xs" style="margin-left:auto;" onclick={onToggleLayout}>
+  <Button.Root class="button button-secondary button-xs" style="margin-left:auto;" onclick={onToggleLayout}>
     {sideBySide ? 'Inline' : 'Side-by-side'}
-  </button>
+  </Button.Root>
 </div>
 
 {#if sideBySide}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
+
   export let onCreateTestVolume: (name: string) => void = () => {};
   export let creatingTest = false;
   export let testStatus = '';
@@ -32,9 +34,9 @@
       <h3 class="stats-heading" style="margin:0 0 12px;">Create test data</h3>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input class="input" type="text" placeholder="name or group/name" style="width:200px;flex:none;" bind:value={testVolName} on:keydown={e => e.key === 'Enter' && handleCreate()} />
-        <button class="button button-secondary" on:click={handleCreate} disabled={creatingTest}>
+        <Button.Root class="button button-secondary" onclick={handleCreate} disabled={creatingTest}>
           {creatingTest ? 'Creating...' : 'Create sample data'}
-        </button>
+        </Button.Root>
       </div>
       {#if testStatus}
         <div class="status" style="margin-top:12px;color:{testStatus.includes('Error') ? 'var(--red)' : 'inherit'}">{testStatus}</div>

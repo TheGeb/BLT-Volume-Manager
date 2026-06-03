@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button, Popover } from 'bits-ui';
   import type { Snapshot } from '../lib/types';
 
   export let snapshots: Snapshot[] = [];
@@ -23,28 +24,11 @@
   export let onToggleDeletion: (sn: Snapshot) => void = () => {};
   export let onDeleteSelected: () => void = () => {};
 
-  let openFilter: 'type' | 'host' | null = null;
-
-  function toggleFilter(f: 'type' | 'host') {
-    openFilter = openFilter === f ? null : f;
-  }
-
-  function handleFilterKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') openFilter = null;
-  }
-
-  function handleDocClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (!target.closest('.filter-wrap')) openFilter = null;
-  }
-
   function handleRPClick(sn: Snapshot) {
     const isRP = sn.id === restorePointID || sn.short_id === restorePointID;
     isRP ? onRemoveTag(sn.id, 'restore-point', selectedVolume) : onAddTag(sn.id, 'restore-point', selectedVolume);
   }
 </script>
-
-<svelte:window on:keydown={handleFilterKeydown} on:click={handleDocClick} />
 
 <section class="panel table-panel" style="margin-bottom:0;">
   <div style="overflow-x:auto;">
@@ -59,44 +43,39 @@
           <th>
             <div class="filter-wrap">
               <span class="th-label">Type</span>
-              <button aria-label="Filter by type" class="filter-btn" class:active={openFilter === 'type' || typeFilter !== 'all'} on:click|stopPropagation={() => toggleFilter('type')}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-              </button>
-              {#if openFilter === 'type'}
-                <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
-                <div class="filter-dropdown" on:click|stopPropagation>
+              <Popover.Root>
+                <Popover.Trigger class={"filter-btn" + (typeFilter !== 'all' ? ' active' : '')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                  </svg>
+                </Popover.Trigger>
+                <Popover.Content class="filter-dropdown">
                   {#each ['all', 'hot', 'cold'] as opt (opt)}
-                    <button class="filter-opt" class:selected={typeFilter === opt}
-                      on:click={() => { onTypeFilter(opt); openFilter = null; }}>
+                    <Popover.Close class="filter-opt {typeFilter === opt ? 'selected' : ''}" onclick={() => onTypeFilter(opt)}>
                       {opt === 'all' ? 'All' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                    </button>
+                    </Popover.Close>
                   {/each}
-                </div>
-              {/if}
+                </Popover.Content>
+              </Popover.Root>
             </div>
           </th>
           <th style="text-align:center;width:100px;">Size</th>
           <th>
             <div class="filter-wrap">
               <span class="th-label">Host</span>
-              <button aria-label="Filter by host" class="filter-btn" class:active={openFilter === 'host' || hostFilter !== ''} on:click|stopPropagation={() => toggleFilter('host')}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-              </button>
-              {#if openFilter === 'host'}
-                <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
-                <div class="filter-dropdown" on:click|stopPropagation>
-                  <button class="filter-opt" class:selected={hostFilter === ''}
-                    on:click={() => { onHostFilter(''); openFilter = null; }}>All</button>
+              <Popover.Root>
+                <Popover.Trigger class={"filter-btn" + (hostFilter !== '' ? ' active' : '')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                  </svg>
+                </Popover.Trigger>
+                <Popover.Content class="filter-dropdown">
+                  <Popover.Close class="filter-opt {hostFilter === '' ? 'selected' : ''}" onclick={() => onHostFilter('')}>All</Popover.Close>
                   {#each hosts as h (h)}
-                    <button class="filter-opt" class:selected={hostFilter === h}
-                      on:click={() => { onHostFilter(h); openFilter = null; }}>{h}</button>
+                    <Popover.Close class="filter-opt {hostFilter === h ? 'selected' : ''}" onclick={() => onHostFilter(h)}>{h}</Popover.Close>
                   {/each}
-                </div>
-              {/if}
+                </Popover.Content>
+              </Popover.Root>
             </div>
           </th>
           <th style="cursor:pointer;user-select:none;white-space:nowrap;" on:click={onToggleSort}>
@@ -110,12 +89,14 @@
           <tr class:del-row={selectedForDeletion.has(sn.id)}>
              <td style="text-align:center">
                {#if restorePointLoading[sn.id]}
-                 <svg width="20" height="20" viewBox="0 0 20 20" class="spin" style="vertical-align:middle;">
-                   <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
-                   <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
-                 </svg>
+                  <span class="rp-loader">
+                    <svg width="20" height="20" viewBox="0 0 20 20" class="spin">
+                      <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
+                      <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </span>
                {:else}
-                  <button type="button" class="rp-btn" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
+                  <button type="button" class="rp-btn" title="Toggle restore point" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
                     <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
                       <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
                         stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
@@ -163,7 +144,7 @@
             </td>
          <td>
                <div style="display:flex;gap:4px;flex-wrap:nowrap;">
-                 <button class="button button-secondary button-xs" on:click={() => onOpenViewer(sn)}>View</button>
+                  <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View</Button.Root>
                  <button
                    class="button button-xs del-toggle"
                    class:del-selected={selectedForDeletion.has(sn.id)}
@@ -196,9 +177,9 @@
           <td>
             <span class="slide-wrap">
               <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
-                <button class="button del-confirm-btn" on:click={() => onDeleteSelected()}>
+                <Button.Root class="button del-confirm-btn" onclick={() => onDeleteSelected()}>
                   Delete selected
-                </button>
+                </Button.Root>
               </span>
             </span>
           </td>
@@ -259,7 +240,7 @@
     white-space: nowrap;
   }
 
-  .filter-btn {
+  :global(.filter-btn) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -274,15 +255,18 @@
     line-height: 0;
   }
 
-  .filter-btn:hover, .filter-btn.active {
+  :global(.filter-btn.active) {
     background: var(--hover-bg);
     color: var(--text);
   }
 
-  .filter-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
+  :global(.filter-btn:hover),
+  :global(.filter-btn[data-state="open"]) {
+    background: var(--hover-bg);
+    color: var(--text);
+  }
+
+  :global(.filter-dropdown) {
     z-index: 20;
     background: var(--surface-strong);
     border: 1px solid var(--border);
@@ -290,10 +274,9 @@
     padding: 4px;
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     min-width: 100px;
-    margin-top: 4px;
   }
 
-  .filter-opt {
+  :global(.filter-opt) {
     display: block;
     width: 100%;
     text-align: left;
@@ -307,11 +290,11 @@
     white-space: nowrap;
   }
 
-  .filter-opt:hover {
+  :global(.filter-opt:hover) {
     background: var(--hover-bg);
   }
 
-  .filter-opt.selected {
+  :global(.filter-opt.selected) {
     color: var(--accent);
     font-weight: 600;
   }
@@ -320,6 +303,11 @@
     background: none; border: none; padding: 0; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
     line-height: 0;
+  }
+
+  .rp-loader {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; line-height: 0;
   }
   .rp-btn:disabled { cursor: default; }
 
@@ -337,6 +325,16 @@
     margin-left: 6px; vertical-align: middle;
   }
 
+  .restore-point-info:hover::after {
+    content: attr(data-tip);
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    background: var(--surface-strong); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 400;
+    white-space: normal; width: 260px; z-index: 10; pointer-events: none;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+    margin-top: 6px; text-align: center;
+  }
+
   .spin {
     animation: spin 1s linear infinite;
     vertical-align: middle;
@@ -347,15 +345,7 @@
     to { transform: rotate(360deg); }
   }
 
-  .restore-point-info:hover::after {
-    content: attr(data-tip);
-    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-    background: var(--surface-strong); color: var(--text);
-    padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 400;
-    white-space: normal; width: 260px; z-index: 10; pointer-events: none;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
-    margin-top: 6px; text-align: center;
-  }
+
 
   .del-toggle {
     background: none;
@@ -441,7 +431,7 @@
     color: var(--muted);
   }
 
-  .del-confirm-btn {
+  :global(.del-confirm-btn) {
     background: var(--red);
     color: #fff;
     border: none;
@@ -452,7 +442,7 @@
     font-weight: 600;
   }
 
-  .del-confirm-btn:hover {
+  :global(.del-confirm-btn:hover) {
     background: color-mix(in srgb, var(--red) 80%, #000);
   }
 

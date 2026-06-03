@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
-  import Toast from './components/Toast.svelte';
+  import { Button, RadioGroup } from 'bits-ui';
+  import { Toaster } from 'svelte-sonner';
   import LandingPanel from './components/LandingPanel.svelte';
   import VolumeList from './components/VolumeList.svelte';
   import SnapshotTable from './components/SnapshotTable.svelte';
@@ -41,6 +42,12 @@
   } from './lib/stores/navigation';
 
   let initialSyncDone = false;
+  let refreshing = false;
+
+  async function doRefresh() {
+    refreshing = true;
+    try { await Promise.all([handleRefresh(), new Promise(r => setTimeout(r, 300))]); } finally { refreshing = false; }
+  }
 
   onMount(async () => {
     loadDevMode();
@@ -132,6 +139,7 @@
     background: rgb(255 255 255 / 8%);
     color: var(--text);
   }
+  .button-icon:disabled { opacity: 0.5; cursor: default; }
 
   .repo-layout {
     display: flex;
@@ -238,6 +246,44 @@
   .snap-row.restore-point { background: color-mix(in srgb, var(--accent) 4%, transparent); }
   .snap-row.restore-point:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .snap-host { color: var(--muted); margin-left: auto; flex-shrink: 0; }
+
+  :global(.radio-item) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.85rem;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    outline: none;
+    text-align: left;
+  }
+
+  :global(.radio-item::before) {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+    box-sizing: border-box;
+  }
+
+  :global(.radio-item[data-state="checked"]::before) {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--surface);
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); } to { transform: rotate(360deg); }
+  }
+  :global(.spin) { animation: spin 1s linear infinite; }
 </style>
 
 <div class="page-shell">
@@ -245,14 +291,21 @@
     <h1>BLT Volume Manager</h1>
     <div class="topbar-actions">
       {#if $devMode}
-        <DevTools volume={$selectedVolume} onAction={handleRefresh} />
+        <DevTools volume={$selectedVolume} onAction={doRefresh} />
       {/if}
-      <button class="button-icon" title="Refresh" on:click={handleRefresh}>
+      <button class="button-icon" title="Refresh" on:click={doRefresh} disabled={refreshing}>
+        {#if refreshing}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10"/>
+          </svg>
+        {:else}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
         </svg>
+        {/if}
       </button>
       <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
         {#if $themeDark}
@@ -276,7 +329,7 @@
     </div>
   </header>
 
-  <Toast />
+  <Toaster position="bottom-right" visibleToasts={3} toastOptions={{ style: 'padding:18px 28px;font-size:1rem;font-weight:500;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:0 6px 24px rgb(0 0 0 / 30%);' }} />
 
   {#if $landingShown}
     {#if $volumes.length === 0 && !$volumesLoading}
@@ -405,12 +458,12 @@
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
     bind:value={$deleteConfirmText} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => $deleteVolModal = false}>Cancel</button>
-    <button class="button" style="background:var(--red);color:#fff;"
+    <Button.Root class="button button-secondary" onclick={() => $deleteVolModal = false}>Cancel</Button.Root>
+    <Button.Root class="button" style="background:var(--red);color:#fff;"
       disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading}
-      on:click={confirmDeleteVolume}>
+      onclick={confirmDeleteVolume}>
       {$deleteVolLoading ? 'Deleting...' : 'Delete'}
-    </button>
+    </Button.Root>
   </div>
 </Modal>
 
@@ -423,10 +476,10 @@
     style="width:100%;box-sizing:border-box;margin-bottom:16px;"
     bind:value={$snapDeleteInput} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => $deleteSnapModal = false}>Cancel</button>
-    <button class="button" style="background:var(--red);color:#fff;"
+    <Button.Root class="button button-secondary" onclick={() => $deleteSnapModal = false}>Cancel</Button.Root>
+    <Button.Root class="button" style="background:var(--red);color:#fff;"
       disabled={$snapDeleteInput !== 'delete'}
-      on:click={confirmDeleteSnapshot}>Delete</button>
+      onclick={confirmDeleteSnapshot}>Delete</Button.Root>
   </div>
 </Modal>
 
@@ -444,14 +497,14 @@
 
   <fieldset style="border:none;padding:0;margin:0 0 8px;">
     <legend style="font-size:0.85rem;margin-bottom:6px;">Snapshots to copy:</legend>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85rem;cursor:pointer;">
-      <input type="radio" name="copyMode" value="all" bind:group={$copySnapshotMode} />
-      All snapshots
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.85rem;cursor:pointer;">
-      <input type="radio" name="copyMode" value="specific" bind:group={$copySnapshotMode} />
-      Specific snapshot…
-    </label>
+    <RadioGroup.Root bind:value={$copySnapshotMode}>
+      <RadioGroup.Item value="all" class="radio-item">
+        All snapshots
+      </RadioGroup.Item>
+      <RadioGroup.Item value="specific" class="radio-item">
+        Select snapshots...
+      </RadioGroup.Item>
+    </RadioGroup.Root>
   </fieldset>
 
   {#if $copySnapshotMode === 'specific'}
@@ -495,11 +548,11 @@
     <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
   {/if}
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => $copyVolModal = false}>Cancel</button>
-    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading || ($copySnapshotMode === 'specific' && $copySelectedSnapshotIds.length === 0)}
-      on:click={confirmCopyVolume}>
+    <Button.Root class="button button-secondary" onclick={() => $copyVolModal = false}>Cancel</Button.Root>
+    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || ($copySnapshotMode === 'specific' && $copySelectedSnapshotIds.length === 0)}
+      onclick={confirmCopyVolume}>
       {$copyRenameLoading ? 'Copying...' : 'Copy'}
-    </button>
+    </Button.Root>
   </div>
 </Modal>
 
@@ -523,10 +576,10 @@
     <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
   {/if}
   <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="button button-secondary" on:click={() => $renameVolModal = false}>Cancel</button>
-    <button class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeLockInfo[$copyRenameSource]?.locked}
-      on:click={confirmRenameVolume}>
+    <Button.Root class="button button-secondary" onclick={() => $renameVolModal = false}>Cancel</Button.Root>
+    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeLockInfo[$copyRenameSource]?.locked}
+      onclick={confirmRenameVolume}>
       {$copyRenameLoading ? 'Renaming...' : 'Rename'}
-    </button>
+    </Button.Root>
   </div>
 </Modal>

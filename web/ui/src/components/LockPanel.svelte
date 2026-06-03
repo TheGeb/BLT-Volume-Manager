@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import type { LockStatus } from '../lib/types';
   import { formatExpiration } from '../lib/util';
   import * as api from '../lib/api';
@@ -33,9 +34,9 @@
       {/if}
     </div>
     <div class="lock-actions">
-      <button class="button button-block" style="background:var(--red);color:#fff;" on:click={deleteLocks} disabled={deleting || !lockStatus.locked}>
+      <Button.Root class="button button-block" style="background:var(--red);color:#fff;" onclick={deleteLocks} disabled={deleting || !lockStatus.locked}>
         {deleting ? 'Deleting...' : 'Delete lock'}
-      </button>
+      </Button.Root>
     </div>
   {:else}
     <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.9rem;">
