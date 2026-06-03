@@ -492,6 +492,11 @@
     background: color-mix(in srgb, var(--green-bg), rgb(255 255 255 / 10%));
   }
 
+  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
+  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-volume:hover {
+    background: transparent;
+  }
+
   .tree-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .folder-icon, .volume-icon { flex-shrink: 0; opacity: 0.7; }
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
