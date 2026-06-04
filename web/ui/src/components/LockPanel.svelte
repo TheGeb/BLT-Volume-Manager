@@ -34,7 +34,7 @@
       {/if}
     </div>
     <div class="lock-actions">
-      <Button.Root class="button button-block" style="background:var(--red);color:#fff;" onclick={deleteLocks} disabled={deleting || !lockStatus.locked}>
+      <Button.Root class="button button-block button-destructive" onclick={deleteLocks} disabled={deleting || !lockStatus.locked}>
         {deleting ? 'Deleting...' : 'Delete lock'}
       </Button.Root>
     </div>

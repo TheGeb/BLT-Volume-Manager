@@ -17,7 +17,7 @@
     <Button.Root class="button button-secondary button-block" title="Unlock and rebuild repository index" onclick={onRepair} disabled={repairing}>
       {repairing ? 'Repairing...' : 'Repair'}
     </Button.Root>
-    <Button.Root class="button button-block" style="background:var(--red);color:#fff;" onclick={onDeleteVolume}>
+    <Button.Root class="button button-block button-destructive" onclick={onDeleteVolume}>
       Delete volume
     </Button.Root>
   </div>

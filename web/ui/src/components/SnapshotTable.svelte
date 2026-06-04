@@ -146,7 +146,7 @@
                <div style="display:flex;gap:4px;flex-wrap:nowrap;">
                   <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View</Button.Root>
                  <button
-                   class="button button-xs del-toggle"
+                   class="del-toggle"
                    class:del-selected={selectedForDeletion.has(sn.id)}
                    on:click={() => onToggleDeletion(sn)}>
                    {selectedForDeletion.has(sn.id) ? '×' : 'Delete'}
@@ -177,7 +177,7 @@
           <td>
             <span class="slide-wrap">
               <span class="slide-inner" class:bulk-hidden={selectedForDeletion.size === 0}>
-                <Button.Root class="button del-confirm-btn" onclick={() => onDeleteSelected()}>
+                <Button.Root class="del-confirm-btn" onclick={() => onDeleteSelected()}>
                   Delete selected
                 </Button.Root>
               </span>
@@ -434,16 +434,18 @@
   :global(.del-confirm-btn) {
     background: var(--red);
     color: #fff;
-    border: none;
+    border: 1px solid transparent;
     padding: 8px 14px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.8rem;
     font-weight: 600;
+    transition: background 0.15s, border-color 0.15s;
   }
 
   :global(.del-confirm-btn:hover) {
-    background: color-mix(in srgb, var(--red) 80%, #000);
+    background: color-mix(in srgb, var(--red) 70%, #fff);
+    border-color: var(--red);
   }
 
   .type-badge {

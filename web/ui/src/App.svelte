@@ -459,7 +459,7 @@
     bind:value={$deleteConfirmText} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
     <Button.Root class="button button-secondary" onclick={() => $deleteVolModal = false}>Cancel</Button.Root>
-    <Button.Root class="button" style="background:var(--red);color:#fff;"
+    <Button.Root class="button button-destructive"
       disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading}
       onclick={confirmDeleteVolume}>
       {$deleteVolLoading ? 'Deleting...' : 'Delete'}
@@ -477,13 +477,13 @@
     bind:value={$snapDeleteInput} />
   <div style="display:flex;gap:8px;justify-content:flex-end;">
     <Button.Root class="button button-secondary" onclick={() => $deleteSnapModal = false}>Cancel</Button.Root>
-    <Button.Root class="button" style="background:var(--red);color:#fff;"
+    <Button.Root class="button button-destructive"
       disabled={$snapDeleteInput !== 'delete'}
       onclick={confirmDeleteSnapshot}>Delete</Button.Root>
   </div>
 </Modal>
 
-<Modal show={$copyVolModal} onClose={() => $copyVolModal = false} wide={$copySnapshotMode === 'specific'}>
+<Modal show={$copyVolModal} onClose={() => $copyVolModal = false} wide={true}>
   <h3 style="margin:0 0 12px;">Copy volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
     Copy snapshots from <strong>{$copyRenameSource}</strong> to a new volume.
@@ -508,7 +508,7 @@
   </fieldset>
 
   {#if $copySnapshotMode === 'specific'}
-    <div style="margin-bottom:8px;">
+    <div style="margin-bottom:8px;" transition:slide>
       {#if $copySnapshotsLoading}
         <p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:12px;">Loading snapshots…</p>
       {:else if $copySnapshots.length === 0}
