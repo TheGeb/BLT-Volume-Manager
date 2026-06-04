@@ -412,13 +412,12 @@
   .volume-filter-input::placeholder { color: var(--muted); }
 
   .vol-filter-select {
-    padding: 8px 12px; border-radius: 10px;
-    border: 1px solid var(--border); background: rgb(255 255 255 / 4%);
-    color: var(--text); font-size: 0.85rem; cursor: pointer; outline: none;
+    padding: 8px 28px 8px 12px; border-radius: 10px;
+    font-size: 0.85rem; cursor: pointer; outline: none;
     transition: border-color 0.15s;
   }
+  .vol-filter-select:hover { border-color: var(--muted); }
   .vol-filter-select:focus { border-color: var(--accent); }
-  .vol-filter-select option { background: var(--surface); color: var(--text); }
 
   .tree-toolbar {
     display: flex; align-items: center; gap: 8px;
@@ -430,14 +429,15 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; padding-bottom: 2px; }
+  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; padding-bottom: 4px; }
 
-  .tree-row-wrap { position: relative; display: block; padding-bottom: 6px; margin-bottom: -8px; }
+  .tree-row-wrap { position: relative; display: block; }
 
   .tree-row {
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
     contain: layout style; border: 2px solid transparent; background: transparent;
-    border-radius: 0; overflow: hidden;
+    border-radius: 0;
+    margin-bottom: -4px;
     width: 100%;
     transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, border-radius 0.25s ease;
   }
@@ -454,12 +454,14 @@
     border-bottom: 0;
     background: var(--green-bg);
     border-radius: 8px 8px 0 0;
+    overflow: hidden;
   }
 
   :global(.tree-row[data-lock="middle"]) {
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
-    background: var(--green-bg);
+    background: linear-gradient(90deg, transparent 2.5px, var(--green-bg) 2.5px, var(--green-bg) calc(100% - 2.5px), transparent calc(100% - 2.5px));
+    background-origin: border-box;
     border-radius: 0;
   }
 
@@ -468,12 +470,14 @@
     background: var(--green-bg);
     border-radius: 0 0 8px 8px;
     border-top: 0;
+    overflow: hidden;
   }
 
   :global(.tree-row[data-lock="single"]) {
     border-color: var(--green);
     background: var(--green-bg);
     border-radius: 8px;
+    overflow: hidden;
   }
 
   :global(.tree-row[data-fading="true"]) {
