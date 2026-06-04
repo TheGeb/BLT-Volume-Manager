@@ -268,7 +268,7 @@
 
   :global(.filter-dropdown) {
     z-index: 20;
-    background: var(--surface-strong);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;

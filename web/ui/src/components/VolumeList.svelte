@@ -3,6 +3,7 @@
   import { formatExpiration } from '../lib/util';
   import type { VolumeLockInfo } from '../lib/types';
   import { volumes as allVolumes, openCopyVolModal, openRenameVolModal } from '../lib/stores/volumes';
+  import DropSelect from './DropSelect.svelte';
 
   export let volumes: string[] = [];
   export let loading = false;
@@ -12,7 +13,7 @@
   export let volumeLockInfo: Record<string, VolumeLockInfo> = {};
 
   let filterVal = '';
-  let statusFilter: 'all' | 'locked' | 'unlocked' = 'all';
+  let statusFilter = 'all';
   let hostFilterVal = '';
   let showLockBorders = true;
   let actionsReady = false;
@@ -270,18 +271,24 @@
   <div class="filter-row">
     <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
       bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
-    <select class="vol-filter-select" bind:value={statusFilter}>
-      <option value="all">All statuses</option>
-      <option value="locked">Locked</option>
-      <option value="unlocked">Unlocked</option>
-    </select>
+    <DropSelect
+      options={[
+        { value: 'All statuses', label: 'All statuses' },
+        { value: 'Locked', label: 'Locked' },
+        { value: 'Unlocked', label: 'Unlocked' },
+      ]}
+      value={statusFilter}
+      onValueChange={(v) => statusFilter = v as 'All statuses' | 'Locked' | 'Unlocked'}
+    />
     {#if hosts.length > 0}
-      <select class="vol-filter-select" bind:value={hostFilterVal}>
-        <option value="">All hosts</option>
-        {#each hosts as h (h)}
-          <option value={h}>{h}</option>
-        {/each}
-      </select>
+      <DropSelect
+        options={[
+          { value: '', label: 'All hosts' },
+          ...hosts.map(h => ({ value: h, label: h })),
+        ]}
+        value={hostFilterVal}
+        onValueChange={(v) => hostFilterVal = v}
+      />
     {/if}
   </div>
   <div class="tree-toolbar">

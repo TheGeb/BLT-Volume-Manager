@@ -11,6 +11,7 @@
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
+  import DropSelect from './DropSelect.svelte';
 
   export let snapshot: Snapshot;
   export let allSnapshots: Snapshot[] = [];
@@ -32,11 +33,11 @@
   let selectedCompareId = '';
   let compareLoading = true;
   let diffLoading = false;
-  let treePanelStartWidth = 300;
-  let selectEl: HTMLSelectElement;
+  let treePanelStartWidth = 280;
+  let selectWrapEl: HTMLDivElement;
 
-  $: if (selectEl) {
-    treePanelStartWidth = selectEl.offsetWidth;
+  $: if (selectWrapEl) {
+    treePanelStartWidth = selectWrapEl.offsetWidth;
   }
 
   let snapSizes: Record<string, string> = {};
@@ -413,11 +414,13 @@
   {:else}
     <div style="gap:12px;margin-bottom:12px;display:flex;align-items:center;">
       {#if compareSnaps.length > 0}
-        <select bind:value={selectedCompareId} bind:this={selectEl}>
-          {#each compareSnaps as cs (cs.id)}
-            <option value={cs.id}>{cs.short_id.slice(0, 8)}… ({new Date(cs.time).toLocaleDateString()} {new Date(cs.time).toLocaleTimeString()} -  {cs.hostname})</option>
-          {/each}
-        </select>
+        <div bind:this={selectWrapEl}>
+          <DropSelect
+            options={compareSnaps.map(cs => ({ value: cs.id, label: `${cs.short_id.slice(0, 8)}… (${new Date(cs.time).toLocaleDateString()} ${new Date(cs.time).toLocaleTimeString()} - ${cs.hostname})` }))}
+            value={selectedCompareId}
+            onValueChange={(v) => selectedCompareId = v}
+          />
+        </div>
         <Button.Root class="button button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={() => doDiff()}>Diff</Button.Root>
       {/if}
       {#if currentDiffResult}
