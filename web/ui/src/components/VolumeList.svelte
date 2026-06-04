@@ -436,15 +436,14 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
-  .tree { display: flex; flex-direction: column; contain: layout style; overflow: hidden; padding-bottom: 4px; }
+  .tree { display: flex; flex-direction: column; contain: layout style; padding-bottom: 4px; }
 
-  .tree-row-wrap { position: relative; display: block; }
+  .tree-row-wrap { position: relative; display: block; margin-bottom: -4px; }
 
   .tree-row {
     display: flex; align-items: stretch; height: 36px; position: relative; box-sizing: border-box;
     contain: layout style; border: 2px solid transparent; background: transparent;
     border-radius: 0;
-    margin-bottom: -4px;
     width: 100%;
     transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, border-radius 0.25s ease;
   }
@@ -467,8 +466,9 @@
   :global(.tree-row[data-lock="middle"]) {
     border-left: 2px solid var(--green);
     border-right: 2px solid var(--green);
-    background: linear-gradient(90deg, transparent 2.5px, var(--green-bg) 2.5px, var(--green-bg) calc(100% - 2.5px), transparent calc(100% - 2.5px));
-    background-origin: border-box;
+    border-top: 0;
+    border-bottom: 0;
+    background-color: var(--green-bg);
     border-radius: 0;
   }
 
@@ -488,8 +488,11 @@
   }
 
   :global(.tree-row[data-fading="true"]) {
-    border-color: var(--surface);
-    background: var(--surface);
+    /* border-color: var(--surface);
+    background: var(--surface); */
+    border-color: var(--green);
+    background: var(--green-bg);
+    transition: none;
   }
 
 .tree-row > * { flex-shrink: 0; }
