@@ -348,7 +348,7 @@
 
 
   .del-toggle {
-    background: none;
+    background: rgb(255 80 80 / 10%);
     border: 1px solid var(--red);
     color: var(--red);
     cursor: pointer;
