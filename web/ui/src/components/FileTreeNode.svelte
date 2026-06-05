@@ -73,7 +73,7 @@
   $: isSearchActive = searchActivePath && (node.path === searchActivePath || node.full_path === searchActivePath);
 
   $: diffColor = !diffType ? ''
-    : diffType === 'added' ? 'var(--green)'
+    : diffType === 'added' ? 'var(--purple)'
     : diffType === 'removed' ? 'var(--red)'
     : diffType === 'modified' ? 'var(--yellow)' : '';
 
@@ -92,7 +92,7 @@
   $: hlIndent = 8 + Math.max(0, depth - 1) * 18;
 
   $: dirDiffColor = node.dirDiffType
-    ? ({ added: 'var(--green)', removed: 'var(--red)', modified: 'var(--yellow)' } as Record<string, string>)[node.dirDiffType] || ''
+    ? ({ added: 'var(--purple)', removed: 'var(--red)', modified: 'var(--yellow)' } as Record<string, string>)[node.dirDiffType] || ''
     : '';
   $: dirBg = isSearchActive
     ? 'color-mix(in srgb, var(--accent) 14%, transparent)'

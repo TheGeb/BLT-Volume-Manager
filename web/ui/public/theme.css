@@ -12,8 +12,8 @@
   --accent-soft: #4f46e5;
   --border: rgb(148 163 184 / 16%);
   --shadow: 0 18px 40px rgb(12 20 38 / 25%);
-  --green: #34d399;
-  --green-bg: #10292f;
+  --purple: #8e6ef0;
+  --purple-bg: #19162b;
   --yellow: #fbbf24;
   --yellow-bg: rgb(251 191 36 / 12%);
   --red: #f87171;
@@ -35,8 +35,8 @@ body.light {
   --accent-soft: #3b82f6;
   --border: rgb(148 163 184 / 24%);
   --shadow: 0 18px 40px rgb(15 23 42 / 8%);
-  --green: #059669;
-  --green-bg: #e0f0ed;
+  --purple: #6f55d8;
+  --purple-bg: #eeebff;
   --yellow: #d97706;
   --yellow-bg: rgb(217 119 6 / 10%);
   --red: #dc2626;

@@ -159,7 +159,7 @@
     ? (diffMap.get(fileContentPath) ?? diffMap.get(fileContentPath.replace(/^\//, '')) ?? '')
     : '';
   $: fileContentDiffColor = !fileContentDiffType ? ''
-    : fileContentDiffType === 'added' ? 'var(--green)'
+    : fileContentDiffType === 'added' ? 'var(--purple)'
     : fileContentDiffType === 'removed' ? 'var(--red)'
     : fileContentDiffType === 'modified' ? 'var(--yellow)' : '';
   $: if (snapshot) loadSnapSize(snapshot.id);

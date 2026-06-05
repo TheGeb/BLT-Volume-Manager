@@ -81,6 +81,9 @@ ui:
 	mkdir -p internal/web/static
 	cp -r web/static/* internal/web/static/
 
+run-web:
+	go run ./cmd/web $(ARGS)
+
 web/ui/node_modules/.install-stamp: web/ui/package.json web/ui/package-lock.json
 	cd web/ui && npm install
 	touch $@
