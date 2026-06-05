@@ -34,7 +34,7 @@
         </div>
         {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
           {#if entry.type === 'add'}
-            <div style="padding:0 4px;font-size:0.85rem;background:var(--purple-bg);">&nbsp;</div>
+            <div style="padding:0 4px;font-size:0.85rem;background:var(--green-bg);">&nbsp;</div>
           {:else}
             <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'del' ? 'var(--red-bg)' : ''};">
               <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.oldLineNo || ''}</span>
@@ -55,9 +55,9 @@
           {#if entry.type === 'del'}
             <div style="padding:0 4px;font-size:0.85rem;background:var(--red-bg);">&nbsp;</div>
           {:else}
-            <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--purple-bg)' : ''};">
+            <div style="display:flex;padding:0 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : ''};">
               <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.newLineNo || ''}</span>
-              <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--purple)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
+              <span style="width:1ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : ''};">{entry.type === 'add' ? '+' : ' '}</span>
               <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
             </div>
           {/if}
@@ -71,10 +71,10 @@
       @@ -{hunk.oldStart},{hunk.oldLen} +{hunk.newStart},{hunk.newLen} @@
     </div>
     {#each hunk.lines as entry (entry.oldLineNo + '-' + entry.newLineNo)}
-      <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--purple-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
+      <div style="display:flex;padding:1px 4px;font-size:0.85rem;background:{entry.type === 'add' ? 'var(--green-bg)' : entry.type === 'del' ? 'var(--red-bg)' : ''};border-radius:2px;">
         <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'add' ? '' : entry.oldLineNo}</span>
         <span style="width:3ch;text-align:right;color:var(--muted);flex-shrink:0;user-select:none;">{entry.type === 'del' ? '' : entry.newLineNo}</span>
-        <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--purple)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
+        <span style="width:1.2ch;flex-shrink:0;color:{entry.type === 'add' ? 'var(--green)' : entry.type === 'del' ? 'var(--red)' : ''};">{entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' '}</span>
         <span style="flex:1;white-space:pre-wrap;">{entry.content}</span>
       </div>
     {/each}

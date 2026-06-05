@@ -52,7 +52,10 @@
     border-color: var(--muted);
   }
 
-  :global(.drop-select-trigger:focus),
+  :global(.drop-select-trigger:focus) {
+    border-color: var(--accent);
+  }
+
   :global(.drop-select-trigger[data-state="open"]) {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);

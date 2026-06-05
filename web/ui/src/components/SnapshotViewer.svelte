@@ -1,5 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { slide } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import type { Snapshot, FileNode, DiffResult } from '../lib/types';
   import { computeDiff } from '../lib/diff';
   import type { DiffHunk, DiffLine } from '../lib/diff';
@@ -12,6 +14,33 @@
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
   import DropSelect from './DropSelect.svelte';
+
+  function slideFade(node: Element, { duration = 200 } = {}) {
+    const style = getComputedStyle(node);
+    const height = parseFloat(style.height);
+    const paddingTop = parseFloat(style.paddingTop);
+    const paddingBottom = parseFloat(style.paddingBottom);
+    const marginTop = parseFloat(style.marginTop);
+    const marginBottom = parseFloat(style.marginBottom);
+    const borderTop = parseFloat(style.borderTopWidth);
+    const borderBottom = parseFloat(style.borderBottomWidth);
+    const opacityEasing = (t: number) => 1 - Math.pow(1 - t, 2);
+    return {
+      duration,
+      easing: cubicOut,
+      css: (t: number) => `
+        overflow: hidden;
+        height: ${t * height}px;
+        padding-top: ${t * paddingTop}px;
+        padding-bottom: ${t * paddingBottom}px;
+        margin-top: ${t * marginTop}px;
+        margin-bottom: ${t * marginBottom}px;
+        border-top-width: ${t * borderTop}px;
+        border-bottom-width: ${t * borderBottom}px;
+        opacity: ${opacityEasing(t)};
+      `
+    };
+  }
 
   export let snapshot: Snapshot;
   export let allSnapshots: Snapshot[] = [];
@@ -159,7 +188,7 @@
     ? (diffMap.get(fileContentPath) ?? diffMap.get(fileContentPath.replace(/^\//, '')) ?? '')
     : '';
   $: fileContentDiffColor = !fileContentDiffType ? ''
-    : fileContentDiffType === 'added' ? 'var(--purple)'
+    : fileContentDiffType === 'added' ? 'var(--green)'
     : fileContentDiffType === 'removed' ? 'var(--red)'
     : fileContentDiffType === 'modified' ? 'var(--yellow)' : '';
   $: if (snapshot) loadSnapSize(snapshot.id);
@@ -375,32 +404,30 @@
           <span class="snap-meta-item">Host: <strong>{snapshot.hostname}</strong></span>
         {/if}
         <span class="snap-meta-item">{new Date(snapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(snapshot.time).toLocaleTimeString()}</span></span>
-        {#if snapshot.tags.length}
-          <span class="snap-meta-item">Tags: <strong>{snapshot.tags.join(', ')}</strong></span>
-        {/if}
+        <span class="snap-meta-item">Type: <strong>{snapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
         <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
       </div>
     </div>
     {#if currentDiffResult && diffOtherSnapshot}
-      <div style="display:flex;align-items:center;flex-shrink:0;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-        </svg>
-      </div>
-      <div class="snap-meta-divider"></div>
-      <div style="flex:1;min-width:0;">
-        <h2 class="eyebrow" style="margin:0 0 4px;">
-          Diff <span style="text-transform:none;">{diffOtherSnapshot.short_id}</span>
-        </h2>
-        <div class="snap-meta">
-          {#if diffOtherSnapshot.hostname}
-            <span class="snap-meta-item">Host: <strong>{diffOtherSnapshot.hostname}</strong></span>
-          {/if}
-          <span class="snap-meta-item">{new Date(diffOtherSnapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(diffOtherSnapshot.time).toLocaleTimeString()}</span></span>
-          {#if diffOtherSnapshot.tags.length}
-            <span class="snap-meta-item">Tags: <strong>{diffOtherSnapshot.tags.join(', ')}</strong></span>
-          {/if}
-          <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;overflow:hidden;" transition:slideFade>
+        <div style="display:flex;align-items:center;flex-shrink:0;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </div>
+        <div class="snap-meta-divider"></div>
+        <div style="flex:1;min-width:0;">
+          <h2 class="eyebrow" style="margin:0 0 4px;">
+            Diff <span style="text-transform:none;">{diffOtherSnapshot.short_id}</span>
+          </h2>
+          <div class="snap-meta">
+            {#if diffOtherSnapshot.hostname}
+              <span class="snap-meta-item">Host: <strong>{diffOtherSnapshot.hostname}</strong></span>
+            {/if}
+            <span class="snap-meta-item">{new Date(diffOtherSnapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(diffOtherSnapshot.time).toLocaleTimeString()}</span></span>
+            <span class="snap-meta-item">Type: <strong>{diffOtherSnapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
+            <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+          </div>
         </div>
       </div>
     {/if}
@@ -424,8 +451,8 @@
         <Button.Root class="button button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={() => doDiff()}>Diff</Button.Root>
       {/if}
       {#if currentDiffResult}
-        <Button.Root class="button button-secondary button-xs" style="margin-left:8px;" onclick={clearDiff}>Clear diff</Button.Root>
-        <Button.Root class="button button-secondary button-xs" style="margin-left:8px;" onclick={handleSwapDiff}>Swap diff</Button.Root>
+        <Button.Root class="button button-xs clear-diff-btn" style="margin-left:8px;padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={clearDiff}>Clear diff</Button.Root>
+        <Button.Root class="button button-secondary button-xs" style="margin-left:8px;padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={handleSwapDiff}>Swap diff</Button.Root>
       {/if}
     </div>
   {/if}
@@ -613,5 +640,18 @@
     pointer-events: none;
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     margin-bottom: 6px;
+  }
+
+  :global(.clear-diff-btn) {
+    background: rgb(255 80 80 / 10%);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  :global(.clear-diff-btn:hover) {
+    background: rgb(255 80 80 / 15%) !important;
+    border-color: var(--red) !important;
+    opacity: 1;
   }
 </style>
