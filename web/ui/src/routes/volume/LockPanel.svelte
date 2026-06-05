@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Button } from 'bits-ui';
-  import type { LockStatus } from '../lib/types';
-  import { formatExpiration } from '../lib/util';
-  import * as api from '../lib/api';
+  import type { LockStatus } from '../../lib/types';
+  import { formatExpiration } from '../../lib/util';
+  import * as api from '../../lib/api';
 
   export let lockStatus: LockStatus | null = null;
   export let volume = '';

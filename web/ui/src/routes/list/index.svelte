@@ -1,9 +1,10 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
-  import { formatExpiration } from '../lib/util';
-  import type { VolumeLockInfo } from '../lib/types';
-  import { volumes as allVolumes, openCopyVolModal, openRenameVolModal } from '../lib/stores/volumes';
-  import DropSelect from './DropSelect.svelte';
+  import { formatExpiration } from '../../lib/util';
+  import type { VolumeLockInfo } from '../../lib/types';
+  import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '../../lib/stores/volumes';
+  import DropSelect from '../../components/DropSelect.svelte';
+  import LandingPanel from './LandingPanel.svelte';
 
   export let volumes: string[] = [];
   export let loading = false;
@@ -11,6 +12,9 @@
   export let filter = '';
   export let onFilterChange: (f: string) => void;
   export let volumeLockInfo: Record<string, VolumeLockInfo> = {};
+  export let onCreateTestVolume: (name: string) => void = () => {};
+  export let creatingTest = false;
+  export let testStatus = '';
 
   let filterVal = '';
   let statusFilter = 'all';
@@ -267,6 +271,10 @@
   }
 </script>
 
+{#if $landingShown}
+  {#if volumes.length === 0 && !loading}
+    <LandingPanel {onCreateTestVolume} {creatingTest} {testStatus} />
+  {:else}
 <section class="panel" class:lock-mode={showLockBorders} style="display:block;">
   <div class="filter-row">
     <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
@@ -402,6 +410,8 @@
     </div>
   {/if}
 </section>
+  {/if}
+{/if}
 
 <style>
   .filter-row {

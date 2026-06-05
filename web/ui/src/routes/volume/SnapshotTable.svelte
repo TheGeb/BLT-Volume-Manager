@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button, Popover } from 'bits-ui';
-  import type { Snapshot } from '../lib/types';
+  import type { Snapshot } from '../../lib/types';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};

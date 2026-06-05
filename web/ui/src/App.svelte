@@ -3,42 +3,29 @@
   import { slide } from 'svelte/transition';
   import { Button, RadioGroup } from 'bits-ui';
   import { Toaster } from 'svelte-sonner';
-  import LandingPanel from './components/LandingPanel.svelte';
-  import VolumeList from './components/VolumeList.svelte';
-  import SnapshotTable from './components/SnapshotTable.svelte';
-  import SnapshotViewer from './components/SnapshotViewer.svelte';
-  import StatsGrid from './components/StatsGrid.svelte';
-  import LockPanel from './components/LockPanel.svelte';
-  import TroubleshootPanel from './components/TroubleshootPanel.svelte';
+  import VolumeList from './routes/list/index.svelte';
+  import VolumeDetail from './routes/volume/index.svelte';
   import DevTools from './components/DevTools.svelte';
   import Modal from './components/Modal.svelte';
-  import type { Snapshot } from './lib/types';
   import { get } from 'svelte/store';
   import { showToast } from './lib/stores/toast';
   import {
-    volumes, selectedVolume, volumeFilter, hostname, volumeLockInfo, volumesLoading, landingShown,
+    volumes, selectedVolume, volumeFilter, volumeLockInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
     copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError,
     copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
-    loadVolumes, onFilterChange, openDeleteVolModal,
+    loadVolumes, onFilterChange,
     confirmCopyVolume, confirmRenameVolume
   } from './lib/stores/volumes';
   import {
-    snapshots, sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
-    viewerOpen, deleteSnapModal, snapDeleteInput, snapsLoading, restorePointLoading,
-    sizeLoading, filteredSnapshots, sortedSnapshots, hosts, diffTargetId, diffTargetFallbackHash, restorePointID,
-    selectedForDeletion, selectedDeletionCount, toggleForDeletion, openBulkDeleteModal,
-    onToggleSort, onTypeFilter, onHostFilter, onAddTag, onRemoveTag,
-    confirmDeleteSnapshot, handleSizeLoaded
+    deleteSnapModal, snapDeleteInput, selectedDeletionCount,
+    confirmDeleteSnapshot
   } from './lib/stores/snapshots';
-  import {
-    prevStats, themeDark, loading, activeTab, lockStatus, stats, statsLoading, checking, repairing,
-    devMode, toggleTheme, loadLockStatus, loadDevMode, loadStats, handleCheck, handleRepair
-  } from './lib/stores/repo';
+  import { themeDark, loading, devMode, toggleTheme, loadDevMode } from './lib/stores/repo';
   import {
     creatingTest, testStatus,
-    onSelectVolume, onOpenViewer, onCloseViewer, confirmDeleteVolume, handleCreateTestVolume,
-    switchTab, loadAll, navigateTo, syncUrl, setDiffTarget, handleRefresh
+    onSelectVolume, confirmDeleteVolume, handleCreateTestVolume,
+    navigateTo, handleRefresh
   } from './lib/stores/navigation';
 
   let initialSyncDone = false;
@@ -140,55 +127,6 @@
     color: var(--text);
   }
   .button-icon:disabled { opacity: 0.5; cursor: default; }
-
-  .repo-layout {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    align-items: stretch;
-  }
-
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    margin-bottom: 20px;
-    border-bottom: 2px solid var(--border);
-  }
-
-  .tab {
-    background: none;
-    border: none;
-    border-radius: 0;
-    padding: 12px 28px;
-    font-size: 1rem;
-    font-weight: 500;
-    font-family: inherit;
-    color: var(--muted);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
-    letter-spacing: 0.02em;
-    appearance: none;
-    outline: none;
-  }
-
-  .tab:hover {
-    color: var(--text);
-  }
-
-  .tab.tab-active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-  }
-
-  .tab-panel {
-    display: block;
-  }
-
-  .viewer-skeleton :global(.skeleton) {
-    display: block;
-  }
 
   @media (width <= 900px) {
     .topbar {
@@ -331,115 +269,22 @@
 
   <Toaster position="bottom-right" visibleToasts={3} toastOptions={{ style: 'padding:18px 28px;font-size:1rem;font-weight:500;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:0 6px 24px rgb(0 0 0 / 30%);' }} />
 
-  {#if $landingShown}
-    {#if $volumes.length === 0 && !$volumesLoading}
-      <LandingPanel onCreateTestVolume={handleCreateTestVolume} creatingTest={$creatingTest} testStatus={$testStatus} />
-    {:else}
-      <VolumeList
-        volumes={$filteredVolumes}
-        loading={$volumesLoading}
-        onSelect={onSelectVolume}
-        filter={$volumeFilter}
-        onFilterChange={onFilterChange}
-        volumeLockInfo={$volumeLockInfo}
-      />
-    {/if}
+  {#if !$selectedVolume}
+    <VolumeList
+      volumes={$filteredVolumes}
+      loading={$volumesLoading}
+      onSelect={onSelectVolume}
+      filter={$volumeFilter}
+      onFilterChange={onFilterChange}
+      volumeLockInfo={$volumeLockInfo}
+      onCreateTestVolume={handleCreateTestVolume}
+      creatingTest={$creatingTest}
+      testStatus={$testStatus}
+    />
   {/if}
 
   {#if $selectedVolume}
-    <div id="volumeView">
-      <div class="tab-bar">
-        <button class="tab" on:click={() => onSelectVolume('')} title="Back to volumes">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
-            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-          </svg>
-        </button>
-        <button class="tab" class:tab-active={$activeTab === 'snapshots'} on:click={() => switchTab('snapshots')}>Snapshots</button>
-        <button class="tab" class:tab-active={$activeTab === 'repo'} on:click={() => switchTab('repo')}>Repo</button>
-      </div>
-
-      {#if $activeTab === 'snapshots'}
-        <div class="tab-panel">
-          {#if $viewerOpen}
-            <div transition:slide>
-              {#if $currentSnapshot}
-                <SnapshotViewer
-                  snapshot={$currentSnapshot}
-                  allSnapshots={$allSnapshots}
-                  onClose={onCloseViewer}
-                  initialDiffTarget={$diffTargetId}
-                  onDiffChange={setDiffTarget}
-                  onSwapDiff={(newSnapshotId, newDiffId, newSnapshotHash, newDiffHash) => {
-                    const newSnap = $allSnapshots.find(s => s.id === newSnapshotId);
-                    if (!newSnap) return;
-                    if (newSnapshotHash) newSnap.fallbackHash = newSnapshotHash;
-                    currentSnapshot.set(newSnap);
-                    diffTargetId.set(newDiffId);
-                    if (newDiffHash) diffTargetFallbackHash.set(newDiffHash);
-                    syncUrl();
-                  }}
-                />
-              {:else}
-                <div class="panel viewer-skeleton">
-                  <div class="row gap" style="margin-bottom:12px;">
-                    <div class="skeleton" style="height:22px;width:200px;border-radius:6px;"></div>
-                    <div class="skeleton" style="height:32px;width:60px;border-radius:8px;margin-left:auto;"></div>
-                  </div>
-                  <div class="skeleton" style="height:32px;width:300px;border-radius:8px;margin-bottom:12px;"></div>
-                  <div style="display:flex;gap:0;height:400px;">
-                    <div class="skeleton" style="flex:0 0 300px;border-radius:12px;"></div>
-                    <div style="width:12px;flex-shrink:0;"></div>
-                    <div class="skeleton" style="flex:1;border-radius:12px;"></div>
-                  </div>
-                </div>
-              {/if}
-            </div>
-          {/if}
-
-          <SnapshotTable
-              snapshots={$sortedSnapshots}
-              sizes={$sizes}
-              selectedVolume={$selectedVolume}
-              sortNewestFirst={$sortNewestFirst}
-              typeFilter={$typeFilter}
-              hostFilter={$hostFilter}
-              hosts={$hosts}
-              loading={$snapsLoading}
-              restorePointLoading={$restorePointLoading}
-              sizeLoading={$sizeLoading}
-              restorePointID={$restorePointID}
-              selectedForDeletion={$selectedForDeletion}
-              onToggleSort={onToggleSort}
-              onTypeFilter={onTypeFilter}
-              onHostFilter={onHostFilter}
-              onOpenViewer={onOpenViewer}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onToggleDeletion={toggleForDeletion}
-              onDeleteSelected={openBulkDeleteModal}
-              onSizeLoaded={handleSizeLoaded}
-            />
-        </div>
-      {:else}
-        <div class="tab-panel">
-          <div class="repo-layout">
-            <StatsGrid stats={$stats} loading={$statsLoading} />
-            <LockPanel
-              lockStatus={$lockStatus}
-              volume={$selectedVolume}
-              onLocksDeleted={() => loadLockStatus()}
-            />
-            <TroubleshootPanel
-              checking={$checking}
-              repairing={$repairing}
-              onCheck={handleCheck}
-              onRepair={handleRepair}
-              onDeleteVolume={openDeleteVolModal}
-            />
-          </div>
-        </div>
-      {/if}
-    </div>
+    <VolumeDetail />
   {/if}
 </div>
 

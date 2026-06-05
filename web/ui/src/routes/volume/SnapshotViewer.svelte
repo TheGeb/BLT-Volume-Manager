@@ -1,42 +1,27 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { slide } from 'svelte/transition';
+  import { slide, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import type { Snapshot, FileNode, DiffResult } from '../lib/types';
-  import { computeDiff } from '../lib/diff';
-  import type { DiffHunk, DiffLine } from '../lib/diff';
-  import { formatBytes } from '../lib/util';
-  import { collectAllPaths, buildDiffMap, buildTree } from '../lib/tree-utils';
-  import { colResize, rowResize } from '../lib/resize';
-  import * as api from '../lib/api';
+  import type { Snapshot, FileNode, DiffResult } from '../../lib/types';
+  import { computeDiff } from '../../lib/diff';
+  import type { DiffHunk, DiffLine } from '../../lib/diff';
+  import { formatBytes } from '../../lib/util';
+  import { collectAllPaths, buildDiffMap, buildTree } from '../../lib/tree-utils';
+  import { colResize, rowResize } from '../../lib/resize';
+  import * as api from '../../lib/api';
 
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
-  import DropSelect from './DropSelect.svelte';
+  import DropSelect from '../../components/DropSelect.svelte';
 
-  function slideFade(node: Element, { duration = 200 } = {}) {
-    const style = getComputedStyle(node);
-    const height = parseFloat(style.height);
-    const paddingTop = parseFloat(style.paddingTop);
-    const paddingBottom = parseFloat(style.paddingBottom);
-    const marginTop = parseFloat(style.marginTop);
-    const marginBottom = parseFloat(style.marginBottom);
-    const borderTop = parseFloat(style.borderTopWidth);
-    const borderBottom = parseFloat(style.borderBottomWidth);
+  function slideFade(node: Element, { duration = 250, direction = 1 } = {}) {
     const opacityEasing = (t: number) => 1 - Math.pow(1 - t, 2);
     return {
       duration,
       easing: cubicOut,
       css: (t: number) => `
-        overflow: hidden;
-        height: ${t * height}px;
-        padding-top: ${t * paddingTop}px;
-        padding-bottom: ${t * paddingBottom}px;
-        margin-top: ${t * marginTop}px;
-        margin-bottom: ${t * marginBottom}px;
-        border-top-width: ${t * borderTop}px;
-        border-bottom-width: ${t * borderBottom}px;
+        transform: translateY(${(1 - t) * 10 * direction}px);
         opacity: ${opacityEasing(t)};
       `
     };
@@ -451,8 +436,10 @@
         <Button.Root class="button button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={() => doDiff()}>Diff</Button.Root>
       {/if}
       {#if currentDiffResult}
-        <Button.Root class="button button-xs clear-diff-btn" style="margin-left:8px;padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={clearDiff}>Clear diff</Button.Root>
-        <Button.Root class="button button-secondary button-xs" style="margin-left:8px;padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={handleSwapDiff}>Swap diff</Button.Root>
+        <div transition:fade style="display:inline-flex;gap:8px;">
+          <Button.Root class="button button-xs clear-diff-btn" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={clearDiff}>Clear diff</Button.Root>
+          <Button.Root class="button button-secondary button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={handleSwapDiff}>Swap diff</Button.Root>
+        </div>
       {/if}
     </div>
   {/if}

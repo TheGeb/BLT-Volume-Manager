@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button } from 'bits-ui';
-  import type { DiffHunk } from '../lib/diff';
+  import type { DiffHunk } from '../../lib/diff';
 
   let {
     diffHunks = [],

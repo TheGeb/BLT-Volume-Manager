@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { FileNode, DiffResult } from '../lib/types';
-  import { formatBytes } from '../lib/util';
+  import type { FileNode, DiffResult } from '../../lib/types';
+  import { formatBytes } from '../../lib/util';
   import FileTreeNode from './FileTreeNode.svelte';
 
   export let node: FileNode;
