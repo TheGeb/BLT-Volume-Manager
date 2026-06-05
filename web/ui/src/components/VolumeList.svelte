@@ -440,7 +440,7 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
   .tree { display: flex; flex-direction: column; contain: layout style; padding-bottom: 4px; }
 
-  .tree-row-wrap { position: relative; display: block; margin-bottom: -4px; }
+  .tree-row-wrap { position: relative; display: block; margin-bottom: -2px; }
   .tree-row-wrap:hover { z-index: 10; }
 
   .tree-row {
