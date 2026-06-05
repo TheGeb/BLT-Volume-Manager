@@ -433,8 +433,8 @@
   .tree-count { color: var(--muted); font-size: 0.85rem; }
   .tree-actions { display: flex; gap: 6px; }
   :global(.btn-icon-sm) { display: inline-flex; align-items: center; gap: 4px; }
-  .lock-toggle { border-color: var(--purple); color: var(--purple); }
-  .lock-toggle:hover { background: var(--purple-bg); border-color: var(--purple); }
+  .lock-toggle { border-color: color-mix(in srgb, var(--purple), rgb(255 255 255 / 10%)); color: var(--purple); }
+  .lock-toggle:hover { background: var(--purple-bg); border-color: var(--accent); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
@@ -518,7 +518,7 @@
 
   .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
   .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-volume:hover {
-    background: transparent;
+    background: rgb(255 255 255 / 6%);
   }
 
   .tree-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

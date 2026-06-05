@@ -88,7 +88,7 @@ h1 {
 .button-secondary {
   background: color-mix(in srgb, var(--muted) 12%, var(--surface));
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
 }
 
 .button-secondary:not(:disabled):hover {
