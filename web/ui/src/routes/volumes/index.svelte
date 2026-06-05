@@ -1,8 +1,8 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
-  import { formatExpiration } from '../../lib/util';
-  import type { VolumeLockInfo } from '../../lib/types';
-  import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '../../lib/stores/volumes';
+  import { formatExpiration } from '$lib/util';
+  import type { VolumeLockInfo } from '$lib/types';
+  import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
   import DropSelect from '../../components/DropSelect.svelte';
   import LandingPanel from './LandingPanel.svelte';
 

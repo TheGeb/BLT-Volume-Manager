@@ -52,13 +52,18 @@
     border-color: var(--muted);
   }
 
-  :global(.drop-select-trigger:focus) {
-    border-color: var(--accent);
+  :global(.drop-select-trigger:focus:not([data-state])) {
+    border-color: var(--muted);
   }
 
   :global(.drop-select-trigger[data-state="open"]) {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  :global(.drop-select-trigger[data-state="closed"]) {
+    border-color: var(--border);
+    box-shadow: none;
   }
 
   :global(.drop-select-content) {

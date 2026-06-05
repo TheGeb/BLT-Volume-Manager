@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button } from 'bits-ui';
-  import { escapeHtml } from '../../lib/util';
+  import { escapeHtml } from '$lib/util';
 
   let { diff = [], path = '', sideBySide = false, onToggleLayout = () => {} }: {
     diff?: { t: string; line: string }[];

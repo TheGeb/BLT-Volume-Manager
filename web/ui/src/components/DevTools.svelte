@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button, Dialog } from 'bits-ui';
-  import * as api from '../lib/api';
+  import * as api from '$lib/api';
 
   export let volume = '';
   export let onAction: () => void = () => {};

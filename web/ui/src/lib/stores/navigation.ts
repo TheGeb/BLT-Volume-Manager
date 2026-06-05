@@ -180,13 +180,14 @@ export function setDiffTarget(id: string) {
 
 function buildUrl(): string {
   const vol = get(selectedVolume);
-  if (!vol) return '/ui';
+  if (!vol) return '/ui/volumes';
   const encodedVol = vol.split('/').map(encodeURIComponent).join('/');
-  const p = new URLSearchParams();
-  if (get(activeTab) === 'repo') p.set('tab', 'repo');
+  const tab = get(activeTab) === 'repo' ? 'repo' : 'snapshots';
+  let url = `/ui/${tab}/${encodedVol}`;
   if (get(viewerOpen) && get(currentSnapshot)) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const snap = get(currentSnapshot)!;
+    const p = new URLSearchParams();
     p.set('snapshot', snap.short_id);
 
     if (snap.fallbackHash) {
@@ -203,9 +204,10 @@ function buildUrl(): string {
         }
       }
     }
+    const qs = p.toString();
+    if (qs) url += `?${qs}`;
   }
-  const qs = p.toString();
-  return qs ? `/ui/volume/${encodedVol}?${qs}` : `/ui/volume/${encodedVol}`;
+  return url;
 }
 
 export function syncUrl() {

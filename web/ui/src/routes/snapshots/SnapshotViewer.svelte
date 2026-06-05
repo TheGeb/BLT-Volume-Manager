@@ -2,13 +2,13 @@
   import { tick } from 'svelte';
   import { slide, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import type { Snapshot, FileNode, DiffResult } from '../../lib/types';
-  import { computeDiff } from '../../lib/diff';
-  import type { DiffHunk, DiffLine } from '../../lib/diff';
-  import { formatBytes } from '../../lib/util';
-  import { collectAllPaths, buildDiffMap, buildTree } from '../../lib/tree-utils';
-  import { colResize, rowResize } from '../../lib/resize';
-  import * as api from '../../lib/api';
+  import type { Snapshot, FileNode, DiffResult } from '$lib/types';
+  import { computeDiff } from '$lib/diff';
+  import type { DiffHunk, DiffLine } from '$lib/diff';
+  import { formatBytes } from '$lib/util';
+  import { collectAllPaths, buildDiffMap, buildTree } from '$lib/tree-utils';
+  import { colResize, rowResize } from '$lib/resize';
+  import * as api from '$lib/api';
 
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import FileTreeNode from './FileTreeNode.svelte';
-import type { FileNode } from '../../lib/types';
+import type { FileNode } from '$lib/types';
 
 afterEach(cleanup);
 

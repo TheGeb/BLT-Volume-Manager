@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { StatsResponse } from '../../lib/types';
-  import { formatBytes } from '../../lib/util';
+  import type { StatsResponse } from '$lib/types';
+  import { formatBytes } from '$lib/util';
   import StatBar from './StatBar.svelte';
 
   export let stats: StatsResponse | null = null;

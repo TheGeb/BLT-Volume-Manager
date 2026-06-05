@@ -1,4 +1,4 @@
-import type { FileNode, DiffResult } from '../lib/types';
+import type { FileNode, DiffResult } from './types';
 
 interface TreeNode {
   name: string;

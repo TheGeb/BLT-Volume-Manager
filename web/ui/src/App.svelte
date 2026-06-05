@@ -3,12 +3,13 @@
   import { slide } from 'svelte/transition';
   import { Button, RadioGroup } from 'bits-ui';
   import { Toaster } from 'svelte-sonner';
-  import VolumeList from './routes/list/index.svelte';
-  import VolumeDetail from './routes/volume/index.svelte';
+  import VolumeList from './routes/volumes/index.svelte';
+  import SnapshotsPage from './routes/snapshots/index.svelte';
+  import RepoPage from './routes/repo/index.svelte';
   import DevTools from './components/DevTools.svelte';
   import Modal from './components/Modal.svelte';
   import { get } from 'svelte/store';
-  import { showToast } from './lib/stores/toast';
+  import { showToast } from '$lib/stores/toast';
   import {
     volumes, selectedVolume, volumeFilter, volumeLockInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
@@ -16,17 +17,17 @@
     copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
     loadVolumes, onFilterChange,
     confirmCopyVolume, confirmRenameVolume
-  } from './lib/stores/volumes';
+  } from '$lib/stores/volumes';
   import {
     deleteSnapModal, snapDeleteInput, selectedDeletionCount,
     confirmDeleteSnapshot
-  } from './lib/stores/snapshots';
-  import { themeDark, loading, devMode, toggleTheme, loadDevMode } from './lib/stores/repo';
+  } from '$lib/stores/snapshots';
+  import { themeDark, loading, activeTab, devMode, toggleTheme, loadDevMode } from '$lib/stores/repo';
   import {
     creatingTest, testStatus,
     onSelectVolume, confirmDeleteVolume, handleCreateTestVolume,
-    navigateTo, handleRefresh
-  } from './lib/stores/navigation';
+    navigateTo, handleRefresh, syncUrl
+  } from '$lib/stores/navigation';
 
   let initialSyncDone = false;
   let refreshing = false;
@@ -54,19 +55,21 @@
 
     const params = new URLSearchParams(window.location.search);
 
-    // Volume from path: /ui/volume/1/2/test
     let volFromUrl = '';
+    let tabFromUrl: string | undefined;
     const path = window.location.pathname;
-    const volumePrefix = '/ui/volume/';
-    if (path.startsWith(volumePrefix)) {
-      volFromUrl = path.slice(volumePrefix.length);
-      // Decode any percent-encoded segments
-      volFromUrl = volFromUrl.split('/').map(decodeURIComponent).join('/');
+
+    if (path.startsWith('/ui/snapshots/')) {
+      tabFromUrl = 'snapshots';
+      volFromUrl = path.slice('/ui/snapshots/'.length).split('/').map(decodeURIComponent).join('/');
+    } else if (path.startsWith('/ui/repo/')) {
+      tabFromUrl = 'repo';
+      volFromUrl = path.slice('/ui/repo/'.length).split('/').map(decodeURIComponent).join('/');
     }
 
     if (volFromUrl && $volumes.includes(volFromUrl)) {
       const navOpts: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string } = {};
-      const tab = params.get('tab');
+      const tab = tabFromUrl ?? params.get('tab');
       const snapshotId = params.get('snapshot');
       const diffId = params.get('diff');
       const fallbackHash = params.get('fallbackHash');
@@ -284,7 +287,11 @@
   {/if}
 
   {#if $selectedVolume}
-    <VolumeDetail />
+    {#if $activeTab === 'repo'}
+      <RepoPage />
+    {:else}
+      <SnapshotsPage />
+    {/if}
   {/if}
 </div>
 
