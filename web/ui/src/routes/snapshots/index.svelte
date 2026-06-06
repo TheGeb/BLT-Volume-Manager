@@ -10,8 +10,9 @@
     sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
     selectedForDeletion, onToggleSort, onAddTag, onRemoveTag,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
-    timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter, loadAllSnapshots,
-    allSnapshotsLoaded, typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter, searchLatest
+    timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter,
+    typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter,
+    pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
@@ -94,9 +95,11 @@
       timeOfDayFrom={$timeOfDayFrom}
       timeOfDayTo={$timeOfDayTo}
       onTimeOfDayFilter={onTimeOfDayFilter}
-      allLoaded={$allSnapshotsLoaded}
-      onLoadAll={loadAllSnapshots}
-      searchLatest={$searchLatest}
+      page={$currentPage}
+      pageSize={$pageSize}
+      hasMore={$hasMore}
+      onGoToPage={goToPage}
+      onSetPageSize={setPageSize}
     />
   </div>
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { RangeCalendar, TimeRangeField, Portal } from 'bits-ui';
+  import { RangeCalendar, Portal } from 'bits-ui';
   import { CalendarDate, type DateValue, Time } from '@internationalized/date';
+  import DropSelect from '../../components/DropSelect.svelte';
 
   export let timeFrom: number | undefined = undefined;
   export let timeTo: number | undefined = undefined;
@@ -61,10 +62,24 @@
       start: timeOfDayFrom !== undefined ? secondsToTime(timeOfDayFrom, new Time(0, 0, 0)) : undefined,
       end: timeOfDayTo !== undefined ? secondsToTime(timeOfDayTo, new Time(23, 59, 59)) : undefined,
     };
+    populateTimeFields();
     appliedDateFrom = timeFrom;
     appliedDateTo = timeTo;
     appliedTimeFrom = timeOfDayFrom;
     appliedTimeTo = timeOfDayTo;
+  }
+
+  function populateTimeFields() {
+    const fill = (t: Time | undefined, setH: (v: string) => void, setM: (v: string) => void, setS: (v: string) => void, setA: (v: string) => void) => {
+      if (!t) { setH(''); setM(''); setS(''); setA('AM'); return; }
+      const h12 = t.hour % 12 || 12;
+      setH(String(h12).padStart(2, '0'));
+      setM(String(t.minute).padStart(2, '0'));
+      setS(String(t.second).padStart(2, '0'));
+      setA(t.hour >= 12 ? 'PM' : 'AM');
+    };
+    fill(timeRange.start, (v) => fromH = v, (v) => fromM = v, (v) => fromS = v, (v) => fromA = v);
+    fill(timeRange.end, (v) => toH = v, (v) => toM = v, (v) => toS = v, (v) => toA = v);
   }
 
   function apply() {
@@ -79,8 +94,42 @@
   function clear() {
     dateRange = { start: undefined, end: undefined };
     timeRange = { start: undefined, end: undefined };
+    fromH = ''; fromM = ''; fromS = ''; fromA = 'AM';
+    toH = ''; toM = ''; toS = ''; toA = 'AM';
     apply();
   }
+
+  function updateTimeRange() {
+    const makeTime = (h: string, m: string, s: string, a: string): Time | undefined => {
+      const hr = parseInt(h);
+      if (isNaN(hr) || h === '') return undefined;
+      const mn = parseInt(m) || 0;
+      const sc = parseInt(s) || 0;
+      let h24 = hr;
+      if (a === 'PM' && hr !== 12) h24 += 12;
+      if (a === 'AM' && hr === 12) h24 = 0;
+      return new Time(h24, mn, sc);
+    };
+    timeRange = { start: makeTime(fromH, fromM, fromS, fromA), end: makeTime(toH, toM, toS, toA) };
+  }
+
+  function clampNum(v: string, max: number): string {
+    const n = parseInt(v);
+    if (v === '' || isNaN(n)) return v;
+    return String(Math.min(n, max));
+  }
+
+  function handleH(v: string, setM: (v: string) => void, setS: (v: string) => void): string {
+    const cleaned = v.replace(/[^0-9]/g, '').slice(0, 2);
+    if (cleaned.length === 2) { setM('00'); setS('00'); }
+    return clampNum(cleaned, 12);
+  }
+  function handleMS(v: string): string {
+    return clampNum(v.replace(/[^0-9]/g, '').slice(0, 2), 59);
+  }
+
+  let fromH = ''; let fromM = ''; let fromS = ''; let fromA = 'AM';
+  let toH = ''; let toM = ''; let toS = ''; let toA = 'AM';
 
   let open = false;
   let triggerEl: HTMLElement;
@@ -181,30 +230,48 @@
         </RangeCalendar.Root>
         <div class="time-of-day-section">
           <div class="date-filter-label">Time of day</div>
-          <TimeRangeField.Root value={timeRange} onValueChange={(v) => v !== undefined && (timeRange = v)} hourCycle={12}>
-            <div class="time-range-row">
+          <div class="time-range-row">
               <div class="time-range-input-group">
                 <span class="time-range-label">from</span>
-                <TimeRangeField.Input type="start">
-                  {#snippet children({ segments })}
-                    {#each segments.filter(s => s.value.trim() && s.part !== 'timeZoneName') as { part, value }, i (`${part}-${i}`)}
-                      <TimeRangeField.Segment {part} class="time-segment">{value}</TimeRangeField.Segment>
-                    {/each}
-                  {/snippet}
-                </TimeRangeField.Input>
+                <div class="timerangefield-input">
+                  <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={fromH} on:input={(e) => { fromH = handleH(e.currentTarget.value, (v) => fromM = v, (v) => fromS = v); updateTimeRange(); }}>
+                  <span class="time-segment time-literal">:</span>
+                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromM} on:input={() => { fromM = handleMS(fromM); updateTimeRange(); }}>
+                  <span class="time-segment time-literal">:</span>
+                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromS} on:input={() => { fromS = handleMS(fromS); updateTimeRange(); }}>
+                  <span class="time-ampm">
+                    <DropSelect
+                      options={[
+                        { value: 'AM', label: 'AM' },
+                        { value: 'PM', label: 'PM' },
+                      ]}
+                      value={fromA}
+                      onValueChange={(v) => { fromA = v; updateTimeRange(); }}
+                    />
+                  </span>
+                </div>
               </div>
               <div class="time-range-input-group">
                 <span class="time-range-label">to</span>
-                <TimeRangeField.Input type="end">
-                  {#snippet children({ segments })}
-                    {#each segments.filter(s => s.value.trim() && s.part !== 'timeZoneName') as { part, value }, i (`${part}-${i}`)}
-                      <TimeRangeField.Segment {part} class="time-segment">{value}</TimeRangeField.Segment>
-                    {/each}
-                  {/snippet}
-                </TimeRangeField.Input>
+                <div class="timerangefield-input">
+                  <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={toH} on:input={(e) => { toH = handleH(e.currentTarget.value, (v) => toM = v, (v) => toS = v); updateTimeRange(); }}>
+                  <span class="time-segment time-literal">:</span>
+                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toM} on:input={() => { toM = handleMS(toM); updateTimeRange(); }}>
+                  <span class="time-segment time-literal">:</span>
+                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toS} on:input={() => { toS = handleMS(toS); updateTimeRange(); }}>
+                  <span class="time-ampm">
+                    <DropSelect
+                      options={[
+                        { value: 'AM', label: 'AM' },
+                        { value: 'PM', label: 'PM' },
+                      ]}
+                      value={toA}
+                      onValueChange={(v) => { toA = v; updateTimeRange(); }}
+                    />
+                  </span>
+                </div>
               </div>
             </div>
-          </TimeRangeField.Root>
           <div class="filter-actions">
             <button class="apply-btn" class:apply-btn-active={hasStagedChanges} on:click={apply}>Apply</button>
             <button class="clear-btn" class:clear-btn-active={hasStagedChanges} on:click={clear}>Clear</button>
@@ -474,6 +541,51 @@
 
   :global(.time-segment[aria-valuetext="Empty"]) {
     color: var(--muted);
+  }
+
+  :global(.time-input) {
+    width: 22px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    padding: 0;
+  }
+
+  :global(.time-input::placeholder) {
+    color: var(--muted);
+  }
+
+  :global(.time-input:focus) {
+    outline: none;
+    background: var(--hover-bg);
+    border-radius: 3px;
+  }
+
+  :global(.time-literal) {
+    color: var(--muted);
+    padding: 0 1px;
+  }
+
+  :global(.time-ampm .drop-select-trigger) {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 3px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85rem;
+  }
+
+  :global(.time-ampm .drop-select-trigger:hover) {
+    background: var(--hover-bg);
+  }
+
+  :global(.time-ampm .drop-select-trigger.open) {
+    background: var(--hover-bg);
   }
 
   .filter-actions {

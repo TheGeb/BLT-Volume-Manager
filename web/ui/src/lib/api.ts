@@ -6,6 +6,8 @@ export interface SnapshotListParams {
   latest?: number;
   tag?: string;
   tags?: string[];
+  offset?: number;
+  limit?: number;
 }
 
 export async function fetchVolumes(): Promise<string[]> {
@@ -25,11 +27,17 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 		if (params.latest !== undefined && params.latest > 0) {
 			p.set('latest', String(params.latest));
 		}
+		if (params.offset !== undefined && params.offset >= 0) {
+			p.set('offset', String(params.offset));
+		}
+		if (params.limit !== undefined && params.limit > 0) {
+			p.set('limit', String(params.limit));
+		}
 	}
 	const resp = await fetch(`/api/snapshots?${p.toString()}`);
 	const data = await resp.json() as SnapshotsResponse;
 	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
-	return { snapshots, restorePointID: data.restorePointID ?? '' };
+	return { snapshots, restorePointID: data.restorePointID ?? '', hasMore: data.hasMore ?? false };
 }
 
 export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<string[]> {

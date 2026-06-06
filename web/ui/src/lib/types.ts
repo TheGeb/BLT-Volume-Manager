@@ -100,6 +100,7 @@ export interface AppState {
 export interface SnapshotsResponse {
 	snapshots: Snapshot[];
 	restorePointID?: string;
+	hasMore?: boolean;
 }
 
 export interface BatchDeleteResponse {

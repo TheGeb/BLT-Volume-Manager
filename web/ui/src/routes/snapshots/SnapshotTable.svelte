@@ -2,6 +2,7 @@
   import { Button, Popover, ScrollArea } from 'bits-ui';
   import type { Snapshot } from '$lib/types';
   import DateRangeFilter from './DateTimeRange.svelte';
+  import DropSelect from '../../components/DropSelect.svelte';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
@@ -30,9 +31,28 @@
   export let timeOfDayFrom: number | undefined = undefined;
   export let timeOfDayTo: number | undefined = undefined;
   export let onTimeOfDayFilter: (from?: number, to?: number) => void = () => {};
-  export let searchLatest = 25;
-  export let allLoaded = false;
-  export let onLoadAll: () => void = () => {};
+  export let page = 1;
+  export let pageSize = 25;
+  export let hasMore = false;
+  export let onGoToPage: (page: number) => void = () => {};
+  export let onSetPageSize: (size: number) => void = () => {};
+
+  let pendingPage: string | undefined = undefined;
+  $: pageDisplay = pendingPage ?? String(page);
+
+  function onPageInput(e: Event) {
+    pendingPage = (e.target as HTMLInputElement).value;
+  }
+
+  function commitPageInput() {
+    if (pendingPage !== undefined) {
+      const n = parseInt(pendingPage, 10);
+      if (!isNaN(n) && n >= 1) {
+        onGoToPage(n);
+      }
+      pendingPage = undefined;
+    }
+  }
 
   function handleRPClick(sn: Snapshot) {
     const isRP = sn.id === restorePointID || sn.short_id === restorePointID;
@@ -120,6 +140,7 @@
 
     <ScrollArea.Root type="always" style="height:calc(100vh - 390px);overflow:hidden;">
       <ScrollArea.Viewport style="height:100%;width:100%;">
+        <div class="body-scroll-inner">
         <table class="body-table">
           {@render columns()}
           <tbody style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
@@ -199,17 +220,9 @@
                 </td>
               </tr>
             {/each}
-            {#if !allLoaded && snapshots.length === searchLatest}
-              <tr>
-                <td colspan="7" style="text-align:center;padding:8px;">
-                  <button class="load-all-btn" on:click={onLoadAll}>
-                    Load all results
-                  </button>
-                </td>
-              </tr>
-            {/if}
           </tbody>
         </table>
+        </div>
       </ScrollArea.Viewport>
       <ScrollArea.Scrollbar style="display:flex;background:transparent;width:8px;padding:2px;" orientation="vertical">
         <ScrollArea.Thumb style="flex:1;background:color-mix(in srgb, var(--muted) 30%, transparent);border-radius:4px;min-height:40px;" />
@@ -220,9 +233,34 @@
       {@render columns()}
       <tfoot>
         <tr>
-          <td class="snap-total">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</td>
-          <td></td>
-          <td></td>
+          <td class="snap-total" colspan="3">
+            <div class="pagination">
+              <button class="page-btn" disabled={page <= 1} on:click={() => onGoToPage(1)} title="First page">&laquo;</button>
+              <button class="page-btn" disabled={page <= 1} on:click={() => onGoToPage(page - 1)} title="Previous page">&lsaquo;</button>
+              <input
+                class="page-input"
+                type="text"
+                inputmode="numeric"
+                value={pageDisplay}
+                on:input={onPageInput}
+                on:keydown={(e) => e.key === 'Enter' && commitPageInput()}
+                on:blur={commitPageInput}
+              />
+              <button class="page-btn" disabled={!hasMore} on:click={() => onGoToPage(page + 1)} title="Next page">&rsaquo;</button>
+              <button class="page-btn" disabled={!hasMore} on:click={() => onGoToPage(-1)} title="Last page">&raquo;</button>
+              <DropSelect
+                options={[
+                  { value: '10', label: '10' },
+                  { value: '25', label: '25' },
+                  { value: '50', label: '50' },
+                  { value: '100', label: '100' },
+                ]}
+                value={String(pageSize)}
+                onValueChange={(v) => onSetPageSize(Number(v))}
+              />
+              <span class="page-size-label">per page</span>
+            </div>
+          </td>
           <td></td>
           <td></td>
           <td class="bulk-count">
@@ -268,6 +306,10 @@
     border-collapse: collapse;
     table-layout: fixed;
     min-width: 550px;
+  }
+
+  .body-scroll-inner {
+    padding-right: 12px;
   }
 
   .body-table td {
@@ -521,22 +563,60 @@
     text-transform: capitalize;
   }
 
-  .load-all-btn {
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    height: auto;
-    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-    color: #fff;
-    border: 1px solid transparent;
-    cursor: pointer;
-    font-family: inherit;
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 2px;
   }
 
-  .load-all-btn:hover {
+  .page-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    line-height: 1;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover-bg);
+    border-color: var(--border);
+  }
+
+  .page-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .page-input {
+    width: 44px;
+    text-align: center;
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 2px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color 0.15s;
+    margin: 0 4px;
+  }
+
+  .page-input:focus {
     border-color: var(--accent);
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
+  }
+
+  .page-size-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-left: 2px;
   }
 
   @media (width <= 900px) {

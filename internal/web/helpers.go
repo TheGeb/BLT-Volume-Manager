@@ -25,11 +25,27 @@ func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return vol, true
 }
 
-func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts) (map[string]any, error) {
+func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts, offset, limit int) (map[string]any, error) {
 	rm := s.volumeManager(volName)
 	snaps, err := rm.ListSnapshotsWithOpts(opts)
 	if err != nil {
 		return nil, err
+	}
+
+	rawLen := len(snaps)
+	hasMore := false
+	if limit > 0 {
+		switch {
+		case offset+limit <= rawLen:
+			hasMore = rawLen > offset+limit
+			snaps = snaps[offset : offset+limit]
+		case offset < rawLen:
+			snaps = snaps[offset:]
+		default:
+			snaps = nil
+		}
+	} else if offset > 0 && offset < rawLen {
+		snaps = snaps[offset:]
 	}
 
 	restorePointID := ""
@@ -47,10 +63,11 @@ func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshots
 	return map[string]any{
 		"snapshots":      result,
 		"restorePointID": restorePointID,
+		"hasMore":        hasMore,
 	}, nil
 }
 
-func parseSnapshotListOpts(r *http.Request) *restic.ListSnapshotsOpts {
+func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, int, int) {
 	hosts := r.URL.Query()["host"]
 	latestStr := r.URL.Query().Get("latest")
 	latest := 0
@@ -61,10 +78,28 @@ func parseSnapshotListOpts(r *http.Request) *restic.ListSnapshotsOpts {
 	}
 	tags := r.URL.Query()["tag"]
 
-	if len(hosts) == 0 && latest == 0 && len(tags) == 0 {
-		return nil
+	offset := 0
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if n, err := strconv.Atoi(o); err == nil && n >= 0 {
+			offset = n
+		}
 	}
-	return &restic.ListSnapshotsOpts{Hosts: hosts, Latest: latest, Tags: tags}
+	limit := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	if limit > 0 {
+		latest = offset + limit + 1
+	}
+
+	var opts *restic.ListSnapshotsOpts
+	if len(hosts) > 0 || latest > 0 || len(tags) > 0 {
+		opts = &restic.ListSnapshotsOpts{Hosts: hosts, Latest: latest, Tags: tags}
+	}
+	return opts, offset, limit
 }
 
 func respondError(w http.ResponseWriter, err error, status int) {

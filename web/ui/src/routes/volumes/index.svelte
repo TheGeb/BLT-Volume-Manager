@@ -430,14 +430,6 @@
   .volume-filter-input:focus { border-color: var(--accent); }
   .volume-filter-input::placeholder { color: var(--muted); }
 
-  .vol-filter-select {
-    padding: 8px 28px 8px 12px; border-radius: 10px;
-    font-size: 0.85rem; cursor: pointer; outline: none;
-    transition: border-color 0.15s;
-  }
-  .vol-filter-select:hover { border-color: var(--muted); }
-  .vol-filter-select:focus { border-color: var(--accent); }
-
   .tree-toolbar {
     display: flex; align-items: center; gap: 8px;
     margin-bottom: 12px;

@@ -15,7 +15,6 @@ export const timeFrom = writable<number | undefined>(undefined);
 export const timeTo = writable<number | undefined>(undefined);
 export const timeOfDayFrom = writable<number | undefined>(undefined);
 export const timeOfDayTo = writable<number | undefined>(undefined);
-export const searchLatest = writable(25);
 export const snapsLoading = writable(false);
 export const currentSnapshot = writable<Snapshot | null>(null);
 export const allSnapshots = derived(snapshots, $s => $s);
@@ -28,8 +27,10 @@ export const sizes = writable<Record<string, string>>({});
 export const restorePointLoading = writable<Record<string, boolean>>({});
 export const restorePointID = writable('');
 export const sizeLoading = writable<Record<string, boolean>>({});
-export const displayLimit = writable(50);
-export const allSnapshotsLoaded = writable(false);
+export const pageSize = writable(25);
+export const currentPage = writable(1);
+export const hasMore = writable(false);
+export const totalCount = writable(0);
 export const allHosts = writable<string[]>([]);
 
 export async function loadHosts(volume: string) {
@@ -57,10 +58,10 @@ export function filterSnapshots(
     const snTime = new Date(sn.time);
     if (timeFrom !== undefined && snTime.getTime() < timeFrom) return false;
     if (timeTo !== undefined && snTime.getTime() > timeTo) return false;
-    if (timeOfDayFrom !== undefined) {
+    if (timeOfDayFrom !== undefined || timeOfDayTo !== undefined) {
       const snSeconds = snTime.getHours() * 3600 + snTime.getMinutes() * 60 + snTime.getSeconds();
-      const to = timeOfDayTo ?? 86400;
-      if (snSeconds < timeOfDayFrom || snSeconds > to) return false;
+      if (timeOfDayFrom !== undefined && snSeconds < timeOfDayFrom) return false;
+      if (timeOfDayTo !== undefined && snSeconds > timeOfDayTo) return false;
     }
     if (!query) return true;
     const q = query.toLowerCase();
@@ -89,10 +90,7 @@ export const sortedSnapshots = derived(
   ([$filtered, $newestFirst]) => sortSnapshots($filtered, $newestFirst)
 );
 
-export const displayedSnapshots = derived(
-  [sortedSnapshots, displayLimit],
-  ([$sorted, $limit]) => $limit > 0 ? $sorted.slice(0, $limit) : $sorted
-);
+export const displayedSnapshots = sortedSnapshots;
 
 export function extractHosts(snapshots: Snapshot[]): string[] {
   return [...new Set(snapshots.map(sn => sn.hostname).filter(Boolean))].sort();
@@ -142,46 +140,109 @@ function reconcileViewerSnapshots() {
 export async function loadSnapshots(volume: string, params?: SnapshotListParams) {
   snapsLoading.set(true);
   try {
-    const p: SnapshotListParams = { latest: get(searchLatest), ...params };
+    const page = get(currentPage);
+    const size = get(pageSize);
+    const offset = (page - 1) * size;
+    const p: SnapshotListParams = { offset, limit: size, ...params };
     const result = await api.fetchSnapshots(volume, p);
     snapshots.set(result.snapshots);
     restorePointID.set(result.restorePointID ?? '');
-    allSnapshotsLoaded.set(false);
-    displayLimit.set(get(searchLatest));
-	} catch {
-		snapshots.set([]);
-		restorePointID.set('');
-		showToast('Failed to load snapshots', true);
-	} finally {
-		snapsLoading.set(false);
-		reconcileViewerSnapshots();
-	}
+    hasMore.set(result.hasMore ?? false);
+  } catch {
+    snapshots.set([]);
+    restorePointID.set('');
+    hasMore.set(false);
+    showToast('Failed to load snapshots', true);
+  } finally {
+    snapsLoading.set(false);
+    reconcileViewerSnapshots();
+  }
 }
 
-export async function loadAllSnapshots() {
-	const vol = get(selectedVolume);
-	if (!vol) return;
-	snapsLoading.set(true);
+export async function goToNextPage() {
+  if (!get(hasMore)) return;
+  const vol = get(selectedVolume);
+  if (!vol) return;
+  currentPage.update(p => p + 1);
+  await loadSnapshots(vol, buildSnapshotParams());
+}
+
+export async function goToPrevPage() {
+  const page = get(currentPage);
+  if (page <= 1) return;
+  const vol = get(selectedVolume);
+  if (!vol) return;
+  currentPage.set(page - 1);
+  await loadSnapshots(vol, buildSnapshotParams());
+}
+
+export async function goToFirstPage() {
+  const vol = get(selectedVolume);
+  if (!vol) return;
+  currentPage.set(1);
+  await loadSnapshots(vol, buildSnapshotParams());
+}
+
+export async function goToLastPage() {
+  const vol = get(selectedVolume);
+  if (!vol) return;
+  snapsLoading.set(true);
   try {
-    const params = { ...buildSnapshotParams(), latest: 0 };
-    const result = await api.fetchSnapshots(vol, params);
-		snapshots.set(result.snapshots);
-		restorePointID.set(result.restorePointID ?? '');
-		allSnapshotsLoaded.set(true);
-		displayLimit.set(0);
-	} catch {
-		showToast('Failed to load all snapshots', true);
-	} finally {
-		snapsLoading.set(false);
-		reconcileViewerSnapshots();
-	}
+    const result = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset: 0, limit: 0 });
+    const total = result.snapshots.length;
+    totalCount.set(total);
+    const size = get(pageSize);
+    const lastPage = Math.max(1, Math.ceil(total / size));
+    const offset = (lastPage - 1) * size;
+    hasMore.set(false);
+    currentPage.set(lastPage);
+
+    const paged = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset, limit: size });
+    snapshots.set(paged.snapshots);
+    restorePointID.set(paged.restorePointID ?? '');
+    hasMore.set(false);
+  } catch {
+    showToast('Failed to load snapshots', true);
+  } finally {
+    snapsLoading.set(false);
+    reconcileViewerSnapshots();
+  }
+}
+
+export async function goToPage(page: number) {
+  const vol = get(selectedVolume);
+  if (!vol) return;
+  if (page < 0) {
+    await goToLastPage();
+    return;
+  }
+  const size = get(pageSize);
+  const total = get(totalCount);
+  if (total > 0) {
+    const maxPage = Math.max(1, Math.ceil(total / size));
+    page = Math.min(page, maxPage);
+  }
+  page = Math.max(1, page);
+  currentPage.set(page);
+  await loadSnapshots(vol, buildSnapshotParams());
+  if (get(snapshots).length === 0 && page > 1 && !get(hasMore)) {
+    await goToLastPage();
+  }
+}
+
+export async function setPageSize(size: number) {
+  const vol = get(selectedVolume);
+  if (!vol || size < 1) return;
+  pageSize.set(size);
+  currentPage.set(1);
+  totalCount.set(0);
+  await loadSnapshots(vol, buildSnapshotParams());
 }
 
 function buildSnapshotParams(): SnapshotListParams {
   const hf = get(hostFilter);
   const tf = get(typeFilter);
-  const latest = get(searchLatest);
-  const params: SnapshotListParams = { latest };
+  const params: SnapshotListParams = {};
   if (hf) params.hosts = [hf];
   if (tf !== 'all') params.tags = [tf];
   return params;
@@ -190,6 +251,8 @@ function buildSnapshotParams(): SnapshotListParams {
 export async function reloadWithFilters(overrides?: Partial<SnapshotListParams>) {
   const vol = get(selectedVolume);
   if (!vol) return;
+  currentPage.set(1);
+  totalCount.set(0);
   const params = { ...buildSnapshotParams(), ...overrides };
   await loadSnapshots(vol, params);
 }

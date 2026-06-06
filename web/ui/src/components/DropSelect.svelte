@@ -3,15 +3,18 @@
 
   type Option = { value: string; label: string };
 
-  export let options: Option[] = [];
-  export let value: string = '';
-  export let onValueChange: (v: string) => void = () => {};
+  let { options = [], value = '', onValueChange = () => {} }: {
+    options: Option[];
+    value: string;
+    onValueChange: (v: string) => void;
+  } = $props();
 
-  $: selectedLabel = options.find(o => o.value === value)?.label ?? options[0]?.label ?? '';
+  let selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options[0]?.label ?? '');
+  let open = $state(false);
 </script>
 
-<Select.Root type="single" value={value} onValueChange={onValueChange}>
-  <Select.Trigger class="drop-select-trigger">
+<Select.Root type="single" {value} {onValueChange} bind:open>
+  <Select.Trigger class="dropdown drop-select-trigger {open ? 'open' : ''}">
     <Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
       <polyline points="6 9 12 15 18 9"/>
@@ -35,35 +38,20 @@
     justify-content: space-between;
     gap: 6px;
     padding: 8px 28px 8px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: color-mix(in srgb, var(--muted) 12%, var(--surface));
-    color: var(--text);
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    outline: none;
-    transition: border-color 0.15s;
     min-width: 0;
     white-space: nowrap;
+    font-weight: 500;
+    border-color: transparent;
   }
 
   :global(.drop-select-trigger:hover) {
     border-color: var(--muted);
+    color: var(--text);
   }
 
-  :global(.drop-select-trigger:focus:not([data-state])) {
+  :global(.drop-select-trigger.open) {
     border-color: var(--muted);
-  }
-
-  :global(.drop-select-trigger[data-state="open"]) {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
-  }
-
-  :global(.drop-select-trigger[data-state="closed"]) {
-    border-color: var(--border);
-    box-shadow: none;
+    color: var(--text);
   }
 
   :global(.drop-select-content) {

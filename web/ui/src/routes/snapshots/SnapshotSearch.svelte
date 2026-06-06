@@ -1,21 +1,18 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Button } from 'bits-ui';
-  import { hostFilter, typeFilter, searchLatest, reloadWithFilters, allHosts, loadHosts } from '$lib/stores/snapshots';
+  import { hostFilter, typeFilter, reloadWithFilters, allHosts, loadHosts } from '$lib/stores/snapshots';
   import { selectedVolume } from '$lib/stores/volumes';
+  import DropSelect from '../../components/DropSelect.svelte';
 
-  let latest = '25';
   let host = $hostFilter;
   let tags: string[] = $typeFilter !== 'all' ? [$typeFilter] : [];
-  let hostsLoading = false;
-  let hostsLoaded = false;
 
-  async function ensureHosts() {
-    if (hostsLoaded || hostsLoading) return;
-    hostsLoading = true;
-    await loadHosts($selectedVolume);
-    hostsLoaded = true;
-    hostsLoading = false;
-  }
+  onMount(() => {
+    if (!$allHosts || $allHosts.length === 0) {
+      loadHosts($selectedVolume);
+    }
+  });
 
   function toggleTag(tag: string) {
     if (tags.includes(tag)) {
@@ -29,48 +26,36 @@
   function search() {
     hostFilter.set(host);
     typeFilter.set(tags.length > 0 ? tags[0]! : 'all');
-    searchLatest.set(parseInt(latest, 10) || 25);
-    reloadWithFilters({ latest: parseInt(latest, 10) || 25 });
+    reloadWithFilters();
   }
 </script>
 
 <div class="search-bar">
   <div class="search-field">
     <span class="search-label">Host</span>
-    <select class="search-input" bind:value={host} on:mousedown={ensureHosts}>
-      <option value="">Any host</option>
-      {#if hostsLoading}
-        <option disabled>Loading hosts...</option>
-      {/if}
-      {#each $allHosts as h (h)}
-        <option value={h}>{h}</option>
-      {/each}
-    </select>
+    <DropSelect
+      options={[
+        { value: '', label: 'Any host' },
+        ...($allHosts ?? []).map(h => ({ value: h, label: h })),
+      ]}
+      value={host}
+      onValueChange={(v) => host = v}
+    />
   </div>
   <div class="search-field">
     <span class="search-label">Type</span>
     <div class="tag-toggles">
       <button
-        class="tag-btn"
+        class="dropdown tag-btn"
         class:tag-active={tags.includes('hot')}
         on:click={() => toggleTag('hot')}
       >Hot</button>
       <button
-        class="tag-btn"
+        class="dropdown tag-btn"
         class:tag-active={tags.includes('cold')}
         on:click={() => toggleTag('cold')}
       >Cold</button>
     </div>
-  </div>
-  <div class="search-field search-field-sm">
-    <span class="search-label">Latest</span>
-    <input
-      type="number"
-      class="search-input search-input-num"
-      min="1"
-      bind:value={latest}
-      on:keydown={(e) => e.key === 'Enter' && search()}
-    />
   </div>
   <Button.Root class="search-btn" onclick={search}>Search</Button.Root>
 </div>
@@ -81,17 +66,13 @@
     align-items: flex-end;
     gap: 12px;
     flex-wrap: wrap;
-    padding: 0 0 16px;
+    padding: 0 0 8px;
   }
 
   .search-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .search-field-sm {
-    max-width: 80px;
   }
 
   .search-label {
@@ -102,43 +83,13 @@
     text-transform: uppercase;
   }
 
-  .search-input {
-    border: 1px solid var(--border);
-    background: var(--surface-strong);
-    color: var(--text);
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-    width: 160px;
-  }
-
-  .search-input:focus {
-    border-color: var(--accent);
-  }
-
-  .search-input-num {
-    width: 70px;
-  }
-
   .tag-toggles {
     display: flex;
     gap: 4px;
   }
 
   .tag-btn {
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface-strong);
-    color: var(--muted);
-    font-size: 0.85rem;
     font-weight: 500;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
 
   .tag-btn:hover {
@@ -166,7 +117,6 @@
     background: linear-gradient(135deg, var(--accent), var(--accent-soft));
     color: #fff;
     border: 1px solid transparent;
-    margin-left: 12px;
   }
 
   :global(.search-btn:hover) {
