@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
@@ -30,11 +29,6 @@ func (s *Server) handleDummyVolume(w http.ResponseWriter, r *http.Request) {
 		respondError(w, fmt.Errorf("name is required"), http.StatusBadRequest)
 		return
 	}
-	if !strings.Contains(req.Name, "/") {
-		respondError(w, fmt.Errorf("name must be in the format group/name"), http.StatusBadRequest)
-		return
-	}
-
 	rm := s.volumeManager(req.Name)
 	volPath := filepath.Join(os.TempDir(), "blt-dummy-data")
 	if err := os.MkdirAll(volPath, 0o755); err != nil {

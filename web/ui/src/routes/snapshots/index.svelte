@@ -11,7 +11,7 @@
     selectedForDeletion, onToggleSort, onAddTag, onRemoveTag,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
     timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter, loadAllSnapshots,
-    allSnapshotsLoaded, typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter
+    allSnapshotsLoaded, typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter, searchLatest
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
@@ -96,6 +96,7 @@
       onTimeOfDayFilter={onTimeOfDayFilter}
       allLoaded={$allSnapshotsLoaded}
       onLoadAll={loadAllSnapshots}
+      searchLatest={$searchLatest}
     />
   </div>
 </div>

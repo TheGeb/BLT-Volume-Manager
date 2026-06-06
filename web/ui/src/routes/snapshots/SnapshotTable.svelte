@@ -30,7 +30,7 @@
   export let timeOfDayFrom: number | undefined = undefined;
   export let timeOfDayTo: number | undefined = undefined;
   export let onTimeOfDayFilter: (from?: number, to?: number) => void = () => {};
-  export let totalSnapshots = 0;
+  export let searchLatest = 25;
   export let allLoaded = false;
   export let onLoadAll: () => void = () => {};
 
@@ -199,11 +199,11 @@
                 </td>
               </tr>
             {/each}
-            {#if !allLoaded && totalSnapshots > snapshots.length && snapshots.length > 0}
+            {#if !allLoaded && snapshots.length === searchLatest}
               <tr>
                 <td colspan="7" style="text-align:center;padding:8px;">
                   <button class="load-all-btn" on:click={onLoadAll}>
-                    Load all ({totalSnapshots} total)
+                    Load all results
                   </button>
                 </td>
               </tr>
@@ -519,6 +519,24 @@
     padding: 2px 6px;
     border-radius: 4px;
     text-transform: capitalize;
+  }
+
+  .load-all-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    height: auto;
+    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+    color: #fff;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .load-all-btn:hover {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
   }
 
   @media (width <= 900px) {

@@ -238,11 +238,11 @@ func TestAPI_EdgeCases(t *testing.T) {
 	apiErr(t, ts, "POST", "/api/repo/init", nil, http.StatusBadRequest)
 	apiErr(t, ts, "GET", "/api/repo/status", nil, http.StatusBadRequest)
 
-	// Test create-volume with invalid name (missing "/")
+	// Test create-volume with valid plain name (no "/" required)
 	resp := api(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "badname"})
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for name without '/', got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for plain name, got %d", resp.StatusCode)
 	}
 
 	// Wrong method on /api/volumes

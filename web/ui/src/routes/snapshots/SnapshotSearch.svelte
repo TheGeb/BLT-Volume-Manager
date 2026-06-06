@@ -163,13 +163,14 @@
     font-size: 0.85rem;
     font-weight: 600;
     height: auto;
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
     color: #fff;
     border: 1px solid transparent;
     margin-left: 12px;
   }
 
   :global(.search-btn:hover) {
-    background: color-mix(in srgb, var(--accent) 80%, #000);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
   }
 </style>

@@ -459,7 +459,7 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
   .tree-scroll-root {
-    max-height: calc(100vh - 220px);
+    height: calc(100vh - 220px);
   }
 
   .tree-scroll-viewport {
