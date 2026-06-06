@@ -329,7 +329,7 @@
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
   {:else}
-    <div class="tree-scroll-root" style="height:calc(100vh - 320px);overflow-y:auto;">
+    <div class="tree-scroll-root" style="height:calc(100vh - 320px);overflow:hidden auto;">
       <div class="tree">
         {#each flatItems as item, idx (item.path)}
           <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
@@ -451,11 +451,6 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
-  .tree-scroll-root {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(255 255 255 / 20%) transparent;
-  }
-
   .tree-scroll-root::-webkit-scrollbar {
     width: 8px;
   }
@@ -465,12 +460,15 @@
   }
 
   .tree-scroll-root::-webkit-scrollbar-thumb {
-    background: rgb(255 255 255 / 16%);
+    background: rgb(255 255 255 / 20%);
     border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   .tree-scroll-root::-webkit-scrollbar-thumb:hover {
-    background: rgb(255 255 255 / 28%);
+    background: rgb(255 255 255 / 32%);
+    background-clip: padding-box;
   }
 
   .tree { display: flex; flex-direction: column; padding-bottom: 4px; min-height: 0; }
