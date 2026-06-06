@@ -199,7 +199,16 @@ export async function goToPage(page: number) {
     return;
   }
   const size = get(pageSize);
-  const total = get(totalCount);
+  let total = get(totalCount);
+  if (total === 0 && page > 1) {
+    try {
+      const result = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset: 0, limit: 0 });
+      total = result.snapshots.length;
+      totalCount.set(total);
+    } catch {
+      // proceed without clamping if count fetch fails
+    }
+  }
   if (total > 0) {
     const maxPage = Math.max(1, Math.ceil(total / size));
     page = Math.min(page, maxPage);
