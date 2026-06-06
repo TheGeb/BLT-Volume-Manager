@@ -232,6 +232,59 @@ func TestNewDriverDefaults(t *testing.T) {
 	}
 }
 
+func TestList(t *testing.T) {
+	root := t.TempDir()
+	d := &Driver{root: root}
+
+	for _, name := range []string{"vol-a", "vol-b", "group/nested-vol"} {
+		p := filepath.Join(root, "volumes", name)
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	resp, err := d.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if len(resp.Volumes) != 3 {
+		t.Fatalf("expected 3 volumes, got %d", len(resp.Volumes))
+	}
+
+	seen := make(map[string]bool)
+	for _, v := range resp.Volumes {
+		seen[v.Name] = true
+		if v.Name != "" && v.Mountpoint == "" {
+			t.Errorf("volume %q has empty Mountpoint", v.Name)
+		}
+	}
+	for _, name := range []string{"vol-a", "vol-b", "group/nested-vol"} {
+		if !seen[name] {
+			t.Errorf("expected volume %q in list", name)
+		}
+	}
+}
+
+func TestListEmpty(t *testing.T) {
+	d := &Driver{root: t.TempDir()}
+	resp, err := d.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if len(resp.Volumes) != 0 {
+		t.Errorf("expected 0 volumes, got %d", len(resp.Volumes))
+	}
+}
+
 func TestCapabilities(t *testing.T) {
 	d := &Driver{}
 	cap := d.Capabilities()
