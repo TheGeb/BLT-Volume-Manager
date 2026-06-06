@@ -23,19 +23,19 @@ type mockS3Store struct {
 	listFunc func(prefix string) ([]types.Object, error)
 }
 
-func (m *mockS3Store) PutObject(string, []byte) error                               { return nil }
-func (m *mockS3Store) ReadObject(string) ([]byte, error)                            { return nil, nil }
-func (m *mockS3Store) DeleteObject(string) error                                    { return nil }
-func (m *mockS3Store) ListObjects(prefix string) ([]types.Object, error)            { return m.listFunc(prefix) }
-func (m *mockS3Store) ListCommonPrefixes(string, string) ([]string, error)          { return nil, nil }
-func (m *mockS3Store) DeleteObjectsWithPrefix(string) error                         { return nil }
-func (m *mockS3Store) WriteVolumeMarker(string) error                               { return nil }
-func (m *mockS3Store) DeleteVolumeMarker(string) error                              { return nil }
-func (m *mockS3Store) ListVolumeMarkers() ([]string, error)                         { return nil, nil }
-func (m *mockS3Store) DeleteLockObjects() error                                      { return nil }
-func (m *mockS3Store) WriteRestorePoint(string, RestorePoint) error                 { return nil }
-func (m *mockS3Store) ReadRestorePoint(string) (*RestorePoint, error)               { return nil, nil }
-func (m *mockS3Store) DeleteRestorePoint(string) error                              { return nil }
+func (m *mockS3Store) PutObject(string, []byte) error                      { return nil }
+func (m *mockS3Store) ReadObject(string) ([]byte, error)                   { return nil, nil }
+func (m *mockS3Store) DeleteObject(string) error                           { return nil }
+func (m *mockS3Store) ListObjects(prefix string) ([]types.Object, error)   { return m.listFunc(prefix) }
+func (m *mockS3Store) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
+func (m *mockS3Store) DeleteObjectsWithPrefix(string) error                { return nil }
+func (m *mockS3Store) WriteVolumeMarker(string) error                      { return nil }
+func (m *mockS3Store) DeleteVolumeMarker(string) error                     { return nil }
+func (m *mockS3Store) ListVolumeMarkers() ([]string, error)                { return nil, nil }
+func (m *mockS3Store) DeleteLockObjects() error                            { return nil }
+func (m *mockS3Store) WriteRestorePoint(string, RestorePoint) error        { return nil }
+func (m *mockS3Store) ReadRestorePoint(string) (*RestorePoint, error)      { return nil, ErrNotImplemented }
+func (m *mockS3Store) DeleteRestorePoint(string) error                     { return nil }
 
 var _ S3Store = (*mockS3Store)(nil)
 

@@ -20,6 +20,9 @@ import (
 // ErrKeyNotFound is returned when an S3 key does not exist.
 var ErrKeyNotFound = errors.New("key not found")
 
+// ErrNotImplemented is returned by mock implementations for unimplemented methods.
+var ErrNotImplemented = errors.New("not implemented")
+
 const (
 	LockPrefix         = "blt-volume-manager/locks/"
 	VolumePrefix       = "blt-volume-manager/registered-volumes/"
