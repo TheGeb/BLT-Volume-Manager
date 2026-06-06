@@ -243,6 +243,16 @@
     color: var(--text);
   }
 
+  .sort-btn::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+  }
+
   .sort-chevron {
     position: absolute;
     left: -18px;
