@@ -1,6 +1,5 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
-  import { ScrollArea } from 'bits-ui';
   import { formatExpiration } from '$lib/util';
   import type { VolumeLockInfo } from '$lib/types';
   import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
@@ -330,12 +329,11 @@
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
   {:else}
-    <ScrollArea.Root class="tree-scroll-root" type="auto">
-      <ScrollArea.Viewport class="tree-scroll-viewport">
-        <div class="tree">
-          {#each flatItems as item, idx (item.path)}
-            <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
-              <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
+    <div class="tree-scroll-root" style="height:calc(100vh - 320px);overflow-y:auto;">
+      <div class="tree">
+        {#each flatItems as item, idx (item.path)}
+          <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
+            <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
                 {#if item.isGroup}
                   <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
                   <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -409,14 +407,9 @@
                 </span>
               {/if}
             </div>
-          {/each}
-        </div>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="vertical" class="tree-scrollbar">
-        <ScrollArea.Thumb class="tree-scrollbar-thumb" />
-      </ScrollArea.Scrollbar>
-      <ScrollArea.Corner />
-    </ScrollArea.Root>
+      {/each}
+      </div>
+    </div>
   {/if}
 </section>
   {/if}
@@ -459,48 +452,28 @@
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
   .tree-scroll-root {
-    height: calc(100vh - 220px);
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 20%) transparent;
   }
 
-  .tree-scroll-viewport {
-    height: 100%;
-    width: 100%;
+  .tree-scroll-root::-webkit-scrollbar {
+    width: 8px;
   }
 
-  .tree-scrollbar {
-    display: flex;
-    touch-action: none;
-    user-select: none;
-    padding: 1px;
-    transition: background 0.2s;
+  .tree-scroll-root::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .tree-scrollbar:global([data-state="visible"]) {
-    background: rgb(255 255 255 / 4%);
-  }
-
-  .tree-scrollbar:global([data-state="visible"]):hover {
-    background: rgb(255 255 255 / 8%);
-  }
-
-  .tree-scrollbar:global([data-scroll-area-scrollbar-y]) {
-    width: 8px;
-    border-left: 1px solid transparent;
-  }
-
-  .tree-scrollbar-thumb {
-    flex: 1;
+  .tree-scroll-root::-webkit-scrollbar-thumb {
     background: rgb(255 255 255 / 16%);
     border-radius: 4px;
-    position: relative;
   }
 
-  .tree-scrollbar-thumb:hover {
+  .tree-scroll-root::-webkit-scrollbar-thumb:hover {
     background: rgb(255 255 255 / 28%);
   }
 
-  .tree { display: flex; flex-direction: column; contain: layout style; padding-bottom: 4px; }
+  .tree { display: flex; flex-direction: column; padding-bottom: 4px; min-height: 0; }
 
   .tree-row-wrap { position: relative; display: block; margin-bottom: -2px; }
   .tree-row-wrap:hover { z-index: 10; }

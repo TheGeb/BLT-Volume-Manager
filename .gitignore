@@ -42,5 +42,6 @@ blt-volume-manager-plugin
 .node-bin
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+.vscode/gitcharm-changelists.json
