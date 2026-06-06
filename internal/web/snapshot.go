@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
@@ -22,12 +23,38 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := s.snapshotListResponse(volName)
+	opts := parseSnapshotListOpts(r)
+	resp, err := s.snapshotListResponse(volName, opts)
 	if err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
 	respondJSON(w, resp)
+}
+
+func (s *Server) handleSnapshotHosts(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	volName, ok := requireVolumeParam(w, r)
+	if !ok {
+		return
+	}
+
+	rm := s.volumeManager(volName)
+	latest := 1
+	if l := r.URL.Query().Get("latest"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			latest = n
+		}
+	}
+
+	hosts, err := rm.ListSnapshotsGroupedByHost(latest)
+	if err != nil {
+		respondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, hosts)
 }
 
 func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +135,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		resp, err := s.snapshotListResponse(volName)
+		resp, err := s.snapshotListResponse(volName, nil)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -127,7 +154,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		resp, err := s.snapshotListResponse(volName)
+		resp, err := s.snapshotListResponse(volName, nil)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return

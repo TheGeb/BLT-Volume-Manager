@@ -1,5 +1,6 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
+  import { ScrollArea } from 'bits-ui';
   import { formatExpiration } from '$lib/util';
   import type { VolumeLockInfo } from '$lib/types';
   import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
@@ -275,7 +276,7 @@
   {#if volumes.length === 0 && !loading}
     <LandingPanel {onCreateTestVolume} {creatingTest} {testStatus} />
   {:else}
-<section class="panel" class:lock-mode={showLockBorders} style="display:block;">
+<section class="panel" class:lock-mode={showLockBorders}>
   <div class="filter-row">
     <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
       bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
@@ -329,85 +330,93 @@
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
   {:else}
-    <div class="tree">
-      {#each flatItems as item, idx (item.path)}
-        <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
-          <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
-            {#if item.isGroup}
-              <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
-              <div style="width:22px; display:flex; justify-content:center; align-items:center;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
-                  style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5; transition:transform 0.15s;">
-                  <path d="M7 10l5 5 5-5H7z"/>
-                </svg>
+    <ScrollArea.Root class="tree-scroll-root" type="auto">
+      <ScrollArea.Viewport class="tree-scroll-viewport">
+        <div class="tree">
+          {#each flatItems as item, idx (item.path)}
+            <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
+              <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
+                {#if item.isGroup}
+                  <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
+                  <div style="width:22px; display:flex; justify-content:center; align-items:center;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
+                      style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5; transition:transform 0.15s;">
+                      <path d="M7 10l5 5 5-5H7z"/>
+                    </svg>
+                  </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="tree-name">{item.name}</span>
+                  </button>
+                {:else}
+                  <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
+                    on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
+                    <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
+                      <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                    <span class="tree-name">{item.name}</span>
+                    {#if !item.isGroup}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <span class="vol-actions" on:mouseenter={onActionsEnter} on:mouseleave={onActionsLeave}>
+                      <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
+                        on:click|stopPropagation={() => { if (actionsReady) openCopyVolModal(item.path); }}
+                        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                      </span>
+                      <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
+                        on:click|stopPropagation={() => { if (actionsReady) openRenameVolModal(item.path); }}
+                        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+                        </svg>
+                      </span>
+                    </span>
+                    {/if}
+                  </button>
+                {/if}
               </div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                <span class="tree-name">{item.name}</span>
-              </button>
-            {:else}
-              <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
-                on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
-                <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
-                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                </svg>
-                <span class="tree-name">{item.name}</span>
-                {#if !item.isGroup}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <span class="vol-actions" on:mouseenter={onActionsEnter} on:mouseleave={onActionsLeave}>
-                  <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
-                    on:click|stopPropagation={() => { if (actionsReady) openCopyVolModal(item.path); }}
-                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                  </span>
-                  <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
-                    on:click|stopPropagation={() => { if (actionsReady) openRenameVolModal(item.path); }}
-                    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
-                    </svg>
-                  </span>
-                </span>
-                {/if}
-              </button>
-            {/if}
-          </div>
-          {#if item.isGroup}
-            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
-              {#if folderLocks[item.path]}
-                <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
-                  <span class="lock-badge lock-locked">
-                    <span class="lock-text">Locked:</span>
-                  </span>
-                  <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
-                </span>
-              {/if}
-            </span>
-          {:else}
-            <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
-              {#if volumeLockInfo[item.path]}
-                {#if !lockStyles[idx] || labelAtIdx[idx]}
-                  <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
-                    <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
-                  </span>
-                  {#if volumeLockInfo[item.path]!.owner}
-                    <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
+              {#if item.isGroup}
+                <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
+                  {#if folderLocks[item.path]}
+                    <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
+                      <span class="lock-badge lock-locked">
+                        <span class="lock-text">Locked:</span>
+                      </span>
+                      <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
+                    </span>
                   {/if}
-                {/if}
-              {:else if !loading && !lockStyles[idx]}
-                <span class="lock-badge">—</span>
+                </span>
+              {:else}
+                <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
+                  {#if volumeLockInfo[item.path]}
+                    {#if !lockStyles[idx] || labelAtIdx[idx]}
+                      <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
+                        <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                      </span>
+                      {#if volumeLockInfo[item.path]!.owner}
+                        <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
+                      {/if}
+                    {/if}
+                  {:else if !loading && !lockStyles[idx]}
+                    <span class="lock-badge">—</span>
+                  {/if}
+                </span>
               {/if}
-            </span>
-          {/if}
+            </div>
+          {/each}
         </div>
-      {/each}
-    </div>
+      </ScrollArea.Viewport>
+      <ScrollArea.Scrollbar orientation="vertical" class="tree-scrollbar">
+        <ScrollArea.Thumb class="tree-scrollbar-thumb" />
+      </ScrollArea.Scrollbar>
+      <ScrollArea.Corner />
+    </ScrollArea.Root>
   {/if}
 </section>
   {/if}
@@ -448,6 +457,49 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
+
+  .tree-scroll-root {
+    max-height: calc(100vh - 220px);
+  }
+
+  .tree-scroll-viewport {
+    height: 100%;
+    width: 100%;
+  }
+
+  .tree-scrollbar {
+    display: flex;
+    touch-action: none;
+    user-select: none;
+    padding: 1px;
+    transition: background 0.2s;
+    background: transparent;
+  }
+
+  .tree-scrollbar:global([data-state="visible"]) {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .tree-scrollbar:global([data-state="visible"]):hover {
+    background: rgb(255 255 255 / 8%);
+  }
+
+  .tree-scrollbar:global([data-scroll-area-scrollbar-y]) {
+    width: 8px;
+    border-left: 1px solid transparent;
+  }
+
+  .tree-scrollbar-thumb {
+    flex: 1;
+    background: rgb(255 255 255 / 16%);
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .tree-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 28%);
+  }
+
   .tree { display: flex; flex-direction: column; contain: layout style; padding-bottom: 4px; }
 
   .tree-row-wrap { position: relative; display: block; margin-bottom: -2px; }

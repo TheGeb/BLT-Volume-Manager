@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -131,11 +132,34 @@ func (m *Manager) runCommand(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
+type ListSnapshotsOpts struct {
+	Hosts  []string
+	Latest int
+	Tags   []string
+}
+
 func (m *Manager) ListSnapshots() ([]Snapshot, error) {
+	return m.ListSnapshotsWithOpts(nil)
+}
+
+func (m *Manager) ListSnapshotsWithOpts(opts *ListSnapshotsOpts) ([]Snapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json")
+	args := []string{"snapshots", "--no-lock", "--json"}
+	if opts != nil {
+		for _, h := range opts.Hosts {
+			args = append(args, "--host", h)
+		}
+		if opts.Latest > 0 {
+			args = append(args, "--latest", strconv.Itoa(opts.Latest))
+		}
+		for _, t := range opts.Tags {
+			args = append(args, "--tag", t)
+		}
+	}
+
+	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +180,53 @@ func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 		return snapshots[i].Time.After(snapshots[j].Time)
 	})
 	return snapshots, nil
+}
+
+type HostSnapshots struct {
+	Host      string     `json:"host"`
+	Snapshots []Snapshot `json:"snapshots"`
+}
+
+func (m *Manager) ListSnapshotsGroupedByHost(latest int) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), constants.ResticTimeoutShort)
+	defer cancel()
+
+	args := []string{"snapshots", "--no-lock", "--json", "--group-by", "host", "--latest", "1"}
+	cmd, err := m.resticCommand(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		if isRepositoryMissing(string(out)) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var raw []json.RawMessage
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, err
+	}
+
+	hostSet := make(map[string]bool)
+	for _, item := range raw {
+		var group struct {
+			GroupKey struct {
+				Hostname string `json:"hostname"`
+			} `json:"group_key"`
+		}
+		if json.Unmarshal(item, &group) == nil && group.GroupKey.Hostname != "" {
+			hostSet[group.GroupKey.Hostname] = true
+		}
+	}
+
+	hosts := make([]string, 0, len(hostSet))
+	for h := range hostSet {
+		hosts = append(hosts, h)
+	}
+	sort.Strings(hosts)
+	return hosts, nil
 }
 
 func (m *Manager) ForgetSnapshot(snapshotID string) error {

@@ -150,6 +150,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/snapshot/", s.handleSnapshotAction)
 	inner.HandleFunc("/api/snapshot-view/", s.handleSnapshotView)
 	inner.HandleFunc("/api/snapshots/delete-batch", s.handleSnapshotBatchDelete)
+	inner.HandleFunc("/api/snapshots/hosts", s.handleSnapshotHosts)
 	inner.HandleFunc("/api/volume/", s.handleVolumeAction)
 	inner.HandleFunc("/api/stats", s.handleStats)
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)

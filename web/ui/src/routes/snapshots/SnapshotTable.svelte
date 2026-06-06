@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { Button, Popover } from 'bits-ui';
+  import { Button, Popover, ScrollArea } from 'bits-ui';
   import type { Snapshot } from '$lib/types';
+  import DateRangeFilter from './DateTimeRange.svelte';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
@@ -23,6 +24,15 @@
   export let selectedForDeletion: Set<string> = new Set();
   export let onToggleDeletion: (sn: Snapshot) => void = () => {};
   export let onDeleteSelected: () => void = () => {};
+  export let timeFrom: number | undefined = undefined;
+  export let timeTo: number | undefined = undefined;
+  export let onTimeFilter: (from?: number, to?: number) => void = () => {};
+  export let timeOfDayFrom: number | undefined = undefined;
+  export let timeOfDayTo: number | undefined = undefined;
+  export let onTimeOfDayFilter: (from?: number, to?: number) => void = () => {};
+  export let totalSnapshots = 0;
+  export let allLoaded = false;
+  export let onLoadAll: () => void = () => {};
 
   function handleRPClick(sn: Snapshot) {
     const isRP = sn.id === restorePointID || sn.short_id === restorePointID;
@@ -30,9 +40,22 @@
   }
 </script>
 
+{#snippet columns()}
+  <colgroup>
+    <col style="width:18%;">
+    <col style="width:14%;">
+    <col style="width:8%;">
+    <col style="width:10%;">
+    <col style="width:14%;">
+    <col style="width:12%;">
+    <col style="width:24%;">
+  </colgroup>
+{/snippet}
+
 <section class="panel table-panel" style="margin-bottom:0;">
-  <div style="overflow-x:auto;">
-    <table class="data-table">
+  <div class="table-scroll-wrapper">
+    <table class="header-table">
+      {@render columns()}
       <thead>
         <tr>
           <th style="text-align:center;white-space:nowrap;">
@@ -59,7 +82,7 @@
               </Popover.Root>
             </div>
           </th>
-          <th style="text-align:center;width:100px;">Size</th>
+          <th style="text-align:center;">Size</th>
           <th>
             <div class="filter-wrap">
               <span class="th-label">Host</span>
@@ -78,90 +101,123 @@
               </Popover.Root>
             </div>
           </th>
-          <th style="cursor:pointer;user-select:none;white-space:nowrap;" on:click={onToggleSort}>
-            Date {sortNewestFirst ? '▼' : '▲'}
+          <th>
+            <DateRangeFilter
+              {timeFrom}
+              {timeTo}
+              {sortNewestFirst}
+              {onToggleSort}
+              {onTimeFilter}
+              {timeOfDayFrom}
+              {timeOfDayTo}
+              {onTimeOfDayFilter}
+            />
           </th>
           <th>Actions</th>
         </tr>
       </thead>
-      <tbody id="snapshotTable" style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
-        {#each snapshots as sn (sn.id)}
-          <tr class:del-row={selectedForDeletion.has(sn.id)}>
-             <td style="text-align:center">
-               {#if restorePointLoading[sn.id]}
-                  <span class="rp-loader">
-                    <svg width="20" height="20" viewBox="0 0 20 20" class="spin">
-                      <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
-                      <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    </svg>
-                  </span>
-               {:else}
-                  <button type="button" class="rp-btn" title="Toggle restore point" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
-                    <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
-                      <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
-                        stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
-                      {#if sn.id === restorePointID || sn.short_id === restorePointID}
-                       <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
+    </table>
+
+    <ScrollArea.Root type="always" style="height:calc(100vh - 390px);overflow:hidden;">
+      <ScrollArea.Viewport style="height:100%;width:100%;">
+        <table class="body-table">
+          {@render columns()}
+          <tbody style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
+            {#each snapshots as sn (sn.id)}
+              <tr class:del-row={selectedForDeletion.has(sn.id)}>
+                 <td style="text-align:center">
+                   {#if restorePointLoading[sn.id]}
+                      <span class="rp-loader">
+                        <svg width="20" height="20" viewBox="0 0 20 20" class="spin">
+                          <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
+                          <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        </svg>
+                      </span>
+                   {:else}
+                      <button type="button" class="rp-btn" title="Toggle restore point" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
+                        <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
+                          <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
+                            stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
+                          {#if sn.id === restorePointID || sn.short_id === restorePointID}
+                           <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
+                         {/if}
+                       </svg>
+                     </button>
+                   {/if}
+                 </td>
+                <td class="copy-id" title="Click to copy full snapshot ID"
+                  on:click={() => { navigator.clipboard.writeText(sn.id); }}>
+                  {sn.short_id.slice(0, 8)}…
+                </td>
+                 <td style="color:var(--muted);font-size:0.9rem;">
+                   {#each ['hot', 'cold'] as t (t)}
+                     {#if sn.tags.includes(t)}
+                       <span class="type-badge">{t}</span>
+                       {#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}
                      {/if}
-                   </svg>
-                 </button>
-               {/if}
-             </td>
-            <td class="copy-id" title="Click to copy full snapshot ID"
-              on:click={() => { navigator.clipboard.writeText(sn.id); }}>
-              {sn.short_id.slice(0, 8)}…
-            </td>
-             <td style="color:var(--muted);font-size:0.9rem;">
-               {#each ['hot', 'cold'] as t (t)}
-                 {#if sn.tags.includes(t)}
-                   <span class="type-badge">{t}</span>
-                   {#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}
-                 {/if}
-               {:else}—
-               {/each}
-             </td>
-            <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
-              {#if sizes[sn.id]}
-                {sizes[sn.id]}
-               {:else if sizeLoading[sn.id]}
-                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-                   <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-                   <path d="M12 2a10 10 0 0 1 10 10" />
-                 </svg>
-               {:else}
-                <button type="button" class="size-btn" title="Compute size"
-                  on:click|stopPropagation={() => onSizeLoaded(sn.id)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                  </svg>
-                </button>
-              {/if}
-            </td>
-            <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '—'}</td>
-            <td>{new Date(sn.time).toLocaleDateString()}<br>
-              <span style="font-size:0.85rem;color:var(--muted);">{new Date(sn.time).toLocaleTimeString()}</span>
-            </td>
-         <td>
-               <div style="display:flex;gap:4px;flex-wrap:nowrap;">
-                  <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View</Button.Root>
-                 <button
-                   class="del-toggle"
-                   class:del-selected={selectedForDeletion.has(sn.id)}
-                   on:click={() => onToggleDeletion(sn)}>
-                   {selectedForDeletion.has(sn.id) ? '×' : 'Delete'}
-                 </button>
-               </div>
-             </td>
-          </tr>
-        {:else}
-          <tr>
-            <td colspan="7" style="text-align:center;color:var(--muted);padding:40px;">
-              {loading ? 'Loading...' : 'No snapshots found'}
-            </td>
-          </tr>
-        {/each}
-      </tbody>
+                   {:else}—
+                   {/each}
+                 </td>
+                <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                  {#if sizes[sn.id]}
+                    {sizes[sn.id]}
+                   {:else if sizeLoading[sn.id]}
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
+                       <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
+                       <path d="M12 2a10 10 0 0 1 10 10" />
+                     </svg>
+                   {:else}
+                    <button type="button" class="size-btn" title="Compute size"
+                      on:click|stopPropagation={() => onSizeLoaded(sn.id)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                      </svg>
+                    </button>
+                  {/if}
+                </td>
+                <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '—'}</td>
+                <td>{new Date(sn.time).toLocaleDateString()}<br>
+                  <span style="font-size:0.85rem;color:var(--muted);">{new Date(sn.time).toLocaleTimeString()}</span>
+                </td>
+             <td>
+                   <div style="display:flex;gap:4px;flex-wrap:nowrap;">
+                      <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View</Button.Root>
+                     <button
+                       class="del-toggle"
+                       class:del-selected={selectedForDeletion.has(sn.id)}
+                       on:click={() => onToggleDeletion(sn)}>
+                       {selectedForDeletion.has(sn.id) ? '×' : 'Delete'}
+                     </button>
+                   </div>
+                 </td>
+              </tr>
+            {:else}
+              <tr>
+                <td colspan="7" style="text-align:center;color:var(--muted);padding:40px;">
+                  {loading ? 'Loading...' : 'No snapshots found'}
+                </td>
+              </tr>
+            {/each}
+            {#if !allLoaded && totalSnapshots > snapshots.length && snapshots.length > 0}
+              <tr>
+                <td colspan="7" style="text-align:center;padding:8px;">
+                  <button class="load-all-btn" on:click={onLoadAll}>
+                    Load all ({totalSnapshots} total)
+                  </button>
+                </td>
+              </tr>
+            {/if}
+          </tbody>
+        </table>
+      </ScrollArea.Viewport>
+      <ScrollArea.Scrollbar style="display:flex;background:transparent;width:8px;padding:2px;" orientation="vertical">
+        <ScrollArea.Thumb style="flex:1;background:color-mix(in srgb, var(--muted) 30%, transparent);border-radius:4px;min-height:40px;" />
+      </ScrollArea.Scrollbar>
+    </ScrollArea.Root>
+
+    <table class="footer-table">
+      {@render columns()}
       <tfoot>
         <tr>
           <td class="snap-total">{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</td>
@@ -190,33 +246,55 @@
 </section>
 
 <style>
-  .data-table {
+  .header-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     min-width: 550px;
-  }
-
-  .data-table th,
-  .data-table td {
-    padding: 16px 18px;
-    text-align: left;
     border-bottom: 1px solid var(--border);
   }
 
-  .data-table th {
+  .header-table th {
+    padding: 16px 18px;
+    text-align: left;
     color: var(--muted);
     font-size: 0.95rem;
     letter-spacing: 0.01em;
     white-space: nowrap;
   }
 
-  .data-table tbody tr {
-    background: var(--surface);
-    transition: background 0.15s ease;
+  .body-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    min-width: 550px;
   }
 
-  .data-table tbody tr:hover {
-    background: rgb(255 255 255 / 4%);
+  .body-table td {
+    padding: 16px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .footer-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    min-width: 550px;
+  }
+
+  .footer-table td {
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: none;
+  }
+
+  .footer-table td:first-child {
+    border-radius: 0 0 0 24px;
+  }
+
+  .footer-table td:last-child {
+    border-radius: 0 0 24px;
   }
 
   .copy-id {
@@ -244,20 +322,21 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
+    width: 28px;
+    height: 26px;
+    border-radius: 6px;
     border: none;
     background: transparent;
     color: var(--muted);
     cursor: pointer;
     padding: 0;
     line-height: 0;
+    transition: color 0.15s, background 0.15s;
   }
 
   :global(.filter-btn.active) {
-    background: var(--hover-bg);
-    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
   }
 
   :global(.filter-btn:hover),
@@ -345,8 +424,6 @@
     to { transform: rotate(360deg); }
   }
 
-
-
   .del-toggle {
     background: rgb(255 80 80 / 10%);
     border: 1px solid var(--red);
@@ -379,31 +456,17 @@
     background: color-mix(in srgb, var(--red) 80%, #000);
   }
 
-  .data-table tbody tr.del-row {
+  .body-table tbody tr.del-row {
     background: rgb(255 80 80 / 6%);
     outline: 1px solid rgb(255 80 80 / 15%);
     outline-offset: -1px;
   }
 
-  .data-table tbody tr.del-row:hover {
+  .body-table tbody tr.del-row:hover {
     background: rgb(255 80 80 / 14%);
   }
 
-  .data-table tfoot td {
-    padding: 10px 18px;
-    background: var(--surface);
-    border-bottom: none;
-  }
-
-  .data-table tfoot td:first-child {
-    border-radius: 0 0 0 24px;
-  }
-
-  .data-table tfoot td:last-child {
-    border-radius: 0 0 24px;
-  }
-
-  .data-table tfoot .snap-total {
+  .footer-table tfoot .snap-total {
     font-size: 0.85rem;
     color: var(--muted);
     text-align: center;
@@ -459,7 +522,9 @@
   }
 
   @media (width <= 900px) {
-    .data-table {
+    .header-table,
+    .body-table,
+    .footer-table {
       min-width: 0;
     }
   }

@@ -2,13 +2,16 @@
   import { slide } from 'svelte/transition';
   import SnapshotTable from './SnapshotTable.svelte';
   import SnapshotViewer from './SnapshotViewer.svelte';
+  import SnapshotSearch from './SnapshotSearch.svelte';
   import { onSelectVolume, onOpenViewer, onCloseViewer, switchTab, setDiffTarget, syncUrl } from '$lib/stores/navigation';
   import {
-    sortNewestFirst, typeFilter, hostFilter, sizes, currentSnapshot, allSnapshots,
+    sortNewestFirst, sizes, currentSnapshot, allSnapshots,
     viewerOpen, snapsLoading, restorePointLoading,
-    sizeLoading, sortedSnapshots, hosts, diffTargetId, diffTargetFallbackHash, restorePointID,
-    selectedForDeletion, onToggleSort, onTypeFilter, onHostFilter, onAddTag, onRemoveTag,
-    toggleForDeletion, openBulkDeleteModal, handleSizeLoaded
+    sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
+    selectedForDeletion, onToggleSort, onAddTag, onRemoveTag,
+    toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
+    timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter, loadAllSnapshots,
+    allSnapshotsLoaded
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
@@ -62,28 +65,32 @@
       </div>
     {/if}
 
+    <SnapshotSearch />
     <SnapshotTable
-      snapshots={$sortedSnapshots}
+      snapshots={$displayedSnapshots}
       sizes={$sizes}
       selectedVolume={$selectedVolume}
       sortNewestFirst={$sortNewestFirst}
-      typeFilter={$typeFilter}
-      hostFilter={$hostFilter}
-      hosts={$hosts}
       loading={$snapsLoading}
       restorePointLoading={$restorePointLoading}
       sizeLoading={$sizeLoading}
       restorePointID={$restorePointID}
       selectedForDeletion={$selectedForDeletion}
       onToggleSort={onToggleSort}
-      onTypeFilter={onTypeFilter}
-      onHostFilter={onHostFilter}
       onOpenViewer={onOpenViewer}
       onAddTag={onAddTag}
       onRemoveTag={onRemoveTag}
       onToggleDeletion={toggleForDeletion}
       onDeleteSelected={openBulkDeleteModal}
       onSizeLoaded={handleSizeLoaded}
+      timeFrom={$timeFrom}
+      timeTo={$timeTo}
+      onTimeFilter={onTimeFilter}
+      timeOfDayFrom={$timeOfDayFrom}
+      timeOfDayTo={$timeOfDayTo}
+      onTimeOfDayFilter={onTimeOfDayFilter}
+      allLoaded={$allSnapshotsLoaded}
+      onLoadAll={loadAllSnapshots}
     />
   </div>
 </div>

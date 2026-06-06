@@ -3,6 +3,9 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -22,9 +25,9 @@ func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return vol, true
 }
 
-func (s *Server) snapshotListResponse(volName string) (map[string]any, error) {
+func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts) (map[string]any, error) {
 	rm := s.volumeManager(volName)
-	snaps, err := rm.ListSnapshots()
+	snaps, err := rm.ListSnapshotsWithOpts(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +48,23 @@ func (s *Server) snapshotListResponse(volName string) (map[string]any, error) {
 		"snapshots":      result,
 		"restorePointID": restorePointID,
 	}, nil
+}
+
+func parseSnapshotListOpts(r *http.Request) *restic.ListSnapshotsOpts {
+	hosts := r.URL.Query()["host"]
+	latestStr := r.URL.Query().Get("latest")
+	latest := 0
+	if latestStr != "" {
+		if n, err := strconv.Atoi(latestStr); err == nil && n > 0 {
+			latest = n
+		}
+	}
+	tags := r.URL.Query()["tag"]
+
+	if len(hosts) == 0 && latest == 0 && len(tags) == 0 {
+		return nil
+	}
+	return &restic.ListSnapshotsOpts{Hosts: hosts, Latest: latest, Tags: tags}
 }
 
 func respondError(w http.ResponseWriter, err error, status int) {

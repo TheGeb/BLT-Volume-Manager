@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deleteSnapModal, snapDeleteInput, selectedForDeletion, filteredSnapshots, sortedSnapshots, hosts, onToggleSort, onSearch, onTypeFilter, onHostFilter, toggleForDeletion, openBulkDeleteModal, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
+import { snapshots, query, sortNewestFirst, typeFilter, hostFilter, deleteSnapModal, snapDeleteInput, selectedForDeletion, filteredSnapshots, sortedSnapshots, hosts, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo, onToggleSort, onSearch, onTypeFilter, onHostFilter, toggleForDeletion, openBulkDeleteModal, filterSnapshots, sortSnapshots, extractHosts } from './snapshots';
 import type { Snapshot } from '../types';
 
 function makeSnap(overrides: Partial<Snapshot> = {}): Snapshot {
@@ -23,43 +23,32 @@ describe('filterSnapshots', () => {
   const snaps = [snapA, snapB, snapC];
 
   it('returns all when no filters active', () => {
-    expect(filterSnapshots(snaps, 'all', '', '')).toEqual(snaps);
-  });
-
-  it('filters by hot tag', () => {
-    expect(filterSnapshots(snaps, 'hot', '', '')).toEqual([snapA]);
-  });
-
-  it('filters by cold tag', () => {
-    expect(filterSnapshots(snaps, 'cold', '', '')).toEqual([snapB]);
-  });
-
-  it('filters by hostname', () => {
-    expect(filterSnapshots(snaps, 'all', 'h1', '')).toEqual([snapA, snapC]);
+    expect(filterSnapshots(snaps, '')).toEqual(snaps);
   });
 
   it('filters by query matching short_id', () => {
-    expect(filterSnapshots(snaps, 'all', '', 'b')).toEqual([snapB]);
+    expect(filterSnapshots(snaps, 'b')).toEqual([snapB]);
   });
 
   it('filters by query matching hostname', () => {
-    expect(filterSnapshots(snaps, 'all', '', 'h1')).toEqual([snapA, snapC]);
+    expect(filterSnapshots(snaps, 'h1')).toEqual([snapA, snapC]);
   });
 
   it('filters by query matching tags', () => {
-    expect(filterSnapshots(snaps, 'all', '', 'hot')).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'hot')).toEqual([snapA]);
   });
 
   it('filters by query case-insensitively', () => {
-    expect(filterSnapshots(snaps, 'all', '', 'HOT')).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'HOT')).toEqual([snapA]);
   });
 
-  it('combines multiple filters', () => {
-    expect(filterSnapshots(snaps, 'hot', 'h1', '')).toEqual([snapA]);
+  it('filters by time range', () => {
+    const from = new Date('2024-02-15T00:00:00Z').getTime();
+    expect(filterSnapshots(snaps, '', from)).toEqual([snapA]);
   });
 
   it('returns empty when no match', () => {
-    expect(filterSnapshots(snaps, 'all', '', 'nonexistent')).toEqual([]);
+    expect(filterSnapshots(snaps, 'nonexistent')).toEqual([]);
   });
 });
 
@@ -123,6 +112,10 @@ describe('derived stores initial state', () => {
     sortNewestFirst.set(true);
     typeFilter.set('all');
     hostFilter.set('');
+    timeFrom.set(undefined);
+    timeTo.set(undefined);
+    timeOfDayFrom.set(undefined);
+    timeOfDayTo.set(undefined);
   });
 
   it('filteredSnapshots starts empty', () => {
@@ -137,9 +130,9 @@ describe('derived stores initial state', () => {
     expect(get(hosts)).toEqual([]);
   });
 
-  it('filteredSnapshots computes initial value', () => {
+  it('filteredSnapshots filters by time range', () => {
     snapshots.set([snapA, snapB, snapC]);
-    typeFilter.set('hot');
+    timeFrom.set(new Date('2024-02-15T00:00:00Z').getTime());
     expect(get(filteredSnapshots)).toEqual([snapA]);
   });
 

@@ -1,16 +1,45 @@
 import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
+export interface SnapshotListParams {
+  host?: string;
+  hosts?: string[];
+  latest?: number;
+  tag?: string;
+  tags?: string[];
+}
+
 export async function fetchVolumes(): Promise<string[]> {
 	const resp = await fetch('/api/volumes');
 	const data = await resp.json() as { volumes?: string[] };
 	return data.volumes ?? [];
 }
 
-export async function fetchSnapshots(volume: string): Promise<SnapshotsResponse> {
-	const resp = await fetch(`/api/snapshots?volume=${encodeURIComponent(volume)}`);
+export async function fetchSnapshots(volume: string, params?: SnapshotListParams): Promise<SnapshotsResponse> {
+	const p = new URLSearchParams();
+	p.set('volume', volume);
+	if (params) {
+		const hosts = params.hosts ?? (params.host ? [params.host] : []);
+		for (const h of hosts) p.append('host', h);
+		const tags = params.tags ?? (params.tag ? [params.tag] : []);
+		for (const t of tags) p.append('tag', t);
+		if (params.latest !== undefined && params.latest > 0) {
+			p.set('latest', String(params.latest));
+		}
+	}
+	const resp = await fetch(`/api/snapshots?${p.toString()}`);
 	const data = await resp.json() as SnapshotsResponse;
 	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
 	return { snapshots, restorePointID: data.restorePointID ?? '' };
+}
+
+export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<string[]> {
+	const p = new URLSearchParams();
+	p.set('volume', volume);
+	p.set('latest', String(latest));
+	const resp = await fetch(`/api/snapshots/hosts?${p.toString()}`);
+	if (!resp.ok) throw new Error('Failed to fetch hosts');
+	const data = await resp.json() as string[];
+	return data;
 }
 
 export async function fetchRepoStatus(volume: string): Promise<RepoStatus> {

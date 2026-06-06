@@ -36,17 +36,12 @@ func (s *Server) handleDummyVolume(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rm := s.volumeManager(req.Name)
-	volPath, err := os.MkdirTemp("", "blt-dummy-*")
-	if err != nil {
+	volPath := filepath.Join(os.TempDir(), "blt-dummy-data")
+	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		respondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
 		return
 	}
 	defer func() { _ = os.RemoveAll(volPath) }()
-
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
-		respondError(w, fmt.Errorf("create volume dir: %w", err), http.StatusInternalServerError)
-		return
-	}
 
 	if err := os.WriteFile(filepath.Join(volPath, constants.VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil {
 		respondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
@@ -112,17 +107,12 @@ func (s *Server) handleDummySnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rm := s.volumeManager(req.Volume)
-	volPath, err := os.MkdirTemp("", "blt-dummy-snap-*")
-	if err != nil {
-		respondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
-		return
-	}
-	defer func() { _ = os.RemoveAll(volPath) }()
-
+	volPath := filepath.Join(os.TempDir(), "blt-dummy-data")
 	if err := os.MkdirAll(volPath, 0o755); err != nil {
 		respondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
 		return
 	}
+	defer func() { _ = os.RemoveAll(volPath) }()
 
 	count := writeDummyFiles(volPath)
 
