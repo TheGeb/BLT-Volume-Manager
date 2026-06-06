@@ -23,32 +23,32 @@ describe('filterSnapshots', () => {
   const snaps = [snapA, snapB, snapC];
 
   it('returns all when no filters active', () => {
-    expect(filterSnapshots(snaps, '')).toEqual(snaps);
+    expect(filterSnapshots(snaps, '', 'all', '')).toEqual(snaps);
   });
 
   it('filters by query matching short_id', () => {
-    expect(filterSnapshots(snaps, 'b')).toEqual([snapB]);
+    expect(filterSnapshots(snaps, 'b', 'all', '')).toEqual([snapB]);
   });
 
   it('filters by query matching hostname', () => {
-    expect(filterSnapshots(snaps, 'h1')).toEqual([snapA, snapC]);
+    expect(filterSnapshots(snaps, 'h1', 'all', '')).toEqual([snapA, snapC]);
   });
 
   it('filters by query matching tags', () => {
-    expect(filterSnapshots(snaps, 'hot')).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'hot', 'all', '')).toEqual([snapA]);
   });
 
   it('filters by query case-insensitively', () => {
-    expect(filterSnapshots(snaps, 'HOT')).toEqual([snapA]);
+    expect(filterSnapshots(snaps, 'HOT', 'all', '')).toEqual([snapA]);
   });
 
   it('filters by time range', () => {
     const from = new Date('2024-02-15T00:00:00Z').getTime();
-    expect(filterSnapshots(snaps, '', from)).toEqual([snapA]);
+    expect(filterSnapshots(snaps, '', 'all', '', from)).toEqual([snapA]);
   });
 
   it('returns empty when no match', () => {
-    expect(filterSnapshots(snaps, 'nonexistent')).toEqual([]);
+    expect(filterSnapshots(snaps, 'nonexistent', 'all', '')).toEqual([]);
   });
 });
 

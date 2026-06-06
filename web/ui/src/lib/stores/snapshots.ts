@@ -44,12 +44,16 @@ export async function loadHosts(volume: string) {
 export function filterSnapshots(
   snapshots: Snapshot[],
   query: string,
+  typeFilter: string,
+  hostFilter: string,
   timeFrom?: number,
   timeTo?: number,
   timeOfDayFrom?: number,
   timeOfDayTo?: number,
 ): Snapshot[] {
   return snapshots.filter(sn => {
+    if (hostFilter && sn.hostname !== hostFilter) return false;
+    if (typeFilter !== 'all' && !sn.tags.includes(typeFilter)) return false;
     const snTime = new Date(sn.time);
     if (timeFrom !== undefined && snTime.getTime() < timeFrom) return false;
     if (timeTo !== undefined && snTime.getTime() > timeTo) return false;
@@ -67,9 +71,9 @@ export function filterSnapshots(
 }
 
 export const filteredSnapshots = derived(
-  [snapshots, query, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo],
-  ([$snapshots, $query, $timeFrom, $timeTo, $todFrom, $todTo]) =>
-    filterSnapshots($snapshots, $query, $timeFrom, $timeTo, $todFrom, $todTo)
+  [snapshots, query, typeFilter, hostFilter, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo],
+  ([$snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo]) =>
+    filterSnapshots($snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo)
 );
 
 export function sortSnapshots(snapshots: Snapshot[], newestFirst: boolean): Snapshot[] {

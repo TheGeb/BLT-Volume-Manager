@@ -11,7 +11,7 @@
     selectedForDeletion, onToggleSort, onAddTag, onRemoveTag,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
     timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter, loadAllSnapshots,
-    allSnapshotsLoaded
+    allSnapshotsLoaded, typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
@@ -71,12 +71,17 @@
       sizes={$sizes}
       selectedVolume={$selectedVolume}
       sortNewestFirst={$sortNewestFirst}
+      typeFilter={$typeFilter}
+      hostFilter={$hostFilter}
+      hosts={$hosts}
       loading={$snapsLoading}
       restorePointLoading={$restorePointLoading}
       sizeLoading={$sizeLoading}
       restorePointID={$restorePointID}
       selectedForDeletion={$selectedForDeletion}
       onToggleSort={onToggleSort}
+      onTypeFilter={onTypeFilter}
+      onHostFilter={onHostFilter}
       onOpenViewer={onOpenViewer}
       onAddTag={onAddTag}
       onRemoveTag={onRemoveTag}
