@@ -13,6 +13,7 @@
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
+  import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
 
   function slideFade(node: Element, { duration = 250, direction = 1 } = {}) {
@@ -390,7 +391,7 @@
         {/if}
         <span class="snap-meta-item">{new Date(snapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(snapshot.time).toLocaleTimeString()}</span></span>
         <span class="snap-meta-item">Type: <strong>{snapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
-        <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+        <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
       </div>
     </div>
     {#if currentDiffResult && diffOtherSnapshot}
@@ -411,7 +412,7 @@
             {/if}
             <span class="snap-meta-item">{new Date(diffOtherSnapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(diffOtherSnapshot.time).toLocaleTimeString()}</span></span>
             <span class="snap-meta-item">Type: <strong>{diffOtherSnapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
-            <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+            <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
           </div>
         </div>
       </div>
@@ -452,8 +453,7 @@
     <div style="display:flex;flex:1;min-height:0;">
       <div id="viewerTreePanel" style="flex:0 0 {treePanelStartWidth}px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
          <div style="display:flex;gap:4px;align-items:center;">
-          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery}
-            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgb(255 255 255 / 4%);color:var(--text);font-size:0.8rem;outline:none;min-width:0;" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
+          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery} class="search-files-input" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
           <button class="button button-secondary button-xs mode-toggle" style="padding:7px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
               {#if treeSearchFullPath}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
@@ -490,17 +490,11 @@
         <div id="viewerTree" style="overflow:auto;scrollbar-gutter:stable;border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;opacity:{treeOpacity};will-change:transform;" bind:this={treeEl}>
           {#if loading}
             <div style="text-align:center;padding:40px;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
+              <Spinner />
             </div>
           {:else if diffLoading}
             <div style="text-align:center;padding:40px;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
+              <Spinner />
               <div style="color:var(--muted);font-size:0.85rem;margin-top:8px;">Computing diff...</div>
             </div>
           {:else}
@@ -517,13 +511,10 @@
       </div>
       <div id="viewerDetail" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:12px;font-family:monospace;">
         {#if loading}
-          <div style="text-align:center;padding:40px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-              <path d="M12 2a10 10 0 0 1 10 10" />
-            </svg>
-          </div>
-        {:else if fileContentPath}
+            <div style="text-align:center;padding:40px;">
+              <Spinner />
+            </div>
+          {:else if fileContentPath}
           <div style="font-size:0.82rem;color:{fileContentDiffColor || 'var(--accent)'};font-weight:600;padding:0 0 8px;margin-bottom:8px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:system-ui,sans-serif;">
             {fileContentPath.replace(/^\//, '')}
           </div>
@@ -537,10 +528,7 @@
           {:else if fileContent}<div style="white-space:pre-wrap;">{fileContent.trimStart()}</div>
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
+              <Spinner />
             </div>
           {:else}
             <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
@@ -558,6 +546,26 @@
 </section>
 
 <style>
+  .search-files-input {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgb(255 255 255 / 4%);
+    color: var(--text);
+    font-size: 0.8rem;
+    outline: none;
+    min-width: 0;
+  }
+
+  .search-files-input:hover {
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
+  .search-files-input:focus {
+    border-color: var(--muted);
+  }
+
   .eyebrow {
     margin: 0 0 8px;
     color: var(--accent);
@@ -594,16 +602,6 @@
     width: 1px;
     background: var(--border);
     flex-shrink: 0;
-  }
-
-  .spin {
-    animation: spin 1s linear infinite;
-    vertical-align: middle;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
   }
 
   .mode-toggle {

@@ -283,13 +283,6 @@
 {/if}
 
 <style>
-  .filter-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   .sort-btn {
     position: relative;
     font-size: 0.95rem;

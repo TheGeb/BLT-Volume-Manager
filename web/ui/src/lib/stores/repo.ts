@@ -49,28 +49,24 @@ export async function loadStats(volume: string) {
   }
 }
 
-export async function handleCheck() {
+async function withRepoOp(loading: { set: (v: boolean) => void }, apiFn: () => Promise<string>) {
   const vol = get(selectedVolume);
   if (!vol) return;
-  checking.set(true);
+  loading.set(true);
   showToast('');
   try {
-    const msg = await api.checkRepo(vol);
+    const msg = await apiFn();
     showToast(msg);
   } catch (e: unknown) { showToast((e as Error).message, true); }
-  finally { checking.set(false); }
+  finally { loading.set(false); }
+}
+
+export async function handleCheck() {
+  await withRepoOp(checking, () => api.checkRepo(get(selectedVolume)));
 }
 
 export async function handleRepair() {
-  const vol = get(selectedVolume);
-  if (!vol) return;
-  repairing.set(true);
-  showToast('');
-  try {
-    const msg = await api.repairRepo(vol);
-    showToast(msg);
-  } catch (e: unknown) { showToast((e as Error).message, true); }
-  finally { repairing.set(false); }
+  await withRepoOp(repairing, () => api.repairRepo(get(selectedVolume)));
 }
 
 export function doSwitchTab(tab: 'snapshots' | 'repo') {

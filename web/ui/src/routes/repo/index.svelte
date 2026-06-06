@@ -38,38 +38,6 @@
 </div>
 
 <style>
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    margin-bottom: 20px;
-    border-bottom: 2px solid var(--border);
-  }
-
-  .tab {
-    background: none;
-    border: none;
-    border-radius: 0;
-    padding: 12px 28px;
-    font-size: 1rem;
-    font-weight: 500;
-    font-family: inherit;
-    color: var(--muted);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
-    letter-spacing: 0.02em;
-    appearance: none;
-    outline: none;
-  }
-  .tab:hover { color: var(--text); }
-
-  .tab.tab-active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-  }
-  .tab-panel { display: block; }
-
   .repo-layout {
     display: flex;
     flex-wrap: wrap;

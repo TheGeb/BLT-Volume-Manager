@@ -221,10 +221,6 @@
     box-shadow: inset 0 0 0 3px var(--surface);
   }
 
-  @keyframes spin {
-    from { transform: rotate(0deg); } to { transform: rotate(360deg); }
-  }
-  :global(.spin) { animation: spin 1s linear infinite; }
 </style>
 
 <div class="page-shell">
@@ -236,7 +232,7 @@
       {/if}
       <button class="button-icon" title="Refresh" on:click={doRefresh} disabled={refreshing}>
         {#if refreshing}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin" style="vertical-align:middle;">
             <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
             <path d="M12 2a10 10 0 0 1 10 10"/>
           </svg>

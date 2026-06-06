@@ -427,7 +427,9 @@
     font-size: 0.9rem; font-weight: 500; outline: none;
     transition: border-color 0.15s;
   }
-  .volume-filter-input:focus { border-color: var(--accent); }
+
+  .volume-filter-input:hover { border-color: color-mix(in srgb, var(--muted), var(--bg) 40%); }
+  .volume-filter-input:focus { border-color: var(--muted); }
   .volume-filter-input::placeholder { color: var(--muted); }
 
   .tree-toolbar {

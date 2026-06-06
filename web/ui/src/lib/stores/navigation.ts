@@ -5,7 +5,7 @@ import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
 import { activeTab, loadLockStatus, loadStats, doSwitchTab } from './repo';
-import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal } from './snapshots';
+import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal, findSnapshot } from './snapshots';
 
 export const creatingTest = writable(false);
 export const testStatus = writable('');
@@ -67,20 +67,13 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
     await loadStats(volume);
 
     if (params?.snapshotId) {
-      let snap = get(snapshots).find(s => s.id === params.snapshotId || s.short_id === params.snapshotId);
-      if (!snap && params.fallbackHash) {
-        snap = get(snapshots).find(s => s.fallbackHash === params.fallbackHash);
-      }
+      const snap = findSnapshot(get(snapshots), params.snapshotId, params.fallbackHash);
       if (snap) {
         snap.fallbackHash = params.fallbackHash ?? '';
         currentSnapshot.set(snap);
       }
       if (params.diffId && params.diffFallbackHash) {
-        let diffSnap = get(snapshots).find(s => s.id === params.diffId || s.short_id === params.diffId);
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        if (!diffSnap) {
-          diffSnap = get(snapshots).find(s => s.fallbackHash === params.diffFallbackHash);
-        }
+        const diffSnap = findSnapshot(get(snapshots), params.diffId, params.diffFallbackHash);
         if (diffSnap) {
           diffSnap.fallbackHash = diffSnap.fallbackHash ?? params.diffFallbackHash;
           diffTargetFallbackHash.set(params.diffFallbackHash);
@@ -171,7 +164,7 @@ export function onCloseViewer() {
 }
 
 export function setDiffTarget(id: string) {
-  const snap = get(allSnapshots).find(s => s.id === id || s.short_id === id);
+  const snap = findSnapshot(get(allSnapshots), id);
   if (!snap) return;
   diffTargetFallbackHash.set(snap.fallbackHash ?? '');
   diffTargetId.set(snap.id);
@@ -195,7 +188,7 @@ function buildUrl(): string {
     }
     const dtId = get(diffTargetId);
     if (dtId) {
-      const dtSnap = get(allSnapshots).find(s => s.id === dtId || s.short_id === dtId);
+      const dtSnap = findSnapshot(get(allSnapshots), dtId);
       if (dtSnap) {
         p.set('diff', dtSnap.short_id);
         const hash = dtSnap.fallbackHash ?? get(diffTargetFallbackHash);

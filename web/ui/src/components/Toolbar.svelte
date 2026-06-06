@@ -46,8 +46,12 @@
     transition: border-color 0.15s;
   }
 
+  .volume-filter-input:hover {
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
   .volume-filter-input:focus {
-    border-color: var(--accent);
+    border-color: var(--muted);
   }
 
   .volume-filter-input::placeholder {

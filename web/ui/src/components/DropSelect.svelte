@@ -37,15 +37,15 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    padding: 8px 28px 8px 12px;
+    padding: 8px 12px;
     min-width: 0;
     white-space: nowrap;
     font-weight: 500;
-    border-color: transparent;
+    background: var(--surface-strong);
   }
 
   :global(.drop-select-trigger:hover) {
-    border-color: var(--muted);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
     color: var(--text);
   }
 

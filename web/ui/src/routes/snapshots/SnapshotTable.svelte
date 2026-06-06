@@ -2,6 +2,7 @@
   import { Button, Popover, ScrollArea } from 'bits-ui';
   import type { Snapshot } from '$lib/types';
   import DateRangeFilter from './DateTimeRange.svelte';
+  import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
 
   export let snapshots: Snapshot[] = [];
@@ -182,11 +183,8 @@
                 <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
                   {#if sizes[sn.id]}
                     {sizes[sn.id]}
-                   {:else if sizeLoading[sn.id]}
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-                       <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-                       <path d="M12 2a10 10 0 0 1 10 10" />
-                     </svg>
+                    {:else if sizeLoading[sn.id]}
+                      <Spinner size={16} />
                    {:else}
                     <button type="button" class="size-btn" title="Compute size"
                       on:click|stopPropagation={() => onSizeLoaded(sn.id)}>
@@ -349,13 +347,6 @@
     color: var(--accent);
   }
 
-  .filter-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   .th-label {
     white-space: nowrap;
   }
@@ -459,11 +450,6 @@
   .spin {
     animation: spin 1s linear infinite;
     vertical-align: middle;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
   }
 
   .del-toggle {
@@ -609,8 +595,12 @@
     margin: 0 4px;
   }
 
+  .page-input:hover {
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
   .page-input:focus {
-    border-color: var(--accent);
+    border-color: var(--muted);
   }
 
   .page-size-label {

@@ -38,9 +38,18 @@ h1 {
   padding: 14px 16px;
   border-radius: 16px;
   border: 1px solid var(--border);
-  background: rgb(255 255 255 / 4%);
+  background: var(--surface-strong);
   color: var(--text);
   font-size: 1rem;
+  outline: none;
+}
+
+.input:hover {
+  border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+}
+
+.input:focus {
+  border-color: var(--muted);
 }
 
 .button {
@@ -86,13 +95,13 @@ h1 {
 }
 
 .button-secondary {
-  background: color-mix(in srgb, var(--muted) 12%, var(--surface));
+  background: var(--surface-strong);
   color: var(--text);
   border: 1.5px solid var(--border);
 }
 
 .button-secondary:not(:disabled):hover {
-  background: color-mix(in srgb, var(--muted) 20%, var(--surface));
+  background: color-mix(in srgb, var(--muted) 20%, var(--surface-strong));
   border-color: var(--muted);
 }
 
@@ -106,4 +115,14 @@ h1 {
   font-size: 0.82rem;
   font-weight: 600;
   border-radius: 8px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+  vertical-align: middle;
 }

@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Snapshot } from '../types';
+import type { Snapshot, SnapshotsResponse } from '../types';
 import type { SnapshotListParams } from '../api';
 import * as api from '../api';
 import { showToast } from './toast';
@@ -106,10 +106,8 @@ function reconcileViewerSnapshots() {
   const $current = get(currentSnapshot)!;
   const $diffId = get(diffTargetId);
 
-  let found = $snapshots.find(s => s.id === $current.id || s.short_id === $current.short_id);
-  if (!found && $current.fallbackHash) {
-    found = $snapshots.find(s => s.fallbackHash === $current.fallbackHash);
-  }
+  const found = findSnapshot($snapshots, $current.short_id, $current.fallbackHash)
+    ?? findSnapshot($snapshots, $current.id, $current.fallbackHash);
 
   if (found) {
     currentSnapshot.set(found);
@@ -121,13 +119,7 @@ function reconcileViewerSnapshots() {
   }
 
   if ($diffId) {
-    let dtSnap = $snapshots.find(s => s.id === $diffId || s.short_id === $diffId);
-    if (!dtSnap) {
-      const $hash = get(diffTargetFallbackHash);
-      if ($hash) {
-        dtSnap = $snapshots.find(s => s.fallbackHash === $hash);
-      }
-    }
+    const dtSnap = findSnapshot($snapshots, $diffId, get(diffTargetFallbackHash));
     if (dtSnap) {
       diffTargetId.set(dtSnap.id);
     } else {
@@ -161,26 +153,16 @@ export async function loadSnapshots(volume: string, params?: SnapshotListParams)
 
 export async function goToNextPage() {
   if (!get(hasMore)) return;
-  const vol = get(selectedVolume);
-  if (!vol) return;
-  currentPage.update(p => p + 1);
-  await loadSnapshots(vol, buildSnapshotParams());
+  await goToPage(get(currentPage) + 1);
 }
 
 export async function goToPrevPage() {
-  const page = get(currentPage);
-  if (page <= 1) return;
-  const vol = get(selectedVolume);
-  if (!vol) return;
-  currentPage.set(page - 1);
-  await loadSnapshots(vol, buildSnapshotParams());
+  if (get(currentPage) <= 1) return;
+  await goToPage(get(currentPage) - 1);
 }
 
 export async function goToFirstPage() {
-  const vol = get(selectedVolume);
-  if (!vol) return;
-  currentPage.set(1);
-  await loadSnapshots(vol, buildSnapshotParams());
+  await goToPage(1);
 }
 
 export async function goToLastPage() {
@@ -276,15 +258,15 @@ export function onTimeOfDayFilter(from?: number, to?: number) {
 
 
 
-export async function onAddTag(id: string, tag: string, vol: string) {
+async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<SnapshotsResponse>, action: string) {
   restorePointLoading.update(r => ({ ...r, [id]: true }));
   try {
-    const result = await api.addTag(id, tag, vol);
+    const result = await apiFn();
     snapshots.set(result.snapshots);
     restorePointID.set(result.restorePointID ?? '');
     reconcileViewerSnapshots();
   } catch (e) {
-    showToast(`Failed to add tag: ${String(e)}`, true);
+    showToast(`Failed to ${action} tag: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -292,20 +274,12 @@ export async function onAddTag(id: string, tag: string, vol: string) {
   }
 }
 
+export async function onAddTag(id: string, tag: string, vol: string) {
+  await withRestorePointOp(id, vol, () => api.addTag(id, tag, vol), 'add');
+}
+
 export async function onRemoveTag(id: string, tag: string, vol: string) {
-  restorePointLoading.update(r => ({ ...r, [id]: true }));
-  try {
-    const result = await api.removeTag(id, tag, vol);
-    snapshots.set(result.snapshots);
-    restorePointID.set(result.restorePointID ?? '');
-    reconcileViewerSnapshots();
-  } catch (e) {
-    showToast(`Failed to remove tag: ${String(e)}`, true);
-    await loadSnapshots(vol);
-  } finally {
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    restorePointLoading.update(r => { const n = { ...r }; delete n[id]; return n; });
-  }
+  await withRestorePointOp(id, vol, () => api.removeTag(id, tag, vol), 'remove');
 }
 
 export const selectedForDeletion = writable<Set<string>>(new Set());
@@ -322,6 +296,14 @@ export function toggleForDeletion(sn: Snapshot) {
     }
     return next;
   });
+}
+
+export function findSnapshot(snaps: Snapshot[], id: string, hash?: string): Snapshot | undefined {
+  let found = snaps.find(s => s.id === id || s.short_id === id);
+  if (!found && hash) {
+    found = snaps.find(s => s.fallbackHash === hash);
+  }
+  return found;
 }
 
 export function openBulkDeleteModal() {
