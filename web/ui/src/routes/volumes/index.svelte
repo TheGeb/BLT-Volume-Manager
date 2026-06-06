@@ -277,7 +277,7 @@
   {:else}
 <section class="panel" class:lock-mode={showLockBorders}>
   <div class="filter-row">
-    <input class="volume-filter-input" type="search" placeholder="Filter volumes..."
+    <input class="filter-input" type="search" placeholder="Filter volumes..."
       bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
     <DropSelect
       options={[
@@ -420,17 +420,11 @@
     display: flex; gap: 10px; flex-wrap: wrap; padding: 0 0 16px;
   }
 
-  .volume-filter-input {
+  .filter-input {
     flex: 1 1 240px; min-width: 160px;
-    border: 1px solid var(--border); background: rgb(255 255 255 / 4%);
-    color: var(--text); padding: 10px 16px; border-radius: 999px;
-    font-size: 0.9rem; font-weight: 500; outline: none;
-    transition: border-color 0.15s;
+    padding: 10px 16px;
   }
-
-  .volume-filter-input:hover { border-color: color-mix(in srgb, var(--muted), var(--bg) 40%); }
-  .volume-filter-input:focus { border-color: var(--muted); }
-  .volume-filter-input::placeholder { color: var(--muted); }
+  .filter-input:focus { border-color: var(--accent); }
 
   .tree-toolbar {
     display: flex; align-items: center; gap: 8px;

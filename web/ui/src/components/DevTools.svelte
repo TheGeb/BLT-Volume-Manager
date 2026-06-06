@@ -80,18 +80,18 @@
         <h3 style="margin:0 0 12px;">
           {activeDialog === 'volume' ? 'Create Volume' : activeDialog === 'snapshot' ? 'Create Snapshot' : 'Create Lock'}
         </h3>
-        <input class="input" type="text"
+        <input class="input modal-input" type="text"
           placeholder={activeDialog === 'snapshot' ? 'Target volume' : 'Volume'}
-          style="width:100%;box-sizing:border-box;margin-bottom:{activeDialog === 'lock' ? '8px' : '12px'};"
+          style="margin-bottom:{activeDialog === 'lock' ? '8px' : '12px'};"
           bind:value={inputName}
           on:keydown={(e) => e.key === 'Enter' && (activeDialog === 'volume' ? submitVolume() : activeDialog === 'snapshot' ? submitSnapshot() : submitLock())} />
         {#if activeDialog === 'lock'}
-          <input class="input" type="text" placeholder="Owner"
-            style="width:100%;box-sizing:border-box;margin-bottom:12px;"
+          <input class="input modal-input" type="text" placeholder="Owner"
+            style="margin-bottom:12px;"
             bind:value={inputOwner}
             on:keydown={(e) => e.key === 'Enter' && submitLock()} />
         {/if}
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <div class="modal-footer">
           <Button.Root class="button button-secondary" onclick={closeDialog}>Cancel</Button.Root>
           <Button.Root class="button" onclick={activeDialog === 'volume' ? submitVolume : activeDialog === 'snapshot' ? submitSnapshot : submitLock}
             disabled={busy || !inputName.trim() || (activeDialog === 'lock' && !inputOwner.trim())}>

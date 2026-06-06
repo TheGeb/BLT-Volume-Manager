@@ -82,3 +82,50 @@
 }
 
 .tab-panel { display: block; }
+
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btn-sm {
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+}
+
+.filter-input {
+  border: 1px solid var(--border);
+  background: rgb(255 255 255 / 4%);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.filter-input:hover {
+  border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+}
+
+.filter-input:focus {
+  border-color: var(--muted);
+}
+
+.filter-input::placeholder {
+  color: var(--muted);
+}
+
+.error-text {
+  margin: 0 0 8px;
+  color: var(--red);
+  font-size: 0.85rem;
+}

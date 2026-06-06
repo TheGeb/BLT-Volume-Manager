@@ -302,10 +302,10 @@
   <p style="margin:0 0 8px;font-size:0.85rem;">
     Type <strong>{$selectedVolume}</strong> to confirm:
   </p>
-  <input class="input" type="text" placeholder={$selectedVolume}
-    style="width:100%;box-sizing:border-box;margin-bottom:16px;"
+  <input class="input modal-input" type="text" placeholder={$selectedVolume}
+    style="margin-bottom:16px;"
     bind:value={$deleteConfirmText} />
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
+  <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $deleteVolModal = false}>Cancel</Button.Root>
     <Button.Root class="button button-destructive"
       disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading}
@@ -320,10 +320,10 @@
   <div style="margin-bottom:16px;font-size:0.85rem;color:var(--muted);">
     {$selectedDeletionCount} snapshot{$selectedDeletionCount !== 1 ? 's' : ''} selected for deletion.
   </div>
-  <input class="input" type="text" placeholder='Type "delete" to confirm'
-    style="width:100%;box-sizing:border-box;margin-bottom:16px;"
+  <input class="input modal-input" type="text" placeholder='Type "delete" to confirm'
+    style="margin-bottom:16px;"
     bind:value={$snapDeleteInput} />
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
+  <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $deleteSnapModal = false}>Cancel</Button.Root>
     <Button.Root class="button button-destructive"
       disabled={$snapDeleteInput !== 'delete'}
@@ -339,8 +339,8 @@
   <p style="margin:0 0 8px;font-size:0.85rem;">
     New volume name:
   </p>
-  <input class="input" type="text" placeholder="Enter new volume name"
-    style="width:100%;box-sizing:border-box;margin-bottom:12px;"
+  <input class="input modal-input" type="text" placeholder="Enter new volume name"
+    style="margin-bottom:12px;"
     bind:value={$copyRenameTarget} />
 
   <fieldset style="border:none;padding:0;margin:0 0 8px;">
@@ -393,9 +393,9 @@
   {/if}
 
   {#if $copyRenameError}
-    <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
+    <p class="error-text">{$copyRenameError}</p>
   {/if}
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
+  <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $copyVolModal = false}>Cancel</Button.Root>
     <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || ($copySnapshotMode === 'specific' && $copySelectedSnapshotIds.length === 0)}
       onclick={confirmCopyVolume}>
@@ -417,13 +417,13 @@
   <p style="margin:0 0 8px;font-size:0.85rem;">
     New volume name:
   </p>
-  <input class="input" type="text" placeholder="Enter new volume name"
-    style="width:100%;box-sizing:border-box;margin-bottom:8px;"
+  <input class="input modal-input" type="text" placeholder="Enter new volume name"
+    style="margin-bottom:8px;"
     bind:value={$copyRenameTarget} />
   {#if $copyRenameError}
-    <p style="margin:0 0 8px;color:var(--red);font-size:0.85rem;">{$copyRenameError}</p>
+    <p class="error-text">{$copyRenameError}</p>
   {/if}
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
+  <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $renameVolModal = false}>Cancel</Button.Root>
     <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeLockInfo[$copyRenameSource]?.locked}
       onclick={confirmRenameVolume}>

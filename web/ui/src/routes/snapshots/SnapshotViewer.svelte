@@ -434,12 +434,12 @@
             onValueChange={(v) => selectedCompareId = v}
           />
         </div>
-        <Button.Root class="button button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={() => doDiff()}>Diff</Button.Root>
+        <Button.Root class="button button-xs btn-sm" onclick={() => doDiff()}>Diff</Button.Root>
       {/if}
       {#if currentDiffResult}
         <div transition:fade style="display:inline-flex;gap:8px;">
-          <Button.Root class="button button-xs clear-diff-btn" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={clearDiff}>Clear diff</Button.Root>
-          <Button.Root class="button button-secondary button-xs" style="padding:9px 12px;font-size:0.85rem;border-radius:10px;" onclick={handleSwapDiff}>Swap diff</Button.Root>
+          <Button.Root class="button button-xs btn-sm clear-diff-btn" onclick={clearDiff}>Clear diff</Button.Root>
+          <Button.Root class="button button-secondary button-xs btn-sm" onclick={handleSwapDiff}>Swap diff</Button.Root>
         </div>
       {/if}
     </div>
