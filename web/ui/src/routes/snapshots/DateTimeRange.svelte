@@ -224,6 +224,7 @@
   }
 
   .sort-btn {
+    position: relative;
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -236,7 +237,6 @@
     white-space: nowrap;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
   }
 
   .sort-btn:hover {
@@ -244,13 +244,16 @@
   }
 
   .sort-chevron {
-    flex-shrink: 0;
+    position: absolute;
+    left: -18px;
+    top: 50%;
+    transform: translateY(-50%);
     opacity: 0.8;
     transition: transform 0.15s;
   }
 
   .sort-desc {
-    transform: rotate(180deg);
+    transform: translateY(-50%) rotate(180deg);
   }
 
   :global(.filter-btn) {
