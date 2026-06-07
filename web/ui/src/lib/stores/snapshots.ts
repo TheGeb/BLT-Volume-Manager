@@ -289,11 +289,13 @@ export function onHostFilter(h: string) { hostFilter.set(h); }
 export function onTimeFilter(from?: number, to?: number) {
   timeFrom.set(from);
   timeTo.set(to);
+  void reloadWithFilters();
 }
 
 export function onTimeOfDayFilter(from?: number, to?: number) {
   timeOfDayFrom.set(from);
   timeOfDayTo.set(to);
+  void reloadWithFilters();
 }
 
 

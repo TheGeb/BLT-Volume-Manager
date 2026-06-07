@@ -451,16 +451,26 @@
     cursor: pointer;
     padding: 0;
     line-height: 0;
+    outline: none;
     transition: color 0.15s, background 0.15s;
   }
 
   :global(.filter-btn.active) {
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
+    background: var(--hover-bg);
+    color: var(--text);
   }
 
-  :global(.filter-btn:hover),
+  :global(.filter-btn:hover) {
+    background: var(--hover-bg);
+    color: var(--text);
+  }
+
   :global(.filter-btn[data-state="open"]) {
+    background: var(--hover-bg);
+    color: var(--text);
+  }
+
+  :global(.filter-btn:active) {
     background: var(--hover-bg);
     color: var(--text);
   }
@@ -735,11 +745,17 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-strong);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .version-input-group:hover {
+    background: var(--hover-bg);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
   }
 
   .version-input-group:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgb(124 58 237 / 20%);
+    background: var(--hover-bg);
+    border-color: var(--muted);
   }
 
   .version-prefix,

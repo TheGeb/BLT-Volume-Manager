@@ -39,6 +39,7 @@ export async function loadVolumes() {
   volumesLoading.set(true);
   try {
     volumes.set(await api.fetchVolumes());
+    void fetchAllVolumeLockInfo();
   } catch {
     showToast('Cannot reach server', true);
   } finally {

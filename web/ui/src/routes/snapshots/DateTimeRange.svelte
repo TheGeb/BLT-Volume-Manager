@@ -1,25 +1,40 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { RangeCalendar, Portal } from 'bits-ui';
   import { CalendarDate, type DateValue, Time } from '@internationalized/date';
-  import DropSelect from '../../components/DropSelect.svelte';
 
   export let timeFrom: number | undefined = undefined;
   export let timeTo: number | undefined = undefined;
-  export let sortNewestFirst = true;
-  export let onToggleSort: () => void = () => {};
-  export let onTimeFilter: (from?: number, to?: number) => void = () => {};
   export let timeOfDayFrom: number | undefined = undefined;
   export let timeOfDayTo: number | undefined = undefined;
+  export let onTimeFilter: (from?: number, to?: number) => void = () => {};
   export let onTimeOfDayFilter: (from?: number, to?: number) => void = () => {};
+  export let onClose: () => void = () => {};
+  export let sortNewestFirst = true;
+  export let onToggleSort: () => void = () => {};
+  export let triggerless = false;
 
-  function dateValueToTs(dv: DateValue | undefined): number | undefined {
+  function dateValueToTs(dv: DateValue | undefined, isEnd = true): number | undefined {
     if (!dv) return undefined;
-    return Date.UTC(dv.year, dv.month - 1, dv.day, 23, 59, 59, 999);
+    const h = isEnd ? 23 : 0;
+    const m = isEnd ? 59 : 0;
+    const s = isEnd ? 59 : 0;
+    const ms = isEnd ? 999 : 0;
+    return Date.UTC(dv.year, dv.month - 1, dv.day, h, m, s, ms);
+  }
+
+  function combineDateTime(dv: DateValue | undefined, t: Time | undefined, isEnd: boolean): number | undefined {
+    if (!dv) return undefined;
+    const h = t ? t.hour : (isEnd ? 23 : 0);
+    const m = t ? t.minute : (isEnd ? 59 : 0);
+    const s = t ? t.second : (isEnd ? 59 : 0);
+    const ms = isEnd ? 999 : 0;
+    return Date.UTC(dv.year, dv.month - 1, dv.day, h, m, s, ms);
   }
 
   function tsToDateValue(ts: number | undefined): DateValue | undefined {
     if (ts === undefined) return undefined;
-    const d = new Date(ts);  
+    const d = new Date(ts);
     return new CalendarDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
   }
 
@@ -45,16 +60,18 @@
     end: undefined,
   };
 
-  let appliedDateFrom: number | undefined = timeFrom;
-  let appliedDateTo: number | undefined = timeTo;
-  let appliedTimeFrom: number | undefined = timeOfDayFrom;
-  let appliedTimeTo: number | undefined = timeOfDayTo;
-
-  $: hasAppliedFilter = timeFrom !== undefined || timeTo !== undefined
-    || timeOfDayFrom !== undefined || timeOfDayTo !== undefined;
-
   $: hasStagedChanges = dateRange.start !== undefined || dateRange.end !== undefined
     || timeRange.start !== undefined || timeRange.end !== undefined;
+
+  $: hasAppliedFilter = !triggerless && (timeFrom !== undefined || timeTo !== undefined
+    || timeOfDayFrom !== undefined || timeOfDayTo !== undefined);
+
+  $: effStart = dateRange.start ?? dateRange.end;
+  $: effEnd = dateRange.end ?? dateRange.start;
+
+  onMount(() => {
+    loadFromProps();
+  });
 
   function loadFromProps() {
     dateRange = { start: tsToDateValue(timeFrom), end: tsToDateValue(timeTo) };
@@ -63,10 +80,6 @@
       end: timeOfDayTo !== undefined ? secondsToTime(timeOfDayTo, new Time(23, 59, 59)) : undefined,
     };
     populateTimeFields();
-    appliedDateFrom = timeFrom;
-    appliedDateTo = timeTo;
-    appliedTimeFrom = timeOfDayFrom;
-    appliedTimeTo = timeOfDayTo;
   }
 
   function populateTimeFields() {
@@ -83,23 +96,38 @@
   }
 
   function apply() {
-    appliedDateFrom = dateValueToTs(dateRange.start);
-    appliedDateTo = dateValueToTs(dateRange.end);
-    appliedTimeFrom = timeToSeconds(timeRange.start);
-    appliedTimeTo = timeToSeconds(timeRange.end);
-    onTimeFilter(appliedDateFrom, appliedDateTo);
-    onTimeOfDayFilter(appliedTimeFrom, appliedTimeTo);
+    const hasDate = effStart !== undefined;
+    const hasTime = timeRange.start !== undefined || timeRange.end !== undefined;
+
+    if (hasDate && hasTime) {
+      onTimeFilter(
+        combineDateTime(effStart, timeRange.start, false),
+        combineDateTime(effEnd, timeRange.end, true),
+      );
+      onTimeOfDayFilter(undefined, undefined);
+    } else if (hasDate) {
+      onTimeFilter(dateValueToTs(effStart, false), dateValueToTs(effEnd));
+      onTimeOfDayFilter(undefined, undefined);
+    } else if (hasTime) {
+      onTimeFilter(undefined, undefined);
+      onTimeOfDayFilter(timeToSeconds(timeRange.start), timeToSeconds(timeRange.end));
+    }
+
     if (hasStagedChanges) {
-      open = false;
+      if (triggerless) onClose();
+      else open = false;
     }
   }
 
-  function clear() {
+  function clearPanel() {
     dateRange = { start: undefined, end: undefined };
     timeRange = { start: undefined, end: undefined };
     fromH = ''; fromM = ''; fromS = ''; fromA = 'AM';
     toH = ''; toM = ''; toS = ''; toA = 'AM';
-    apply();
+    onTimeFilter(undefined, undefined);
+    onTimeOfDayFilter(undefined, undefined);
+    if (triggerless) onClose();
+    else open = false;
   }
 
   function updateTimeRange() {
@@ -131,6 +159,11 @@
     return clampNum(v.replace(/[^0-9]/g, '').slice(0, 2), 59);
   }
 
+  function fmtDV(dv: DateValue | undefined): string {
+    if (!dv) return '';
+    return String(dv.month) + '/' + String(dv.day);
+  }
+
   let fromH = ''; let fromM = ''; let fromS = ''; let fromA = 'AM';
   let toH = ''; let toM = ''; let toS = ''; let toA = 'AM';
 
@@ -139,7 +172,6 @@
   let panelEl: HTMLElement;
 
   function toggle() {
-    if (!open) loadFromProps();
     open = !open;
   }
 
@@ -162,134 +194,142 @@
   }
 </script>
 
-<div class="filter-wrap">
-  <button class="th-label sort-btn" on:click={onToggleSort}>
-    <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
-      <path d="M3 2l5 6 5-6H3z"/>
-    </svg>
-    Date
-  </button>
-  <button
-    bind:this={triggerEl}
-    class={"filter-btn" + (hasAppliedFilter ? ' active' : '')}
-    on:click={toggle}
-    aria-label="Filter by date"
-  >
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-    </svg>
-  </button>
-</div>
+{#if !triggerless}
+  <div class="filter-wrap">
+    <button class="th-label sort-btn" on:click={onToggleSort}>
+      <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
+        <path d="M3 2l5 6 5-6H3z"/>
+      </svg>
+      Date
+    </button>
+    <button
+      bind:this={triggerEl}
+      class={"filter-btn" + (hasAppliedFilter || open ? ' active' : '')}
+      on:click={toggle}
+      aria-label="Filter by date"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+      </svg>
+    </button>
+  </div>
+{/if}
 
-{#if open}
-  <Portal>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="filter-backdrop" on:click={onBackdropClick} on:keydown={(e) => e.key === 'Escape' && (open = false)}>
-      <div class="date-filter-content" bind:this={panelEl}>
-        <RangeCalendar.Root
-          value={dateRange}
-          onValueChange={(v) => v !== undefined && (dateRange = v)}
-          weekdayFormat="short"
-          fixedWeeks={true}
-          class="date-filter-calendar"
-        >
-          {#snippet children({ months, weekdays })}
-            <RangeCalendar.Header class="cal-header">
-              <RangeCalendar.PrevButton class="cal-nav-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </RangeCalendar.PrevButton>
-              <RangeCalendar.Heading class="cal-heading" />
-              <RangeCalendar.NextButton class="cal-nav-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </RangeCalendar.NextButton>
-            </RangeCalendar.Header>
-            {#each months as month (month.value)}
-              <RangeCalendar.Grid class="cal-grid">
-                <RangeCalendar.GridHead>
-                  <RangeCalendar.GridRow class="cal-weekday-row">
-                    {#each weekdays as day (day)}
-                      <RangeCalendar.HeadCell class="cal-weekday">{day.slice(0, 2)}</RangeCalendar.HeadCell>
+{#if triggerless || open}
+  {#snippet panel()}
+    <div class="date-filter-content">
+      <RangeCalendar.Root
+        value={dateRange}
+        onValueChange={(v) => v !== undefined && (dateRange = v)}
+        weekdayFormat="short"
+        fixedWeeks={true}
+        class="date-filter-calendar"
+      >
+        {#snippet children({ months, weekdays })}
+          <RangeCalendar.Header class="cal-header">
+            <RangeCalendar.PrevButton class="cal-nav-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </RangeCalendar.PrevButton>
+            <RangeCalendar.Heading class="cal-heading" />
+            <RangeCalendar.NextButton class="cal-nav-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </RangeCalendar.NextButton>
+          </RangeCalendar.Header>
+          {#each months as month (month.value)}
+            <RangeCalendar.Grid class="cal-grid">
+              <RangeCalendar.GridHead>
+                <RangeCalendar.GridRow class="cal-weekday-row">
+                  {#each weekdays as day (day)}
+                    <RangeCalendar.HeadCell class="cal-weekday">{day.slice(0, 2)}</RangeCalendar.HeadCell>
+                  {/each}
+                </RangeCalendar.GridRow>
+              </RangeCalendar.GridHead>
+              <RangeCalendar.GridBody>
+                {#each month.weeks as weekDates (weekDates)}
+                  <RangeCalendar.GridRow class="cal-week-row">
+                    {#each weekDates as date (date)}
+                      <RangeCalendar.Cell {date} month={month.value} class="cal-cell">
+                        <RangeCalendar.Day class="cal-day">{date.day}</RangeCalendar.Day>
+                      </RangeCalendar.Cell>
                     {/each}
                   </RangeCalendar.GridRow>
-                </RangeCalendar.GridHead>
-                <RangeCalendar.GridBody>
-                  {#each month.weeks as weekDates (weekDates)}
-                    <RangeCalendar.GridRow class="cal-week-row">
-                      {#each weekDates as date (date)}
-                        <RangeCalendar.Cell {date} month={month.value} class="cal-cell">
-                          <RangeCalendar.Day class="cal-day">{date.day}</RangeCalendar.Day>
-                        </RangeCalendar.Cell>
-                      {/each}
-                    </RangeCalendar.GridRow>
-                  {/each}
-                </RangeCalendar.GridBody>
-              </RangeCalendar.Grid>
-            {/each}
-          {/snippet}
-        </RangeCalendar.Root>
-        <div class="time-of-day-section">
-          <div class="date-filter-label">Time of day</div>
-          <div class="time-range-row">
-              <div class="time-range-input-group">
-                <span class="time-range-label">from</span>
-                <div class="timerangefield-input">
-                  <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={fromH} on:input={(e) => { fromH = handleH(e.currentTarget.value, (v) => fromM = v, (v) => fromS = v); updateTimeRange(); }}>
-                  <span class="time-segment time-literal">:</span>
-                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromM} on:input={() => { fromM = handleMS(fromM); updateTimeRange(); }}>
-                  <span class="time-segment time-literal">:</span>
-                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromS} on:input={() => { fromS = handleMS(fromS); updateTimeRange(); }}>
-                  <span class="time-ampm">
-                    <DropSelect
-                      options={[
-                        { value: 'AM', label: 'AM' },
-                        { value: 'PM', label: 'PM' },
-                      ]}
-                      value={fromA}
-                      onValueChange={(v) => { fromA = v; updateTimeRange(); }}
-                    />
-                  </span>
-                </div>
-              </div>
-              <div class="time-range-input-group">
-                <span class="time-range-label">to</span>
-                <div class="timerangefield-input">
-                  <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={toH} on:input={(e) => { toH = handleH(e.currentTarget.value, (v) => toM = v, (v) => toS = v); updateTimeRange(); }}>
-                  <span class="time-segment time-literal">:</span>
-                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toM} on:input={() => { toM = handleMS(toM); updateTimeRange(); }}>
-                  <span class="time-segment time-literal">:</span>
-                  <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toS} on:input={() => { toS = handleMS(toS); updateTimeRange(); }}>
-                  <span class="time-ampm">
-                    <DropSelect
-                      options={[
-                        { value: 'AM', label: 'AM' },
-                        { value: 'PM', label: 'PM' },
-                      ]}
-                      value={toA}
-                      onValueChange={(v) => { toA = v; updateTimeRange(); }}
-                    />
-                  </span>
-                </div>
+                {/each}
+              </RangeCalendar.GridBody>
+            </RangeCalendar.Grid>
+          {/each}
+        {/snippet}
+      </RangeCalendar.Root>
+      <div class="time-of-day-section">
+        <div class="date-filter-label">Time</div>
+        <div class="time-range-row">
+            <div class="time-range-input-group">
+              <span class="time-range-label">from {fmtDV(effStart)}</span>
+              <div class="timerangefield-input">
+                <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={fromH} on:input={(e) => { fromH = handleH(e.currentTarget.value, (v) => fromM = v, (v) => fromS = v); updateTimeRange(); }}>
+                <span class="time-segment time-literal">:</span>
+                <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromM} on:input={() => { fromM = handleMS(fromM); updateTimeRange(); }} on:focus={() => fromM === '00' && (fromM = '')} on:blur={() => { if (!fromM) fromM = '00'; updateTimeRange(); }}>
+                <span class="time-segment time-literal">:</span>
+                <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromS} on:input={() => { fromS = handleMS(fromS); updateTimeRange(); }} on:focus={() => fromS === '00' && (fromS = '')} on:blur={() => { if (!fromS) fromS = '00'; updateTimeRange(); }}>
+                <span class="time-ampm-toggle"
+                  on:click={() => { fromA = fromA === 'AM' ? 'PM' : 'AM'; updateTimeRange(); }}
+                  on:keydown={(e) => e.key === 'Enter' && (fromA = fromA === 'AM' ? 'PM' : 'AM', updateTimeRange())}
+                  tabindex="0" role="button"
+                >{fromA}</span>
               </div>
             </div>
-          <div class="filter-actions">
-            <button class="apply-btn" class:apply-btn-active={hasStagedChanges} on:click={apply}>Apply</button>
-            <button class="clear-btn" class:clear-btn-active={hasStagedChanges} on:click={clear}>Clear</button>
+            <div class="time-range-input-group">
+              <span class="time-range-label">to {fmtDV(effEnd)}</span>
+              <div class="timerangefield-input">
+                <input type="text" placeholder="--" maxlength="2" class="time-segment time-input" bind:value={toH} on:input={(e) => { toH = handleH(e.currentTarget.value, (v) => toM = v, (v) => toS = v); updateTimeRange(); }}>
+                <span class="time-segment time-literal">:</span>
+                <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toM} on:input={() => { toM = handleMS(toM); updateTimeRange(); }} on:focus={() => toM === '00' && (toM = '')} on:blur={() => { if (!toM) toM = '00'; updateTimeRange(); }}>
+                <span class="time-segment time-literal">:</span>
+                <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toS} on:input={() => { toS = handleMS(toS); updateTimeRange(); }} on:focus={() => toS === '00' && (toS = '')} on:blur={() => { if (!toS) toS = '00'; updateTimeRange(); }}>
+                <span class="time-ampm-toggle"
+                  on:click={() => { toA = toA === 'AM' ? 'PM' : 'AM'; updateTimeRange(); }}
+                  on:keydown={(e) => e.key === 'Enter' && (toA = toA === 'AM' ? 'PM' : 'AM', updateTimeRange())}
+                  tabindex="0" role="button"
+                >{toA}</span>
+              </div>
+            </div>
           </div>
+        <div class="filter-actions">
+          <button class="apply-btn" class:apply-btn-active={hasStagedChanges} on:click={apply}>Apply</button>
+          <button class="clear-btn" class:clear-btn-active={hasStagedChanges} on:click={clearPanel}>Clear</button>
         </div>
       </div>
     </div>
-  </Portal>
+  {/snippet}
+
+  {#if triggerless}
+    {@render panel()}
+  {:else}
+    <Portal>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="filter-backdrop" on:click={onBackdropClick} on:keydown={(e) => e.key === 'Escape' && (open = false)}>
+        <div class="panel-wrapper" bind:this={panelEl}>
+          {@render panel()}
+        </div>
+      </div>
+    </Portal>
+  {/if}
 {/if}
 
 <style>
+  .filter-wrap {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
   .sort-btn {
     position: relative;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.01em;
     color: var(--muted);
     background: none;
@@ -332,6 +372,12 @@
     cursor: pointer;
     padding: 0;
     line-height: 0;
+    outline: none;
+  }
+
+  :global(.filter-btn:active) {
+    background: var(--hover-bg);
+    color: var(--text);
   }
 
   :global(.filter-btn.active) {
@@ -339,8 +385,7 @@
     color: var(--text);
   }
 
-  :global(.filter-btn:hover),
-  :global(.filter-btn[data-state="open"]) {
+  :global(.filter-btn:hover) {
     background: var(--hover-bg);
     color: var(--text);
   }
@@ -351,19 +396,18 @@
     z-index: 50;
   }
 
-  :global(.date-filter-content) {
+  .panel-wrapper {
     position: fixed;
     opacity: 0;
+  }
+
+  :global(.date-filter-content) {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     display: flex;
     flex-direction: row;
     gap: 16px;
-    max-height: calc(var(--visual-viewport-height, 100vh) - 16px);
-    overflow: hidden;
   }
 
   :global(.date-filter-calendar) {
@@ -471,6 +515,14 @@
     min-width: 140px;
   }
 
+  .date-filter-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   .time-range-row {
     display: flex;
     flex-direction: column;
@@ -499,12 +551,17 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-strong);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  :global(.timerangefield-input:hover) {
+    background: var(--hover-bg);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
   }
 
   :global(.timerangefield-input:focus-within) {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgb(124 58 237 / 20%);
+    background: var(--hover-bg);
+    border-color: var(--muted);
   }
 
   :global(.time-segment) {
@@ -554,24 +611,24 @@
     padding: 0 1px;
   }
 
-  :global(.time-ampm .drop-select-trigger) {
+  .time-ampm-toggle {
     background: transparent;
     border: none;
     color: inherit;
-    font: inherit;
     cursor: pointer;
-    padding: 0 2px;
+    padding: 0 3px;
     border-radius: 3px;
     font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    user-select: none;
+    transition: background 0.1s;
   }
 
-  :global(.time-ampm .drop-select-trigger:hover) {
+  .time-ampm-toggle:hover,
+  .time-ampm-toggle:focus-visible {
     background: var(--hover-bg);
-  }
-
-  :global(.time-ampm .drop-select-trigger.open) {
-    background: var(--hover-bg);
+    outline: none;
   }
 
   .filter-actions {

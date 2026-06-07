@@ -164,13 +164,6 @@ func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshots
 
 func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *SnapshotFilter, int, int) {
 	hosts := r.URL.Query()["host"]
-	latestStr := r.URL.Query().Get("latest")
-	latest := 0
-	if latestStr != "" {
-		if n, err := strconv.Atoi(latestStr); err == nil && n > 0 {
-			latest = n
-		}
-	}
 	tags := r.URL.Query()["tag"]
 
 	offset := 0
@@ -229,9 +222,8 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 		}
 	}
 
-	hasServerSideFilter := filter != nil
-
-	if limit > 0 && !hasServerSideFilter {
+	latest := 0
+	if limit > 0 && filter == nil {
 		latest = offset + limit + 1
 	}
 
