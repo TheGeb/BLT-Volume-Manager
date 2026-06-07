@@ -39,10 +39,10 @@
       </Button.Root>
     </div>
   {:else}
-    <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.9rem;">
-      <div class="skeleton" style="height:28px;width:120px;border-radius:6px;margin:0 auto 12px;"></div>
-      <div class="skeleton" style="height:18px;width:160px;border-radius:6px;margin:0 auto 8px;"></div>
-      <div class="skeleton" style="height:18px;width:200px;border-radius:6px;margin:0 auto 20px;"></div>
+    <div style="padding:20px;color:var(--muted);font-size:0.9rem;">
+      <div class="skeleton" style="height:28px;width:120px;border-radius:6px;margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:18px;width:160px;border-radius:6px;margin-bottom:8px;"></div>
+      <div class="skeleton" style="height:18px;width:200px;border-radius:6px;margin-bottom:20px;"></div>
       <div class="skeleton" style="height:40px;border-radius:999px;margin-bottom:10px;"></div>
       <div class="skeleton" style="height:40px;border-radius:999px;"></div>
     </div>

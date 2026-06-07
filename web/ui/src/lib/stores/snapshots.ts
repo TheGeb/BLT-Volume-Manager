@@ -34,6 +34,8 @@ export const currentPage = writable(1);
 export const hasMore = writable(false);
 export const totalCount = writable(0);
 export const allHosts = writable<string[]>([]);
+export const versionFilterClearKey = writable(0);
+export const tableVersionFilterActive = writable(false);
 
 export async function loadHosts(volume: string) {
 	try {
@@ -289,13 +291,11 @@ export function onHostFilter(h: string) { hostFilter.set(h); }
 export function onTimeFilter(from?: number, to?: number) {
   timeFrom.set(from);
   timeTo.set(to);
-  void reloadWithFilters();
 }
 
 export function onTimeOfDayFilter(from?: number, to?: number) {
   timeOfDayFrom.set(from);
   timeOfDayTo.set(to);
-  void reloadWithFilters();
 }
 
 

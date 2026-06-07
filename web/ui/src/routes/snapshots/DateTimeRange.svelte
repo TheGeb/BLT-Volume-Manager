@@ -204,7 +204,7 @@
     </button>
     <button
       bind:this={triggerEl}
-      class={"filter-btn" + (hasAppliedFilter || open ? ' active' : '')}
+      class={"filter-btn" + (hasAppliedFilter ? ' active' : '') + (open ? ' open' : '')}
       on:click={toggle}
       aria-label="Filter by date"
     >
@@ -381,6 +381,11 @@
   }
 
   :global(.filter-btn.active) {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+
+  :global(.filter-btn.open) {
     background: var(--hover-bg);
     color: var(--text);
   }
@@ -399,6 +404,9 @@
   .panel-wrapper {
     position: fixed;
     opacity: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
   }
 
   :global(.date-filter-content) {

@@ -12,7 +12,6 @@
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
     timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter,
     typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter,
-    versionFrom, versionTo,
     pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
@@ -84,10 +83,6 @@
       onToggleSort={onToggleSort}
       onTypeFilter={onTypeFilter}
       onHostFilter={onHostFilter}
-      bind:versionFrom={$versionFrom}
-      bind:versionTo={$versionTo}
-      onVersionFrom={(v) => versionFrom.set(v)}
-      onVersionTo={(v) => versionTo.set(v)}
       onOpenViewer={onOpenViewer}
       onAddTag={onAddTag}
       onRemoveTag={onRemoveTag}

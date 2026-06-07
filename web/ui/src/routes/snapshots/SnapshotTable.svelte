@@ -4,6 +4,7 @@
   import DateRangeFilter from './DateTimeRange.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
+  import { versionFilterClearKey, tableVersionFilterActive } from '$lib/stores/snapshots';
   import { versionTag, parseVersion } from '$lib/util';
 
   export let snapshots: Snapshot[] = [];
@@ -19,41 +20,65 @@
   export let onToggleSort: () => void = () => {};
   export let onTypeFilter: (t: string) => void = () => {};
   export let onHostFilter: (h: string) => void = () => {};
-  export let versionFrom = '';
-  export let versionTo = '';
-  export let onVersionFrom: (v: string) => void = () => {};
-  export let onVersionTo: (v: string) => void = () => {};
+  let tableVersionFrom = '';
+  let tableVersionTo = '';
 
   let vfMajor = ''; let vfMinor = '';
   let vtMajor = ''; let vtMinor = '';
   let versionOpen = false;
 
-  function loadVersionFields() {
-    const f = parseVersion(versionFrom);
-    vfMajor = f ? String(f.major) : '';
-    vfMinor = f ? String(f.minor) : '';
-    const t = parseVersion(versionTo);
-    vtMajor = t ? String(t.major) : '';
-    vtMinor = t ? String(t.minor) : '';
-  }
-
   function handleVersionOpenChange(o: boolean) {
     versionOpen = o;
-    if (o) loadVersionFields();
   }
 
   $: versionChanged = (() => {
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
     const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
-    return from !== versionFrom || to !== versionTo;
+    return from !== tableVersionFrom || to !== tableVersionTo;
   })();
-
-  function applyVersionFilter() {
+  $: versionInvalid = (() => {
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
     const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
-    const changed = from !== versionFrom || to !== versionTo;
-    onVersionFrom(from);
-    onVersionTo(to);
+    if (!from || !to) return false;
+    const fp = parseVersion(from);
+    const tp = parseVersion(to);
+    if (!fp || !tp) return false;
+    return tp.major < fp.major || (tp.major === fp.major && tp.minor < fp.minor);
+  })();
+
+  let _vcKey = 0;
+  $: if (_vcKey !== $versionFilterClearKey) {
+    _vcKey = $versionFilterClearKey;
+    clearVersionFilter();
+  }
+
+  $: tableVersionFilterActive.set(!!(tableVersionFrom || tableVersionTo));
+
+  $: versionFilteredSnapshots = tableVersionFrom || tableVersionTo
+    ? snapshots.filter(sn => {
+        const vt = sn.tags.find(t => /^v\d+\.\d+$/.test(t));
+        if (!vt) return false;
+        const sv = parseVersion(vt);
+        if (!sv) return false;
+        if (tableVersionFrom) {
+          const fv = parseVersion(tableVersionFrom);
+          if (fv && (sv.major < fv.major || (sv.major === fv.major && sv.minor < fv.minor))) return false;
+        }
+        if (tableVersionTo) {
+          const tv = parseVersion(tableVersionTo);
+          if (tv && (sv.major > tv.major || (sv.major === tv.major && sv.minor > tv.minor))) return false;
+        }
+        return true;
+      })
+    : snapshots;
+
+  function applyVersionFilter() {
+    if (versionInvalid) return;
+    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
+    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    const changed = from !== tableVersionFrom || to !== tableVersionTo;
+    tableVersionFrom = from;
+    tableVersionTo = to;
     if (changed) {
       versionOpen = false;
     }
@@ -62,8 +87,8 @@
   function clearVersionFilter() {
     vfMajor = ''; vfMinor = '';
     vtMajor = ''; vtMinor = '';
-    onVersionFrom('');
-    onVersionTo('');
+    tableVersionFrom = '';
+    tableVersionTo = '';
   }
 
   function cleanDigits(v: string): string {
@@ -138,7 +163,7 @@
             <div class="filter-wrap">
               <span class="th-label">Version</span>
               <Popover.Root bind:open={versionOpen} onOpenChange={handleVersionOpenChange}>
-                <Popover.Trigger class={"filter-btn" + (versionFrom || versionTo ? ' active' : '')}>
+                <Popover.Trigger class={"filter-btn" + (tableVersionFrom || tableVersionTo ? ' active' : '')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                   </svg>
@@ -164,7 +189,7 @@
                       </div>
                     </div>
                     <div class="filter-actions">
-                      <button class="apply-btn" class:apply-btn-active={versionChanged} on:click={applyVersionFilter}>Apply</button>
+                      <button class="apply-btn" class:apply-btn-active={versionChanged && !versionInvalid} class:apply-btn-invalid={versionInvalid} on:click={applyVersionFilter}>Apply</button>
                       <button class="clear-btn" class:clear-btn-active={!!(vfMajor || vfMinor || vtMajor || vtMinor)} on:click={clearVersionFilter}>Clear</button>
                     </div>
                   </div>
@@ -233,7 +258,7 @@
         <table class="body-table">
           {@render columns()}
           <tbody style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
-            {#each snapshots as sn (sn.id)}
+            {#each versionFilteredSnapshots as sn (sn.id)}
               <tr class:del-row={selectedForDeletion.has(sn.id)}>
                  <td style="text-align:center">
                    {#if restorePointLoading[sn.id]}
@@ -456,8 +481,8 @@
   }
 
   :global(.filter-btn.active) {
-    background: var(--hover-bg);
-    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
   }
 
   :global(.filter-btn:hover) {
@@ -719,8 +744,6 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    border-top: 1px solid var(--border);
-    margin-top: 4px;
   }
 
   .version-range-section {
@@ -844,6 +867,14 @@
 
   .version-range-filter .apply-btn-active:hover {
     background: color-mix(in srgb, var(--accent) 80%, #000);
+  }
+
+  .version-range-filter .apply-btn-invalid {
+    background: var(--hover-bg);
+    color: var(--muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .version-range-filter .clear-btn {

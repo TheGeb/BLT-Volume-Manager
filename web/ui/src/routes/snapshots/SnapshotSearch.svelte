@@ -3,6 +3,7 @@
   import { Button, Popover } from 'bits-ui';
   import {
     hostFilter, typeFilter, versionFrom, versionTo, reloadWithFilters, allHosts, loadHosts,
+    timeFrom, timeTo, timeOfDayFrom, timeOfDayTo, versionFilterClearKey, tableVersionFilterActive,
   } from '$lib/stores/snapshots';
 
   import { selectedVolume } from '$lib/stores/volumes';
@@ -14,6 +15,8 @@
   let tags: string[] = $typeFilter !== 'all' ? [$typeFilter] : [];
   let vfMajor = ''; let vfMinor = '';
   let vtMajor = ''; let vtMinor = '';
+  let committedVfMajor = ''; let committedVfMinor = '';
+  let committedVtMajor = ''; let committedVtMinor = '';
   let dateOpen = false;
   let versionOpen = false;
   let localTimeFrom: number | undefined = undefined;
@@ -95,12 +98,21 @@
   $: dateActive = localTimeFrom !== undefined || localTimeTo !== undefined
     || localTimeOfDayFrom !== undefined || localTimeOfDayTo !== undefined;
 
-  $: versionLabel = computeVersionLabel(vfMajor, vfMinor, vtMajor, vtMinor);
+  $: versionLabel = computeVersionLabel(committedVfMajor, committedVfMinor, committedVtMajor, committedVtMinor);
   $: versionActive = versionLabel !== 'Any version';
   $: versionChanged = (() => {
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
     const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
     return from !== $versionFrom || to !== $versionTo;
+  })();
+  $: versionInvalid = (() => {
+    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
+    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    if (!from || !to) return false;
+    const fp = parseVersion(from);
+    const tp = parseVersion(to);
+    if (!fp || !tp) return false;
+    return tp.major < fp.major || (tp.major === fp.major && tp.minor < fp.minor);
   })();
 
   function computeVersionLabel(fm: string, fn: string, tm: string, tn: string): string {
@@ -108,7 +120,7 @@
     const to = fmtVersion(tm, tn);
     const fromEmpty = !from || from === '0';
     const toEmpty = !to || to === '0';
-    if (!fromEmpty && !toEmpty) return `v${from} — v${to}`;
+    if (!fromEmpty && !toEmpty) return `v${from} - v${to}`;
     if (!fromEmpty) return `v${from}`;
     if (!toEmpty) return `v${to}`;
     return 'Any version';
@@ -126,6 +138,16 @@
   function clearVersionPanel() {
     vfMajor = ''; vfMinor = '';
     vtMajor = ''; vtMinor = '';
+    committedVfMajor = ''; committedVfMinor = '';
+    committedVtMajor = ''; committedVtMinor = '';
+  }
+
+  function commitVersion() {
+    if (versionInvalid) return;
+    committedVfMajor = vfMajor;
+    committedVfMinor = vfMinor;
+    committedVtMajor = vtMajor;
+    committedVtMinor = vtMinor;
   }
 
   function handleTimeFilter(from?: number, to?: number) {
@@ -156,9 +178,13 @@
     const f = parseVersion($versionFrom);
     vfMajor = f ? String(f.major) : '';
     vfMinor = f ? String(f.minor) : '';
+    committedVfMajor = vfMajor;
+    committedVfMinor = vfMinor;
     const t = parseVersion($versionTo);
     vtMajor = t ? String(t.major) : '';
     vtMinor = t ? String(t.minor) : '';
+    committedVtMajor = vtMajor;
+    committedVtMinor = vtMinor;
   }
 
   function toggleTag(tag: string) {
@@ -171,11 +197,17 @@
   }
 
   $: hasClearable = host !== '' || tags.length > 0
-    || vfMajor !== '' || vfMinor !== '' || vtMajor !== '' || vtMinor !== ''
+    || committedVfMajor !== '' || committedVfMinor !== '' || committedVtMajor !== '' || committedVtMinor !== ''
     || localTimeFrom !== undefined || localTimeTo !== undefined
-    || localTimeOfDayFrom !== undefined || localTimeOfDayTo !== undefined;
+    || localTimeOfDayFrom !== undefined || localTimeOfDayTo !== undefined
+    || $hostFilter !== '' || $typeFilter !== 'all'
+    || $versionFrom !== '' || $versionTo !== ''
+    || $timeFrom !== undefined || $timeTo !== undefined
+    || $timeOfDayFrom !== undefined || $timeOfDayTo !== undefined
+    || $tableVersionFilterActive;
 
   function search() {
+    commitVersion();
     hostFilter.set(host);
     typeFilter.set(tags.length > 0 ? tags[0]! : 'all');
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
@@ -195,6 +227,8 @@
     tags = [];
     vfMajor = ''; vfMinor = '';
     vtMajor = ''; vtMinor = '';
+    committedVfMajor = ''; committedVfMinor = '';
+    committedVtMajor = ''; committedVtMinor = '';
     localTimeFrom = undefined;
     localTimeTo = undefined;
     localTimeOfDayFrom = undefined;
@@ -203,6 +237,11 @@
     typeFilter.set('all');
     versionFrom.set('');
     versionTo.set('');
+    timeFrom.set(undefined);
+    timeTo.set(undefined);
+    timeOfDayFrom.set(undefined);
+    timeOfDayTo.set(undefined);
+    versionFilterClearKey.update(n => n + 1);
     reloadWithFilters();
   }
 
@@ -267,7 +306,7 @@
             </div>
           </div>
           <div class="filter-actions">
-            <Popover.Close class="apply-btn {versionChanged ? 'apply-btn-active' : ''}">Apply</Popover.Close>
+            <Popover.Close class="apply-btn {versionChanged && !versionInvalid ? 'apply-btn-active' : ''} {versionInvalid ? 'apply-btn-invalid' : ''}" onclick={commitVersion}>Apply</Popover.Close>
             <button class="clear-btn" class:clear-btn-active={!!(vfMajor || vfMinor || vtMajor || vtMinor)} on:click={clearVersionPanel}>Clear</button>
           </div>
         </div>
@@ -570,6 +609,14 @@
 
   :global(.version-popover .apply-btn-active:hover) {
     background: color-mix(in srgb, var(--accent) 80%, #000);
+  }
+
+  :global(.version-popover .apply-btn-invalid) {
+    background: var(--hover-bg);
+    color: var(--muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .clear-btn {
