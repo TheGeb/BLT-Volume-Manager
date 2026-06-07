@@ -3,14 +3,19 @@
 
   type Option = { value: string; label: string; disabled?: boolean };
 
-  let { options = [], value = '', onValueChange = () => {} }: {
+  let { options = [], value = '', onValueChange = () => {}, onOpenChange = (_open: boolean) => {} }: {
     options: Option[];
     value: string;
     onValueChange: (v: string) => void;
+    onOpenChange?: (open: boolean) => void;
   } = $props();
 
   let selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options.find(o => !o.disabled)?.label ?? '');
   let open = $state(false);
+
+  $effect(() => {
+    onOpenChange(open);
+  });
 </script>
 
 <Select.Root type="single" {value} {onValueChange} bind:open>

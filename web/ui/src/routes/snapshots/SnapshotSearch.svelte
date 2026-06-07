@@ -18,10 +18,13 @@
 
   onMount(() => {
     loadVersionFields();
-    if (!$allHosts || $allHosts.length === 0) {
+  });
+
+  function onHostOpenChange(open: boolean) {
+    if (open && (!$allHosts || $allHosts.length === 0)) {
       loadHosts($selectedVolume);
     }
-  });
+  }
 
   function loadVersionFields() {
     const f = parseVersion($versionFrom);
@@ -84,6 +87,7 @@
       ]}
       value={host}
       onValueChange={(v) => host = v}
+      onOpenChange={onHostOpenChange}
     />
   </div>
   <div class="search-field">

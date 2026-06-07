@@ -23,11 +23,7 @@ export async function loadAll(volume: string) {
   landingShown.set(!volume);
   syncUrl();
   if (volume) {
-    await Promise.all([
-      loadSnapshots(volume),
-      loadLockStatus(),
-      loadStats(volume),
-    ]);
+    await loadSnapshots(volume);
   } else {
     await loadVolumes();
   }
@@ -63,8 +59,6 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
     await Promise.all([loadLockStatus(), loadStats(volume)]);
   } else {
     await loadSnapshots(volume);
-    await loadLockStatus();
-    await loadStats(volume);
 
     if (params?.snapshotId) {
       const snap = findSnapshot(get(snapshots), params.snapshotId, params.fallbackHash);
@@ -89,13 +83,14 @@ export async function handleRefresh() {
   try { await api.refreshStats(); } catch {}
   const vol = get(selectedVolume);
   if (vol) {
-    await Promise.all([
-      loadSnapshots(vol),
-      loadStats(vol),
-    ]);
+    const promises: Promise<unknown>[] = [loadSnapshots(vol)];
+    if (get(activeTab) === 'repo') {
+      promises.push(loadStats(vol));
+    }
+    await Promise.all(promises);
   }
   await loadVolumes();
-  if (vol) void loadLockStatus();
+  if (vol && get(activeTab) === 'repo') void loadLockStatus();
 }
 
 export function onSelectVolume(vol: string) {

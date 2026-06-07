@@ -73,7 +73,10 @@ export function doSwitchTab(tab: 'snapshots' | 'repo') {
   activeTab.set(tab);
   const vol = get(selectedVolume);
   if (tab === 'repo') {
-    if (vol) void loadStats(vol);
+    if (vol) {
+      void loadStats(vol);
+      void loadLockStatus();
+    }
   } else if (vol && get(snapshots).length === 0) {
     void loadSnapshots(vol);
   }
