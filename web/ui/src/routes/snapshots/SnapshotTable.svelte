@@ -4,6 +4,7 @@
   import DateRangeFilter from './DateTimeRange.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
+  import { versionTag, parseVersion } from '$lib/util';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
@@ -18,6 +19,40 @@
   export let onToggleSort: () => void = () => {};
   export let onTypeFilter: (t: string) => void = () => {};
   export let onHostFilter: (h: string) => void = () => {};
+  export let versionFrom = '';
+  export let versionTo = '';
+  export let onVersionFrom: (v: string) => void = () => {};
+  export let onVersionTo: (v: string) => void = () => {};
+
+  let vfMajor = ''; let vfMinor = '';
+  let vtMajor = ''; let vtMinor = '';
+
+  function loadVersionFields() {
+    const f = parseVersion(versionFrom);
+    vfMajor = f ? String(f.major) : '';
+    vfMinor = f ? String(f.minor) : '';
+    const t = parseVersion(versionTo);
+    vtMajor = t ? String(t.major) : '';
+    vtMinor = t ? String(t.minor) : '';
+  }
+
+  function applyVersionFilter() {
+    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
+    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    onVersionFrom(from);
+    onVersionTo(to);
+  }
+
+  function clearVersionFilter() {
+    vfMajor = ''; vfMinor = '';
+    vtMajor = ''; vtMinor = '';
+    onVersionFrom('');
+    onVersionTo('');
+  }
+
+  function cleanDigits(v: string): string {
+    return v.replace(/[^0-9]/g, '');
+  }
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
   export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
@@ -83,7 +118,46 @@
             Restore Point
             <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time.">i</span>
           </th>
-          <th>Snapshot ID</th>
+          <th>
+            <div class="filter-wrap">
+              <span class="th-label">Version</span>
+              <Popover.Root>
+                <Popover.Trigger class={"filter-btn" + (versionFrom || versionTo ? ' active' : '')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                  </svg>
+                </Popover.Trigger>
+                <Popover.Content class="filter-dropdown">
+                  <div class="version-range-filter">
+                    <div class="version-range-section">
+                      <span class="filter-label">from</span>
+                      <div class="version-input-group">
+                        <span class="version-prefix">v</span>
+                        <input type="text" placeholder="0" class="version-segment version-num" bind:value={vfMajor} on:input={() => { vfMajor = cleanDigits(vfMajor); }} size={vfMajor.length || 1}>
+                        <span class="version-dot">.</span>
+                        <input type="text" placeholder="0" class="version-segment version-num" bind:value={vfMinor} on:input={() => { vfMinor = cleanDigits(vfMinor); }} size={vfMinor.length || 1}>
+                      </div>
+                    </div>
+                    <div class="version-range-section">
+                      <span class="filter-label">to</span>
+                      <div class="version-input-group">
+                        <span class="version-prefix">v</span>
+                        <input type="text" placeholder="0" class="version-segment version-num" bind:value={vtMajor} on:input={() => { vtMajor = cleanDigits(vtMajor); }} size={vtMajor.length || 1}>
+                        <span class="version-dot">.</span>
+                        <input type="text" placeholder="0" class="version-segment version-num" bind:value={vtMinor} on:input={() => { vtMinor = cleanDigits(vtMinor); }} size={vtMinor.length || 1}>
+                      </div>
+                    </div>
+                    <div class="filter-actions">
+                      <button class="apply-btn apply-btn-active" on:click={applyVersionFilter}>Apply</button>
+                      {#if versionFrom || versionTo}
+                        <button class="clear-btn" on:click={clearVersionFilter}>Clear</button>
+                      {/if}
+                    </div>
+                  </div>
+                </Popover.Content>
+              </Popover.Root>
+            </div>
+          </th>
           <th>
             <div class="filter-wrap">
               <span class="th-label">Type</span>
@@ -167,15 +241,14 @@
                      </button>
                    {/if}
                  </td>
-                <td class="copy-id" title="Click to copy full snapshot ID"
+                 <td class="copy-id" title="{sn.id}"
                   on:click={() => { navigator.clipboard.writeText(sn.id); }}>
-                  {sn.short_id.slice(0, 8)}…
+                  {versionTag(sn.tags) ?? 'v_._?'}
                 </td>
                  <td style="color:var(--muted);font-size:0.9rem;">
                    {#each ['hot', 'cold'] as t (t)}
                      {#if sn.tags.includes(t)}
                        <span class="type-badge">{t}</span>
-                       {#if t === 'cold' && sn.tags.includes('hot') || t === 'hot' && sn.tags.includes('cold')}, {/if}
                      {/if}
                    {:else}—
                    {/each}
@@ -615,5 +688,147 @@
     .footer-table {
       min-width: 0;
     }
+  }
+
+  .version-range-filter {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+
+  .version-range-section {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .filter-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .version-input-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-strong);
+  }
+
+  .version-input-group:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgb(124 58 237 / 20%);
+  }
+
+  .version-prefix,
+  .version-dot {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding: 0 1px;
+    user-select: none;
+  }
+
+  .version-segment {
+    padding: 1px 2px;
+    border-radius: 3px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text);
+    white-space: pre;
+  }
+
+  .version-segment:hover {
+    background: var(--hover-bg);
+  }
+
+  .version-segment:focus {
+    background: var(--hover-bg);
+    color: var(--text);
+  }
+
+  .version-num {
+    width: auto;
+    min-width: 20px;
+    max-width: 80px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 400;
+    text-align: center;
+    padding: 0 1px;
+  }
+
+  .version-num::placeholder {
+    color: var(--muted);
+  }
+
+  .version-num:focus {
+    outline: none;
+    background: var(--hover-bg);
+    border-radius: 3px;
+  }
+
+  .version-num:focus::placeholder {
+    opacity: 0;
+  }
+
+  .version-range-filter .filter-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .version-range-filter .apply-btn {
+    background: var(--hover-bg);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .version-range-filter .apply-btn-active {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  .version-range-filter .apply-btn:hover {
+    background: var(--hover-bg);
+  }
+
+  .version-range-filter .apply-btn-active:hover {
+    background: color-mix(in srgb, var(--accent) 80%, #000);
+  }
+
+  .version-range-filter .clear-btn {
+    background: var(--hover-bg);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .version-range-filter .clear-btn:hover {
+    background: var(--hover-bg);
   }
 </style>

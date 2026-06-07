@@ -4,10 +4,9 @@ import "time"
 
 // Backup types
 const (
-	BackupTagHot      = "hot"
-	BackupTagCold     = "cold"
-	BackupTagRollback = "rollback"
-	BackupTagRestore  = "restore-point"
+	BackupTagHot     = "hot"
+	BackupTagCold    = "cold"
+	BackupTagRestore = "restore-point"
 )
 
 // Snapshot suffixes
@@ -29,7 +28,7 @@ const VolumeConfigFile = "volume.json"
 
 // Time durations
 const (
-	HotBackupInterval   = 5 * time.Minute
+	HotBackupInterval   = 15 * time.Minute
 	OrphanCheckInterval = 30 * time.Minute
 	OrphanRetryMinAge   = 10 * time.Minute
 

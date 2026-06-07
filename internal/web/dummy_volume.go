@@ -56,7 +56,11 @@ func (s *Server) handleDummyVolume(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := rm.BackupInDir(".", constants.BackupTagCold, volPath); err != nil {
+	tags := []string{constants.BackupTagCold}
+	if vt := s.nextVersionTags(req.Name, true); vt != nil {
+		tags = append(tags, vt...)
+	}
+	if err := rm.BackupInDir(".", tags, volPath); err != nil {
 		respondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -110,7 +114,11 @@ func (s *Server) handleDummySnapshot(w http.ResponseWriter, r *http.Request) {
 
 	count := writeDummyFiles(volPath)
 
-	if err := rm.BackupInDir(".", constants.BackupTagCold, volPath); err != nil {
+	tags := []string{constants.BackupTagCold}
+	if vt := s.nextVersionTags(req.Volume, false); vt != nil {
+		tags = append(tags, vt...)
+	}
+	if err := rm.BackupInDir(".", tags, volPath); err != nil {
 		respondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}

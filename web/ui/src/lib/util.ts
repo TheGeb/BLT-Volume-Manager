@@ -29,8 +29,21 @@ export function formatExpiration(totalSeconds: number): string {
 }
 
 export function escapeHtml(s: string | undefined): string {
-  if (!s) return '';
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
+	if (!s) return '';
+	const div = document.createElement('div');
+	div.textContent = s;
+	return div.innerHTML;
+}
+
+export function versionTag(tags: string[]): string | undefined {
+	return tags.find(t => /^v\d+\.\d+$/.test(t));
+}
+
+export function parseVersion(v: string): { major: number; minor: number } | null {
+	const cleaned = v.replace(/^v/, '');
+	const parts = cleaned.split('.');
+	const major = parseInt(parts[0] ?? '');
+	const minor = parts[1] ? parseInt(parts[1]) : 0;
+	if (isNaN(major) || isNaN(minor)) return null;
+	return { major, minor };
 }

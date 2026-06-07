@@ -2,6 +2,8 @@ package web
 
 import (
 	"embed"
+	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -128,6 +130,33 @@ func (s *Server) volumeManager(volName string) *restic.Manager {
 		m.SetS3Store(s3)
 	}
 	return m
+}
+
+func (s *Server) nextVersionTags(volName string, major bool) []string {
+	s3, err := s.getOrCreateS3Store()
+	if err != nil || s3 == nil {
+		return nil
+	}
+	v, err := store.ReadVersionCounter(s3, volName)
+	if err != nil {
+		if !errors.Is(err, store.ErrKeyNotFound) {
+			return nil
+		}
+		v = &store.VersionCounter{}
+	}
+	if major {
+		v.Major++
+		v.Minor = 0
+	} else {
+		v.Minor++
+	}
+	if err := store.WriteVersionCounter(s3, volName, *v); err != nil {
+		return nil
+	}
+	return []string{
+		fmt.Sprintf("v%d", v.Major),
+		fmt.Sprintf("v%d.%d", v.Major, v.Minor),
+	}
 }
 
 func (s *Server) volumeNames() []string {

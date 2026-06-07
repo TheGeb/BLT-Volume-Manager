@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Select } from 'bits-ui';
 
-  type Option = { value: string; label: string };
+  type Option = { value: string; label: string; disabled?: boolean };
 
   let { options = [], value = '', onValueChange = () => {} }: {
     options: Option[];
@@ -9,7 +9,7 @@
     onValueChange: (v: string) => void;
   } = $props();
 
-  let selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options[0]?.label ?? '');
+  let selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options.find(o => !o.disabled)?.label ?? '');
   let open = $state(false);
 </script>
 
@@ -23,7 +23,7 @@
   <Select.Portal>
     <Select.Content class="drop-select-content">
       {#each options as opt (opt.value)}
-        <Select.Item class="drop-select-item" value={opt.value} label={opt.label}>
+        <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
           {opt.label}
         </Select.Item>
       {/each}
@@ -85,5 +85,11 @@
   :global(.drop-select-item[data-state="checked"]) {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  :global(.drop-select-item[data-disabled]) {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 </style>

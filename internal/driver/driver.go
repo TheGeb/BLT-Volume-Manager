@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,6 +97,34 @@ func (d *Driver) ResticManager(volName string) *restic.Manager {
 	return m
 }
 
+func (d *Driver) nextVersionTags(name string, major bool) []string {
+	if d.s3Store == nil {
+		return nil
+	}
+	v, err := store.ReadVersionCounter(d.s3Store, name)
+	if err != nil {
+		if !errors.Is(err, store.ErrKeyNotFound) {
+			applog.Errorf("read_version_counter_failed", err, "volume=%s", name)
+			return nil
+		}
+		v = &store.VersionCounter{}
+	}
+	if major {
+		v.Major++
+		v.Minor = 0
+	} else {
+		v.Minor++
+	}
+	if err := store.WriteVersionCounter(d.s3Store, name, *v); err != nil {
+		applog.Errorf("write_version_counter_failed", err, "volume=%s", name)
+		return nil
+	}
+	return []string{
+		fmt.Sprintf("v%d", v.Major),
+		fmt.Sprintf("v%d.%d", v.Major, v.Minor),
+	}
+}
+
 func (d *Driver) Create(r *volume.CreateRequest) error {
 	name := r.Name
 	volPath := volumepath.VolumePath(d.root, name)
@@ -135,6 +164,12 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		}
 	} else {
 		applog.Warnf("create_lock_acquire_failed", "volume=%s error=%v", name, err)
+	}
+
+	// Cold backup on create — marks the volume's initial state (v0, v0.0)
+	rm := d.ResticManager(name)
+	if err := rm.Backup(volPath, "cold", "v0", "v0.0"); err != nil {
+		applog.Errorf("create_cold_backup_failed", err, "volume=%s", name)
 	}
 
 	return nil
@@ -269,6 +304,14 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	} else {
 		vi.Lock = lock
 
+		// Cold backup at mount — marks session boundary with new major version
+		if vt := d.nextVersionTags(name, true); vt != nil {
+			tags := append([]string{"cold"}, vt...)
+			if err := rm.Backup(volPath, tags...); err != nil {
+				applog.Errorf("mount_cold_backup_failed", err, "volume=%s", name)
+			}
+		}
+
 		if vi.FsType != "" {
 			snapID, err := rm.FindRestorePointByName(name)
 			if err != nil {
@@ -282,11 +325,6 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 					applog.Warnf("lock_expired_skipping_restore", "volume=%s", name)
 				default:
 					applog.Infof("restore_point_found", "volume=%s snapshot=%s", name, snapID)
-
-					applog.Infof("rollback_backup", "volume=%s", name)
-					if err := rm.Backup(volPath, constants.BackupTagRollback); err != nil {
-						applog.Errorf("rollback_backup_failed", err, "volume=%s", name)
-					}
 
 					snapDir := filepath.Join(d.root, constants.SnapshotsDir)
 					preSnap, snapErr := snapshot.Create(volPath, snapDir, name+constants.PreRestoreSuffix)
@@ -455,7 +493,11 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 				return
 			case <-hotTicker.C:
 				applog.Infof("hot_backup_start", "volume=%s", name)
-				if err := rm.Backup(volPath, constants.BackupTagHot); err != nil {
+				tags := []string{constants.BackupTagHot}
+				if vt := d.nextVersionTags(name, false); vt != nil {
+					tags = append(tags, vt...)
+				}
+				if err := rm.Backup(volPath, tags...); err != nil {
 					applog.Errorf("hot_backup_failed", err, "volume=%s", name)
 				}
 			}
@@ -464,15 +506,25 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 }
 
 func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) error {
+	versionTags := d.nextVersionTags(name, false)
+
 	if fsType == "" {
-		return rm.Backup(volPath, constants.BackupTagCold)
+		tags := []string{constants.BackupTagCold}
+		if versionTags != nil {
+			tags = append(tags, versionTags...)
+		}
+		return rm.Backup(volPath, tags...)
 	}
 
 	snapDir := filepath.Join(d.root, constants.SnapshotsDir)
 	info, err := snapshot.Create(volPath, snapDir, name)
 	if err != nil {
 		applog.Errorf("snapshot_create_failed", err, "volume=%s falling back to direct backup", name)
-		return rm.Backup(volPath, constants.BackupTagCold)
+		tags := []string{constants.BackupTagCold}
+		if versionTags != nil {
+			tags = append(tags, versionTags...)
+		}
+		return rm.Backup(volPath, tags...)
 	}
 
 	snapTime := time.Now()
@@ -480,7 +532,11 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 		snapTime = fi.ModTime()
 	}
 
-	if err := rm.BackupAt(info.AccessPath, constants.BackupTagCold, snapTime); err != nil {
+	tags := []string{constants.BackupTagCold}
+	if versionTags != nil {
+		tags = append(tags, versionTags...)
+	}
+	if err := rm.BackupAt(info.AccessPath, tags, snapTime); err != nil {
 		return fmt.Errorf("cold backup: %w", err)
 	}
 	if err := snapshot.Remove(info); err != nil {
@@ -523,7 +579,12 @@ func (d *Driver) retryOrphanedSnapshots() {
 		}
 		applog.Infof("retry_orphaned_cold_backup", "volume=%s path=%s", info.VolName, info.AccessPath)
 		rm := d.ResticManager(info.VolName)
-		if err := rm.BackupAt(info.AccessPath, constants.BackupTagCold, fi.ModTime()); err != nil {
+		versionTags := d.nextVersionTags(info.VolName, false)
+		tags := []string{constants.BackupTagCold}
+		if versionTags != nil {
+			tags = append(tags, versionTags...)
+		}
+		if err := rm.BackupAt(info.AccessPath, tags, fi.ModTime()); err != nil {
 			applog.Errorf("orphaned_cold_backup_failed", err, "volume=%s", info.VolName)
 			continue
 		}

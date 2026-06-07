@@ -10,6 +10,7 @@
   import Modal from './components/Modal.svelte';
   import { get } from 'svelte/store';
   import { showToast } from '$lib/stores/toast';
+  import { versionTag } from '$lib/util';
   import {
     volumes, selectedVolume, volumeFilter, volumeLockInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
@@ -372,7 +373,7 @@
                     ? [...$copySelectedSnapshotIds, sn.id]
                     : $copySelectedSnapshotIds.filter(id => id !== sn.id);
                 }} />
-              <span class="snap-short-id">{sn.short_id.slice(0, 8)}</span>
+              <span class="snap-short-id" title="{sn.id}">{versionTag(sn.tags) ?? 'v_._?'}</span>
               <span class="snap-date">{new Date(sn.time).toLocaleDateString()} {new Date(sn.time).toLocaleTimeString()}</span>
               {#each sn.tags.filter(t => t !== 'restore-point') as tag (tag)}
                 {#if tag === 'hot' || tag === 'cold'}

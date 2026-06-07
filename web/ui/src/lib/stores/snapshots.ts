@@ -4,13 +4,15 @@ import type { SnapshotListParams } from '../api';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume } from './volumes';
-import { formatBytes } from '../util';
+import { formatBytes, parseVersion } from '../util';
 
 export const snapshots = writable<Snapshot[]>([]);
 export const query = writable('');
 export const sortNewestFirst = writable(true);
 export const typeFilter = writable('all');
 export const hostFilter = writable('');
+export const versionFrom = writable('');
+export const versionTo = writable('');
 export const timeFrom = writable<number | undefined>(undefined);
 export const timeTo = writable<number | undefined>(undefined);
 export const timeOfDayFrom = writable<number | undefined>(undefined);
@@ -51,10 +53,27 @@ export function filterSnapshots(
   timeTo?: number,
   timeOfDayFrom?: number,
   timeOfDayTo?: number,
+  versionFrom?: string,
+  versionTo?: string,
 ): Snapshot[] {
   return snapshots.filter(sn => {
     if (hostFilter && sn.hostname !== hostFilter) return false;
     if (typeFilter !== 'all' && !sn.tags.includes(typeFilter)) return false;
+    if (versionFrom || versionTo) {
+      const vt = sn.tags.find(t => /^v\d+\.\d+$/.test(t));
+      if (!vt) return false;
+      const sv = parseVersion(vt);
+      if (sv) {
+        if (versionFrom) {
+          const fv = parseVersion(versionFrom);
+          if (fv && (sv.major < fv.major || (sv.major === fv.major && sv.minor < fv.minor))) return false;
+        }
+        if (versionTo) {
+          const tv = parseVersion(versionTo);
+          if (tv && (sv.major > tv.major || (sv.major === tv.major && sv.minor > tv.minor))) return false;
+        }
+      }
+    }
     const snTime = new Date(sn.time);
     if (timeFrom !== undefined && snTime.getTime() < timeFrom) return false;
     if (timeTo !== undefined && snTime.getTime() > timeTo) return false;
@@ -72,9 +91,9 @@ export function filterSnapshots(
 }
 
 export const filteredSnapshots = derived(
-  [snapshots, query, typeFilter, hostFilter, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo],
-  ([$snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo]) =>
-    filterSnapshots($snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo)
+  [snapshots, query, typeFilter, hostFilter, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo, versionFrom, versionTo],
+  ([$snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo, $verFrom, $verTo]) =>
+    filterSnapshots($snapshots, $query, $typeFilter, $hostFilter, $timeFrom, $timeTo, $todFrom, $todTo, $verFrom, $verTo)
 );
 
 export function sortSnapshots(snapshots: Snapshot[], newestFirst: boolean): Snapshot[] {

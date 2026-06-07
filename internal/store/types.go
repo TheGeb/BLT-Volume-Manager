@@ -15,3 +15,8 @@ type RestorePoint struct {
 	SnapshotID   string `json:"snapshotID"`
 	FallbackHash string `json:"fallbackHash"`
 }
+
+type VersionCounter struct {
+	Major int `json:"major"`
+	Minor int `json:"minor"`
+}

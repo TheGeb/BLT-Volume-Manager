@@ -5,7 +5,7 @@
   import type { Snapshot, FileNode, DiffResult } from '$lib/types';
   import { computeDiff } from '$lib/diff';
   import type { DiffHunk, DiffLine } from '$lib/diff';
-  import { formatBytes } from '$lib/util';
+  import { formatBytes, versionTag } from '$lib/util';
   import { collectAllPaths, buildDiffMap, buildTree } from '$lib/tree-utils';
   import { colResize, rowResize } from '$lib/resize';
   import * as api from '$lib/api';
@@ -190,8 +190,8 @@
     diffOtherId = '';
     sideBySide = false;
     try {
-      if (initialDiffTarget && compareSnaps.some(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget)) {
-        const target = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
+      if (initialDiffTarget && compareSnaps.some(s => (s.id === initialDiffTarget || s.short_id === initialDiffTarget) && s.id !== snapshot.id)) {
+        const target = compareSnaps.find(s => (s.id === initialDiffTarget || s.short_id === initialDiffTarget) && s.id !== snapshot.id);
         selectedCompareId = target ? target.id : initialDiffTarget;
       }
       const fetchedNodes = await api.fetchFileTree(snapshot.id, snapshot.volume!, undefined, snapshot.fallbackHash);
@@ -207,13 +207,14 @@
     }
   }
 
-  $: compareSnaps = allSnapshots.filter(s => s.id !== snapshot.id);
+  $: compareSnaps = allSnapshots;
   $: if (compareSnaps.length > 0 && !selectedCompareId) {
-    selectedCompareId = compareSnaps[0]!.id;
+    const firstEnabled = compareSnaps.find(s => s.id !== snapshot.id);
+    selectedCompareId = firstEnabled ? firstEnabled.id : compareSnaps[0]!.id;
   }
   let lastInitialDiffTarget = '';
   $: if (initialDiffTarget) {
-    const found = compareSnaps.find(s => s.id === initialDiffTarget || s.short_id === initialDiffTarget);
+    const found = compareSnaps.find(s => (s.id === initialDiffTarget || s.short_id === initialDiffTarget) && s.id !== snapshot.id);
     if (found) {
       if (found.id !== selectedCompareId) {
         selectedCompareId = found.id;
@@ -222,8 +223,9 @@
     } else {
       lastInitialDiffTarget = initialDiffTarget;
     }
-  } else if (selectedCompareId && compareSnaps.length > 0 && !compareSnaps.some(s => s.id === selectedCompareId || s.short_id === selectedCompareId)) {
-    selectedCompareId = compareSnaps[0]!.id;
+  } else if (selectedCompareId && compareSnaps.length > 0 && (!compareSnaps.some(s => s.id === selectedCompareId || s.short_id === selectedCompareId) || selectedCompareId === snapshot.id)) {
+    const firstEnabled = compareSnaps.find(s => s.id !== snapshot.id);
+    selectedCompareId = firstEnabled ? firstEnabled.id : compareSnaps[0]!.id;
   }
   $: if (allSnapshots.length > 0) {
     compareLoading = false;
@@ -383,7 +385,7 @@
   <div style="display:flex;gap:12px;margin-bottom:20px;padding-right:70px;">
     <div style="flex:1;min-width:0;">
       <h2 class="eyebrow" style="margin:0 0 4px;">
-        Snapshot <span style="text-transform:none;">{snapshot.short_id}</span>
+        <span style="text-transform:none;" title="{snapshot.id}">{(versionTag(snapshot.tags) ?? 'v_._?') + ' (' + snapshot.short_id + ')'}</span>
       </h2>
       <div class="snap-meta">
         {#if snapshot.hostname}
@@ -404,7 +406,7 @@
         <div class="snap-meta-divider"></div>
         <div style="flex:1;min-width:0;">
           <h2 class="eyebrow" style="margin:0 0 4px;">
-            Diff <span style="text-transform:none;">{diffOtherSnapshot.short_id}</span>
+            <span style="text-transform:none;" title="{diffOtherSnapshot.id}">{(versionTag(diffOtherSnapshot.tags) ?? 'v_._?') + ' (' + diffOtherSnapshot.short_id + ')'}</span>
           </h2>
           <div class="snap-meta">
             {#if diffOtherSnapshot.hostname}
@@ -429,7 +431,7 @@
       {#if compareSnaps.length > 0}
         <div bind:this={selectWrapEl}>
           <DropSelect
-            options={compareSnaps.map(cs => ({ value: cs.id, label: `${cs.short_id.slice(0, 8)}… (${new Date(cs.time).toLocaleDateString()} ${new Date(cs.time).toLocaleTimeString()} - ${cs.hostname})` }))}
+            options={compareSnaps.map(cs => ({ value: cs.id, label: `${versionTag(cs.tags) ?? 'v_._?'} - ${new Date(cs.time).toLocaleDateString()} ${new Date(cs.time).toLocaleTimeString()} - ${cs.hostname}`, disabled: cs.id === snapshot.id }))}
             value={selectedCompareId}
             onValueChange={(v) => selectedCompareId = v}
           />
@@ -522,8 +524,8 @@
             <FileDiff
               diffHunks={currentDiffHunks}
               {sideBySide}
-              oldLabel={diffOtherId.slice(0, 8)}
-              newLabel={snapshot.short_id.slice(0, 8)}
+              oldLabel={(versionTag(diffOtherSnapshot?.tags ?? []) ?? 'v_._?') + ' (' + diffOtherSnapshot?.short_id + ')'}
+              newLabel={(versionTag(snapshot.tags) ?? 'v_._?') + ' (' + snapshot.short_id + ')'}
               onToggleLayout={toggleDiffLayout} />
           {:else if fileContent}<div style="white-space:pre-wrap;">{fileContent.trimStart()}</div>
           {:else if fileContentLoading}

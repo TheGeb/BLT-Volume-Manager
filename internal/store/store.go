@@ -27,6 +27,7 @@ const (
 	LockPrefix         = "blt-volume-manager/locks/"
 	VolumePrefix       = "blt-volume-manager/registered-volumes/"
 	RestorePointPrefix = "blt-volume-manager/restore-points/"
+	VersionPrefix      = "blt-volume-manager/versions/"
 )
 
 // ObjectStore is the minimal interface for S3 object CRUD operations.
