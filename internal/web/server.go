@@ -192,6 +192,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	inner.HandleFunc("/api/stats", s.handleStats)
 	inner.HandleFunc("/api/stats/refresh", s.handleStatsRefresh)
 	inner.HandleFunc("/api/volumes", s.handleVolumes)
+	inner.HandleFunc("/api/volumes/locks", s.handleVolumesLocks)
 	inner.HandleFunc("/api/repo/check", s.handleCheck)
 	inner.HandleFunc("/api/repo/repair", s.handleRepair)
 	inner.HandleFunc("/api/dev-mode", s.handleDevMode)
@@ -241,5 +242,5 @@ func (s *Server) Register(mux *http.ServeMux) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)
 	})
 
-	mux.Handle("/", nosniffMiddleware(loggingMiddleware(inner)))
+	mux.Handle("/", nosniffMiddleware(gzipMiddleware(loggingMiddleware(inner))))
 }

@@ -89,6 +89,9 @@
     appliedTimeTo = timeToSeconds(timeRange.end);
     onTimeFilter(appliedDateFrom, appliedDateTo);
     onTimeOfDayFilter(appliedTimeFrom, appliedTimeTo);
+    if (hasStagedChanges) {
+      open = false;
+    }
   }
 
   function clear() {
@@ -295,22 +298,12 @@
     font-family: inherit;
     padding: 0;
     white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
+    display: inline;
+    appearance: none;
   }
 
   .sort-btn:hover {
     color: var(--text);
-  }
-
-  .sort-btn::before {
-    content: '';
-    position: absolute;
-    left: -22px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
   }
 
   .sort-chevron {

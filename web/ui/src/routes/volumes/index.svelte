@@ -272,7 +272,7 @@
 </script>
 
 {#if $landingShown}
-  {#if volumes.length === 0 && !loading}
+  {#if volumes.length === 0 && !loading && !filter}
     <LandingPanel {onCreateTestVolume} {creatingTest} {testStatus} />
   {:else}
 <section class="panel" class:lock-mode={showLockBorders}>
@@ -349,7 +349,8 @@
                   </button>
                 {:else}
                   <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
-                    on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}>
+                    on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}
+                    on:mousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}>
                     <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
                       <ellipse cx="12" cy="5" rx="9" ry="3"/>

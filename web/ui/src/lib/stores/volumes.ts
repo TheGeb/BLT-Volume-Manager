@@ -50,23 +50,19 @@ export async function loadVolumes() {
 export async function fetchAllVolumeLockInfo() {
   const vols = get(volumes);
   if (vols.length === 0) return;
-  const results = await Promise.all(
-    vols.map(name => api.fetchLockStatus(name).catch(() => null))
-  );
+  const allLocks = await api.fetchAllLockStatus();
   const info: Record<string, VolumeLockInfo> = {};
-  for (let i = 0; i < vols.length; i++) {
-    const r = results[i];
+  for (const vol of vols) {
+    const r = allLocks[vol];
     if (r) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      info[vols[i]!] = {
+      info[vol] = {
         locked: r.locked,
         owner: r.owner ?? '',
         expiresIn: r.expires_in ?? 0,
         status: r.locked ? 'locked' : 'unlocked',
       };
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      info[vols[i]!] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
+      info[vol] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
     }
   }
   volumeLockInfo.set(info);

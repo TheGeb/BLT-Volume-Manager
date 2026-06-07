@@ -26,6 +26,7 @@
 
   let vfMajor = ''; let vfMinor = '';
   let vtMajor = ''; let vtMinor = '';
+  let versionOpen = false;
 
   function loadVersionFields() {
     const f = parseVersion(versionFrom);
@@ -36,11 +37,26 @@
     vtMinor = t ? String(t.minor) : '';
   }
 
+  function handleVersionOpenChange(o: boolean) {
+    versionOpen = o;
+    if (o) loadVersionFields();
+  }
+
+  $: versionChanged = (() => {
+    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
+    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    return from !== versionFrom || to !== versionTo;
+  })();
+
   function applyVersionFilter() {
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
     const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    const changed = from !== versionFrom || to !== versionTo;
     onVersionFrom(from);
     onVersionTo(to);
+    if (changed) {
+      versionOpen = false;
+    }
   }
 
   function clearVersionFilter() {
@@ -121,7 +137,7 @@
           <th>
             <div class="filter-wrap">
               <span class="th-label">Version</span>
-              <Popover.Root>
+              <Popover.Root bind:open={versionOpen} onOpenChange={handleVersionOpenChange}>
                 <Popover.Trigger class={"filter-btn" + (versionFrom || versionTo ? ' active' : '')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
@@ -148,10 +164,8 @@
                       </div>
                     </div>
                     <div class="filter-actions">
-                      <button class="apply-btn apply-btn-active" on:click={applyVersionFilter}>Apply</button>
-                      {#if versionFrom || versionTo}
-                        <button class="clear-btn" on:click={clearVersionFilter}>Clear</button>
-                      {/if}
+                      <button class="apply-btn" class:apply-btn-active={versionChanged} on:click={applyVersionFilter}>Apply</button>
+                      <button class="clear-btn" class:clear-btn-active={!!(vfMajor || vfMinor || vtMajor || vtMinor)} on:click={clearVersionFilter}>Clear</button>
                     </div>
                   </div>
                 </Popover.Content>
@@ -356,7 +370,7 @@
 
 <style>
   .header-table {
-    width: 100%;
+    width: calc(100% - 12px);
     border-collapse: collapse;
     table-layout: fixed;
     min-width: 550px;
@@ -390,7 +404,7 @@
   }
 
   .footer-table {
-    width: 100%;
+    width: calc(100% - 12px);
     border-collapse: collapse;
     table-layout: fixed;
     min-width: 550px;
@@ -830,5 +844,15 @@
 
   .version-range-filter .clear-btn:hover {
     background: var(--hover-bg);
+  }
+
+  .version-range-filter .clear-btn-active {
+    background: var(--red-bg);
+    color: var(--red);
+    border-color: var(--red);
+  }
+
+  .version-range-filter .clear-btn-active:hover {
+    background: rgb(248 113 113 / 20%);
   }
 </style>

@@ -23,8 +23,8 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts, offset, limit := parseSnapshotListOpts(r)
-	resp, err := s.snapshotListResponse(volName, opts, offset, limit)
+	opts, filter, offset, limit := parseSnapshotListOpts(r)
+	resp, err := s.snapshotListResponse(volName, opts, filter, offset, limit)
 	if err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
@@ -135,7 +135,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		resp, err := s.snapshotListResponse(volName, nil, 0, 0)
+		resp, err := s.snapshotListResponse(volName, nil, nil, 0, 0)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -154,7 +154,7 @@ func (s *Server) handleSnapshotAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		resp, err := s.snapshotListResponse(volName, nil, 0, 0)
+		resp, err := s.snapshotListResponse(volName, nil, nil, 0, 0)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return

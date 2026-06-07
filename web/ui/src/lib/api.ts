@@ -8,6 +8,12 @@ export interface SnapshotListParams {
   tags?: string[];
   offset?: number;
   limit?: number;
+  timeFrom?: number;
+  timeTo?: number;
+  timeOfDayFrom?: number;
+  timeOfDayTo?: number;
+  versionFrom?: string;
+  versionTo?: string;
 }
 
 export async function fetchVolumes(): Promise<string[]> {
@@ -32,6 +38,24 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 		}
 		if (params.limit !== undefined && params.limit > 0) {
 			p.set('limit', String(params.limit));
+		}
+		if (params.timeFrom !== undefined) {
+			p.set('timeFrom', String(params.timeFrom));
+		}
+		if (params.timeTo !== undefined) {
+			p.set('timeTo', String(params.timeTo));
+		}
+		if (params.timeOfDayFrom !== undefined) {
+			p.set('timeOfDayFrom', String(params.timeOfDayFrom));
+		}
+		if (params.timeOfDayTo !== undefined) {
+			p.set('timeOfDayTo', String(params.timeOfDayTo));
+		}
+		if (params.versionFrom) {
+			p.set('versionFrom', params.versionFrom);
+		}
+		if (params.versionTo) {
+			p.set('versionTo', params.versionTo);
 		}
 	}
 	const resp = await fetch(`/api/snapshots?${p.toString()}`);
@@ -62,6 +86,12 @@ export async function initRepo(): Promise<void> {
 export async function fetchLockStatus(volume: string): Promise<LockStatus> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`);
   return resp.json() as Promise<LockStatus>;
+}
+
+export async function fetchAllLockStatus(): Promise<Record<string, LockStatus>> {
+  const resp = await fetch('/api/volumes/locks');
+  const data = await resp.json() as { locks?: Record<string, LockStatus> };
+  return data.locks ?? {};
 }
 
 export async function createLock(volume: string, owner?: string): Promise<void> {

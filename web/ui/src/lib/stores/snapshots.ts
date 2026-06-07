@@ -255,6 +255,18 @@ function buildSnapshotParams(): SnapshotListParams {
   const params: SnapshotListParams = {};
   if (hf) params.hosts = [hf];
   if (tf !== 'all') params.tags = [tf];
+  const tfFrom = get(timeFrom);
+  const tfTo = get(timeTo);
+  if (tfFrom !== undefined) params.timeFrom = tfFrom;
+  if (tfTo !== undefined) params.timeTo = tfTo;
+  const todFrom = get(timeOfDayFrom);
+  const todTo = get(timeOfDayTo);
+  if (todFrom !== undefined) params.timeOfDayFrom = todFrom;
+  if (todTo !== undefined) params.timeOfDayTo = todTo;
+  const vf = get(versionFrom);
+  const vt = get(versionTo);
+  if (vf) params.versionFrom = vf;
+  if (vt) params.versionTo = vt;
   return params;
 }
 

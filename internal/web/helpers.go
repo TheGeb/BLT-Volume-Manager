@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
@@ -25,12 +27,105 @@ func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return vol, true
 }
 
-func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts, offset, limit int) (map[string]any, error) {
+type SnapshotFilter struct {
+	TimeFrom, TimeTo                 *time.Time
+	TimeOfDayFrom, TimeOfDayTo       *int
+	VersionFromMajor, VersionToMajor *int
+	VersionFromMinor, VersionToMinor *int
+}
+
+func parseVersionParam(s string) (major, minor int, ok bool) {
+	parts := strings.SplitN(s, ".", 2)
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	maj, err1 := strconv.Atoi(parts[0])
+	min, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || maj < 0 || min < 0 {
+		return 0, 0, false
+	}
+	return maj, min, true
+}
+
+func applySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Snapshot {
+	if f == nil {
+		return snaps
+	}
+	out := make([]restic.Snapshot, 0, len(snaps))
+	for _, sn := range snaps {
+		if f.TimeFrom != nil && sn.Time.Before(*f.TimeFrom) {
+			continue
+		}
+		if f.TimeTo != nil && sn.Time.After(*f.TimeTo) {
+			continue
+		}
+		if f.TimeOfDayFrom != nil || f.TimeOfDayTo != nil {
+			snSeconds := sn.Time.Hour()*3600 + sn.Time.Minute()*60 + sn.Time.Second()
+			if f.TimeOfDayFrom != nil && snSeconds < *f.TimeOfDayFrom {
+				continue
+			}
+			if f.TimeOfDayTo != nil && snSeconds > *f.TimeOfDayTo {
+				continue
+			}
+		}
+		if f.VersionFromMajor != nil || f.VersionToMajor != nil {
+			vt := findVersionTag(sn.Tags)
+			if vt == "" {
+				continue
+			}
+			maj, min, ok := parseVersionParam(vt)
+			if !ok {
+				continue
+			}
+			if f.VersionFromMajor != nil {
+				fmaj, fmin := *f.VersionFromMajor, 0
+				if f.VersionFromMinor != nil {
+					fmin = *f.VersionFromMinor
+				}
+				if maj < fmaj || (maj == fmaj && min < fmin) {
+					continue
+				}
+			}
+			if f.VersionToMajor != nil {
+				tmaj, tmin := *f.VersionToMajor, 0
+				if f.VersionToMinor != nil {
+					tmin = *f.VersionToMinor
+				}
+				if maj > tmaj || (maj == tmaj && min > tmin) {
+					continue
+				}
+			}
+		}
+		out = append(out, sn)
+	}
+	return out
+}
+
+func findVersionTag(tags []string) string {
+	for _, t := range tags {
+		if strings.HasPrefix(t, "v") {
+			rest := t[1:]
+			parts := strings.SplitN(rest, ".", 2)
+			if len(parts) == 2 {
+				if _, err := strconv.Atoi(parts[0]); err == nil {
+					if _, err := strconv.Atoi(parts[1]); err == nil {
+						return rest
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (map[string]any, error) {
 	rm := s.volumeManager(volName)
 	snaps, err := rm.ListSnapshotsWithOpts(opts)
 	if err != nil {
 		return nil, err
 	}
+
+	snaps = applySnapshotFilter(snaps, filter)
 
 	rawLen := len(snaps)
 	hasMore := false
@@ -67,7 +162,7 @@ func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshots
 	}, nil
 }
 
-func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, int, int) {
+func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *SnapshotFilter, int, int) {
 	hosts := r.URL.Query()["host"]
 	latestStr := r.URL.Query().Get("latest")
 	latest := 0
@@ -91,7 +186,52 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, int, int
 		}
 	}
 
-	if limit > 0 {
+	var filter *SnapshotFilter
+
+	if tf := r.URL.Query().Get("timeFrom"); tf != "" {
+		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
+			t := time.UnixMilli(n)
+			filter = initFilter(filter)
+			filter.TimeFrom = &t
+		}
+	}
+	if tf := r.URL.Query().Get("timeTo"); tf != "" {
+		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
+			t := time.UnixMilli(n)
+			filter = initFilter(filter)
+			filter.TimeTo = &t
+		}
+	}
+	if tod := r.URL.Query().Get("timeOfDayFrom"); tod != "" {
+		if n, err := strconv.Atoi(tod); err == nil {
+			filter = initFilter(filter)
+			filter.TimeOfDayFrom = &n
+		}
+	}
+	if tod := r.URL.Query().Get("timeOfDayTo"); tod != "" {
+		if n, err := strconv.Atoi(tod); err == nil {
+			filter = initFilter(filter)
+			filter.TimeOfDayTo = &n
+		}
+	}
+	if vf := r.URL.Query().Get("versionFrom"); vf != "" {
+		if maj, min, ok := parseVersionParam(vf); ok {
+			filter = initFilter(filter)
+			filter.VersionFromMajor = &maj
+			filter.VersionFromMinor = &min
+		}
+	}
+	if vt := r.URL.Query().Get("versionTo"); vt != "" {
+		if maj, min, ok := parseVersionParam(vt); ok {
+			filter = initFilter(filter)
+			filter.VersionToMajor = &maj
+			filter.VersionToMinor = &min
+		}
+	}
+
+	hasServerSideFilter := filter != nil
+
+	if limit > 0 && !hasServerSideFilter {
 		latest = offset + limit + 1
 	}
 
@@ -99,7 +239,14 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, int, int
 	if len(hosts) > 0 || latest > 0 || len(tags) > 0 {
 		opts = &restic.ListSnapshotsOpts{Hosts: hosts, Latest: latest, Tags: tags}
 	}
-	return opts, offset, limit
+	return opts, filter, offset, limit
+}
+
+func initFilter(f *SnapshotFilter) *SnapshotFilter {
+	if f == nil {
+		return &SnapshotFilter{}
+	}
+	return f
 }
 
 func respondError(w http.ResponseWriter, err error, status int) {

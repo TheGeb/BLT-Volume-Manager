@@ -203,6 +203,25 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]any, error) {
 	return result, nil
 }
 
+func (s *Server) handleVolumesLocks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	volumes := s.volumeNames()
+	locks := make(map[string]map[string]any, len(volumes))
+	for _, vol := range volumes {
+		status, err := s.getVolumeLock(vol)
+		if err != nil {
+			locks[vol] = map[string]any{"volume": vol, "locked": false}
+			continue
+		}
+		locks[vol] = status
+	}
+	respondJSON(w, map[string]any{"locks": locks})
+}
+
 func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]any, error) {
 	if s.s3Bucket == "" {
 		return nil, errors.New("S3_LOCK_BUCKET, RESTIC_REPOSITORY, or S3_ENDPOINT must be configured")

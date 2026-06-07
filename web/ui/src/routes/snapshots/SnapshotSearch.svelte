@@ -5,16 +5,8 @@
     hostFilter, typeFilter, versionFrom, versionTo, reloadWithFilters, allHosts, loadHosts,
     timeFrom, timeTo, timeOfDayFrom, timeOfDayTo,
   } from '$lib/stores/snapshots';
-  import { derived } from 'svelte/store';
 
-  let isFiltered = false;
-  const filterActive = derived(
-    [hostFilter, typeFilter, versionFrom, versionTo, timeFrom, timeTo, timeOfDayFrom, timeOfDayTo],
-    ([$hostFilter, $typeFilter, $versionFrom, $versionTo, $timeFrom, $timeTo, $todFrom, $todTo]) =>
-      !!$hostFilter || $typeFilter !== 'all' || !!$versionFrom || !!$versionTo ||
-      $timeFrom !== undefined || $timeTo !== undefined || $todFrom !== undefined || $todTo !== undefined
-  );
-  filterActive.subscribe(v => isFiltered = v);
+  let searchApplied = false;
   import { selectedVolume } from '$lib/stores/volumes';
   import { parseVersion } from '$lib/util';
   import DropSelect from '../../components/DropSelect.svelte';
@@ -50,6 +42,7 @@
   }
 
   function search() {
+    searchApplied = true;
     hostFilter.set(host);
     typeFilter.set(tags.length > 0 ? tags[0]! : 'all');
     const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
@@ -60,6 +53,7 @@
   }
 
   function clear() {
+    searchApplied = false;
     host = '';
     tags = [];
     vfMajor = ''; vfMinor = '';
@@ -126,7 +120,7 @@
     </div>
   </div>
   <Button.Root class="search-btn" onclick={search}>Search</Button.Root>
-  <Button.Root class="clear-btn {isFiltered ? 'clear-active' : ''}" onclick={clear}>Clear</Button.Root>
+  <Button.Root class="clear-btn {searchApplied ? 'clear-active' : ''}" onclick={clear}>Clear</Button.Root>
 </div>
 
 <style>
