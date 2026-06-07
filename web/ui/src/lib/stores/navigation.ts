@@ -4,7 +4,7 @@ import type { Snapshot } from '../types';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
-import { activeTab, loadLockStatus, loadStats, doSwitchTab } from './repo';
+import { activeTab, loadLockStatus, loadStats, stats as repoStats, doSwitchTab } from './repo';
 import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal, findSnapshot } from './snapshots';
 
 export const creatingTest = writable(false);
@@ -56,7 +56,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
   }
 
   if (tab === 'repo') {
-    await Promise.all([loadLockStatus(), loadStats(volume)]);
+    await Promise.all([loadLockStatus(), get(repoStats) ? Promise.resolve() : loadStats(volume)]);
   } else {
     await loadSnapshots(volume);
 
