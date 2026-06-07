@@ -56,6 +56,14 @@ func NewServer(cfg appconfig.Config) *Server {
 	return &Server{resticBase: cfg.ResticBase, s3Bucket: cfg.S3Bucket, s3Endpoint: cfg.S3Endpoint, s3Region: cfg.S3Region}
 }
 
+// SetS3Store injects a pre-configured S3 store, bypassing lazy initialization.
+func (s *Server) SetS3Store(st store.S3Store) {
+	s.s3StoreMu.Lock()
+	defer s.s3StoreMu.Unlock()
+	s.s3Store = st
+	s.s3StoreOnce = sync.Once{}
+}
+
 func (s *Server) getOrCreateS3Store() (store.S3Store, error) {
 	if s.s3Bucket == "" {
 		return nil, nil //nolint:nilnil // S3 not configured is not an error

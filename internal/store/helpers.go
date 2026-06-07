@@ -42,7 +42,7 @@ func SortLockObjects(objects []types.Object) {
 
 // FilterValidLocks reads lock objects, deletes expired ones, and returns
 // the first valid lock owner and its key. Returns ("", nil, 0) if no valid lock.
-func FilterValidLocks(s3 S3Store, objects []types.Object) (firstKey string, firstOwner *LockOwner) {
+func FilterValidLocks(s3 ObjectStore, objects []types.Object) (firstKey string, firstOwner *LockOwner) {
 	for _, obj := range objects {
 		if obj.Key == nil {
 			continue
@@ -65,7 +65,7 @@ func FilterValidLocks(s3 S3Store, objects []types.Object) (firstKey string, firs
 }
 
 // ListVolumeMarkers returns all volume names registered under the given prefix.
-func ListVolumeMarkers(s3 S3Store, prefix string) ([]string, error) {
+func ListVolumeMarkers(s3 ObjectStore, prefix string) ([]string, error) {
 	objects, err := s3.ListObjects(prefix)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func ListVolumeMarkers(s3 S3Store, prefix string) ([]string, error) {
 }
 
 // WriteRestorePoint marshals and stores a restore point for the given volume.
-func WriteRestorePoint(s3 S3Store, volumeName string, rp RestorePoint) error {
+func WriteRestorePoint(s3 ObjectStore, volumeName string, rp RestorePoint) error {
 	data, err := json.Marshal(rp)
 	if err != nil {
 		return fmt.Errorf("marshal restore point: %w", err)
@@ -94,7 +94,7 @@ func WriteRestorePoint(s3 S3Store, volumeName string, rp RestorePoint) error {
 }
 
 // ReadRestorePoint reads and unmarshals a restore point for the given volume.
-func ReadRestorePoint(s3 S3Store, volumeName string) (*RestorePoint, error) {
+func ReadRestorePoint(s3 ObjectStore, volumeName string) (*RestorePoint, error) {
 	data, err := s3.ReadObject(RestorePointPrefix + volumeName + ".json")
 	if err != nil {
 		if errors.Is(err, ErrKeyNotFound) {
@@ -110,6 +110,6 @@ func ReadRestorePoint(s3 S3Store, volumeName string) (*RestorePoint, error) {
 }
 
 // DeleteRestorePoint removes the restore point for the given volume.
-func DeleteRestorePoint(s3 S3Store, volumeName string) error {
+func DeleteRestorePoint(s3 ObjectStore, volumeName string) error {
 	return s3.DeleteObject(RestorePointPrefix + volumeName + ".json")
 }

@@ -18,7 +18,7 @@
   import { selectedVolume } from '$lib/stores/volumes';
 </script>
 
-<div id="volumeView">
+<div id="volume-view">
   <div class="tab-bar">
     <button class="tab" on:click={() => onSelectVolume('')} title="Back to volumes">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">

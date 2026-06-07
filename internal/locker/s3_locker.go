@@ -31,11 +31,11 @@ type s3Locker struct {
 	maxHoldMins int
 	endpoint    string
 	region      string
-	store       store.S3Store
+	store       store.ObjectStore
 }
 
 type s3Lock struct {
-	store store.S3Store
+	store store.ObjectStore
 	myKey string
 }
 

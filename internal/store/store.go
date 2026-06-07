@@ -29,20 +29,43 @@ const (
 	RestorePointPrefix = "blt-volume-manager/restore-points/"
 )
 
-type S3Store interface {
+// ObjectStore is the minimal interface for S3 object CRUD operations.
+type ObjectStore interface {
 	PutObject(key string, data []byte) error
 	ReadObject(key string) ([]byte, error)
 	DeleteObject(key string) error
 	ListObjects(prefix string) ([]types.Object, error)
 	ListCommonPrefixes(prefix, delimiter string) ([]string, error)
 	DeleteObjectsWithPrefix(prefix string) error
+}
+
+// VolumeMarkerStore manages volume registration markers in S3.
+type VolumeMarkerStore interface {
 	WriteVolumeMarker(name string) error
 	DeleteVolumeMarker(name string) error
 	ListVolumeMarkers() ([]string, error)
+}
+
+// LockStore manages lock objects in S3.
+type LockStore interface {
 	DeleteLockObjects() error
+}
+
+// RestorePointStore manages restore points in S3.
+type RestorePointStore interface {
 	WriteRestorePoint(vol string, rp RestorePoint) error
 	ReadRestorePoint(vol string) (*RestorePoint, error)
 	DeleteRestorePoint(vol string) error
+}
+
+// S3Store composes all narrower S3 interfaces for full store capabilities.
+// When only a subset of operations is needed, prefer the narrower interfaces
+// (ObjectStore, VolumeMarkerStore, LockStore, RestorePointStore).
+type S3Store interface {
+	ObjectStore
+	VolumeMarkerStore
+	LockStore
+	RestorePointStore
 }
 
 type S3Client struct {

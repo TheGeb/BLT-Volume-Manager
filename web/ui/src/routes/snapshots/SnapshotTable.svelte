@@ -139,7 +139,7 @@
       </thead>
     </table>
 
-    <ScrollArea.Root type="always" style="height:calc(100vh - 390px);overflow:hidden;">
+    <ScrollArea.Root type="always" style="height:calc(100vh - 460px);overflow:hidden;">
       <ScrollArea.Viewport style="height:100%;width:100%;">
         <div class="body-scroll-inner">
         <table class="body-table">

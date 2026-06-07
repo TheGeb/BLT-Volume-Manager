@@ -39,6 +39,27 @@ type SnapInfo struct {
 	zfsSnap    string
 }
 
+// Snapshotter defines filesystem-specific snapshot operations.
+// Implementations register themselves via init().
+type Snapshotter interface {
+	Type() Type
+	MatchFSType(fsType string) bool
+	CreateSnapshot(volPath, accessPath, volName string, info *SnapInfo) error
+	RemoveSnapshot(info *SnapInfo) error
+}
+
+var (
+	snapshotters = map[Type]Snapshotter{}
+	typeOrder    []Type
+)
+
+func register(s Snapshotter) {
+	t := s.Type()
+	snapshotters[t] = s
+	typeOrder = append(typeOrder, t)
+}
+
+// Detect determines the snapshot-capable filesystem type at path.
 func Detect(path string) Type {
 	applog.Debugf("detect_fs", "path=%s", path)
 	cmd := exec.Command("stat", "-f", "-c", "%T", path)
@@ -46,11 +67,11 @@ func Detect(path string) Type {
 	if err != nil {
 		return TypeNone
 	}
-	switch strings.TrimSpace(string(out)) {
-	case "btrfs":
-		return TypeBtrfs
-	case "zfs":
-		return TypeZFS
+	fsType := strings.TrimSpace(string(out))
+	for _, t := range typeOrder {
+		if s := snapshotters[t]; s != nil && s.MatchFSType(fsType) {
+			return t
+		}
 	}
 	return TypeNone
 }
@@ -109,45 +130,25 @@ func Create(volPath, snapDir, volName string) (*SnapInfo, error) {
 		Subtype:    t,
 	}
 
-	switch t {
-	case TypeNone:
+	s, ok := snapshotters[t]
+	if !ok {
 		return nil, fmt.Errorf("unsupported filesystem type for %s", volPath)
-	case TypeBtrfs:
-		if !IsSubvolume(volPath) {
-			return nil, fmt.Errorf("%s is not a btrfs subvolume; init with btrfs first", volPath)
-		}
-		if err := os.MkdirAll(snapDir, 0o755); err != nil {
-			return nil, fmt.Errorf("create snap dir: %w", err)
-		}
-		if err := btrfsCreate(volPath, accessPath); err != nil {
-			return nil, err
-		}
-	case TypeZFS:
-		dataset, err := zfsDataset(volPath)
-		if err != nil {
-			return nil, fmt.Errorf("resolve zfs dataset: %w", err)
-		}
-		snapName := volName + constants.ColdSnapSuffix
-		fullSnap := dataset + "@" + snapName
-		if err := zfsCreateSnapshot(fullSnap, accessPath); err != nil {
-			return nil, err
-		}
-		info.zfsSnap = fullSnap
 	}
-
+	if err := s.CreateSnapshot(volPath, accessPath, volName, info); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 
 func Remove(info *SnapInfo) error {
-	switch info.Subtype {
-	case TypeNone:
+	if info.Subtype == TypeNone {
 		return nil
-	case TypeBtrfs:
-		return btrfsRemove(info.AccessPath)
-	case TypeZFS:
-		return zfsRemoveSnapshot(info.zfsSnap, info.AccessPath)
 	}
-	return nil
+	s, ok := snapshotters[info.Subtype]
+	if !ok {
+		return nil
+	}
+	return s.RemoveSnapshot(info)
 }
 
 func ListOrphaned(snapDir string) ([]*SnapInfo, error) {

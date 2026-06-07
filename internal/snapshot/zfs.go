@@ -4,10 +4,41 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
 )
+
+type zfsSnapshotter struct{}
+
+func init() {
+	register(&zfsSnapshotter{})
+}
+
+func (z *zfsSnapshotter) Type() Type { return TypeZFS }
+
+func (z *zfsSnapshotter) MatchFSType(fsType string) bool {
+	return fsType == "zfs"
+}
+
+func (z *zfsSnapshotter) CreateSnapshot(volPath, accessPath, volName string, info *SnapInfo) error {
+	dataset, err := zfsDataset(volPath)
+	if err != nil {
+		return fmt.Errorf("resolve zfs dataset: %w", err)
+	}
+	snapName := filepath.Base(accessPath)
+	fullSnap := dataset + "@" + snapName
+	if err := zfsCreateSnapshot(fullSnap, accessPath); err != nil {
+		return err
+	}
+	info.zfsSnap = fullSnap
+	return nil
+}
+
+func (z *zfsSnapshotter) RemoveSnapshot(info *SnapInfo) error {
+	return zfsRemoveSnapshot(info.zfsSnap, info.AccessPath)
+}
 
 func zfsDataset(path string) (string, error) {
 	applog.Debugf("findmnt_lookup", "path=%s", path)

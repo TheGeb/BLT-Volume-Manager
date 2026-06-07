@@ -329,7 +329,7 @@
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
   {:else}
-    <div class="tree-scroll-root" style="height:calc(100vh - 320px);overflow:hidden auto;">
+    <div class="tree-scroll-root" style="height:calc(100vh - 360px);overflow:hidden auto;">
       <div class="tree">
         {#each flatItems as item, idx (item.path)}
           <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>

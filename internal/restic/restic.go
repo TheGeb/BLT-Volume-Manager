@@ -55,12 +55,18 @@ func (m *Manager) GenerateHash(s Snapshot) string {
 
 // Manager wraps restic operations for a single repository.
 type Manager struct {
-	repo    string
-	s3Store store.S3Store
+	repo       string
+	restorePts store.RestorePointStore
 }
 
-func (m *Manager) SetS3Store(s3Store store.S3Store) {
-	m.s3Store = s3Store
+// SetS3Store configures the restore point store. Deprecated: prefer SetRestorePointStore.
+func (m *Manager) SetS3Store(rps store.RestorePointStore) {
+	m.restorePts = rps
+}
+
+// SetRestorePointStore configures the restore point store.
+func (m *Manager) SetRestorePointStore(rps store.RestorePointStore) {
+	m.restorePts = rps
 }
 
 type Snapshot struct {
@@ -397,8 +403,8 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 	if snapshotID == "" {
 		return errors.New("snapshot ID is required")
 	}
-	if m.s3Store == nil {
-		return errors.New("S3 store not configured for restore points")
+	if m.restorePts == nil {
+		return errors.New("restore point store not configured")
 	}
 
 	var fallbackHash string
@@ -411,7 +417,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 		SnapshotID:   snapshotID,
 		FallbackHash: fallbackHash,
 	}
-	if err := m.s3Store.WriteRestorePoint(volume, rp); err != nil {
+	if err := m.restorePts.WriteRestorePoint(volume, rp); err != nil {
 		return fmt.Errorf("write restore point: %w", err)
 	}
 
@@ -421,7 +427,7 @@ func (m *Manager) SetRestorePoint(snapshotID, volume string) error {
 // FindRestorePoint reads the restore-point from S3 for the given volume path.
 // Returns the snapshot ID string, or empty string if none found.
 func (m *Manager) FindRestorePoint(volPath string) (string, error) {
-	if m.s3Store == nil {
+	if m.restorePts == nil {
 		return "", nil
 	}
 
@@ -430,7 +436,7 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 		return "", nil
 	}
 
-	rp, err := m.s3Store.ReadRestorePoint(targetVolume)
+	rp, err := m.restorePts.ReadRestorePoint(targetVolume)
 	if err != nil {
 		if errors.Is(err, store.ErrRestorePointNotFound) {
 			return "", nil
@@ -446,14 +452,14 @@ func (m *Manager) FindRestorePoint(volPath string) (string, error) {
 // FindRestorePointByName reads the restore-point from S3 for the given volume name.
 // Returns the snapshot ID string, or empty string if none found.
 func (m *Manager) FindRestorePointByName(volName string) (string, error) {
-	if m.s3Store == nil {
+	if m.restorePts == nil {
 		return "", nil
 	}
 	if volName == "" {
 		return "", nil
 	}
 
-	rp, err := m.s3Store.ReadRestorePoint(volName)
+	rp, err := m.restorePts.ReadRestorePoint(volName)
 	if err != nil {
 		if errors.Is(err, store.ErrRestorePointNotFound) {
 			return "", nil
@@ -468,10 +474,10 @@ func (m *Manager) FindRestorePointByName(volName string) (string, error) {
 
 // DeleteRestorePoint removes the restore-point from S3 for the given volume.
 func (m *Manager) DeleteRestorePoint(volume string) error {
-	if m.s3Store == nil {
+	if m.restorePts == nil {
 		return nil
 	}
-	return m.s3Store.DeleteRestorePoint(volume)
+	return m.restorePts.DeleteRestorePoint(volume)
 }
 
 func (m *Manager) findSnapshotByID(snapshotID string) (*Snapshot, error) {
