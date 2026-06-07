@@ -12,6 +12,7 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/store"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
@@ -194,12 +195,16 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]any, error) {
 		validObjects = append(validObjects, obj)
 	}
 
-	key, owner := store.FilterValidLocks(s3, validObjects)
-	if key != "" && owner != nil {
+	key, owner, expiry := store.FilterValidLocksByKey(s3, validObjects)
+	if key != "" {
 		result["locked"] = true
-		result["owner"] = owner.Name
-		if owner.ExpiryTime > 0 {
-			result["expires_in"] = owner.GetRemainingTimeInSeconds()
+		result["owner"] = owner
+		if expiry > 0 {
+			remaining := expiry - time.Now().Unix()
+			if remaining < 0 {
+				remaining = 0
+			}
+			result["expires_in"] = remaining
 		}
 	}
 
@@ -212,16 +217,75 @@ func (s *Server) handleVolumesLocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	volumes := s.volumeNames()
-	locks := make(map[string]map[string]any, len(volumes))
-	for _, vol := range volumes {
-		status, err := s.getVolumeLock(vol)
-		if err != nil {
-			locks[vol] = map[string]any{"volume": vol, "locked": false}
+	locks := make(map[string]map[string]any)
+
+	if s.s3Bucket == "" {
+		respondJSON(w, map[string]any{"locks": locks})
+		return
+	}
+
+	s3, err := store.NewS3Store(store.S3StoreConfig{
+		S3Bucket:   s.s3Bucket,
+		S3Endpoint: s.s3Endpoint,
+		Region:     s.s3Region,
+		Logger:     s3LogFn(),
+	})
+	if err != nil || s3 == nil {
+		respondJSON(w, map[string]any{"locks": locks})
+		return
+	}
+
+	objects, listErr := s3.ListObjects(store.LockPrefix)
+	if listErr != nil {
+		respondJSON(w, map[string]any{"locks": locks})
+		return
+	}
+
+	lockTTL := constants.DefaultLockTTL
+	var kept []types.Object
+	for _, obj := range objects {
+		if obj.Key == nil {
 			continue
 		}
-		locks[vol] = status
+		if obj.LastModified != nil && time.Since(*obj.LastModified) > lockTTL {
+			_ = s3.DeleteObject(*obj.Key)
+			continue
+		}
+		kept = append(kept, obj)
 	}
+
+	grouped := make(map[string][]types.Object)
+	for _, obj := range kept {
+		vol, _, _, err := store.ParseLockKey(*obj.Key)
+		if err != nil && !errors.Is(err, store.ErrOldLockKeyFormat) {
+			continue
+		}
+		if vol == "" {
+			continue
+		}
+		grouped[vol] = append(grouped[vol], obj)
+	}
+
+	for vol, objs := range grouped {
+		store.SortLockObjects(objs)
+		key, owner, expiry := store.FilterValidLocksByKey(s3, objs)
+		if key != "" {
+			result := map[string]any{
+				"volume": vol,
+				"locked": true,
+				"owner":  owner,
+			}
+			if expiry > 0 {
+				remaining := expiry - time.Now().Unix()
+				if remaining < 0 {
+					remaining = 0
+				}
+				result["expires_in"] = remaining
+			}
+			locks[vol] = result
+		}
+	}
+
 	respondJSON(w, map[string]any{"locks": locks})
 }
 
@@ -243,7 +307,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string, lockDurationMins
 		expiry = time.Now().Add(time.Duration(lockDurationMins) * time.Minute).Unix()
 	}
 	folder := store.LockFolder(volumeName)
-	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, time.Now().UnixNano())
+	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, expiry)
 
 	proposal := store.LockOwner{Name: ownerName, ExpiryTime: expiry}
 	data, err := json.Marshal(proposal)
@@ -284,7 +348,7 @@ func (s *Server) createVolumeLock(volumeName, ownerName string, lockDurationMins
 		store.SortLockObjects(objects)
 	}
 
-	key, _ := store.FilterValidLocks(s3, objects)
+	key, _, _ := store.FilterValidLocksByKey(s3, objects)
 	if key != myKey {
 		if err := s3.DeleteObject(myKey); err != nil {
 			logError("cleanup_proposal_failed", err)

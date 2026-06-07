@@ -58,7 +58,7 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 	myName := fmt.Sprintf("%s-%d", store.Hostname(), os.Getpid())
 	expiry := time.Now().Add(time.Minute * time.Duration(s.maxHoldMins+2)).Unix()
-	myKey := fmt.Sprintf("%s%s-%d.json", folder, myName, time.Now().UnixNano())
+	myKey := fmt.Sprintf("%s%s-%d.json", folder, myName, expiry)
 
 	proposal := store.LockOwner{Name: myName, ExpiryTime: expiry}
 	data, err := json.Marshal(proposal)
@@ -80,7 +80,7 @@ func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 
 	store.SortLockObjects(objects)
 
-	key, _ := store.FilterValidLocks(s3, objects)
+	key, _, _ := store.FilterValidLocksByKey(s3, objects)
 	if key == "" {
 		if derr := s3.DeleteObject(myKey); derr != nil {
 			applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
@@ -113,6 +113,6 @@ func (l *s3Lock) IsValid() (bool, error) {
 	}
 
 	store.SortLockObjects(objects)
-	key, _ := store.FilterValidLocks(l.store, objects)
+	key, _, _ := store.FilterValidLocksByKey(l.store, objects)
 	return key == l.myKey, nil
 }
