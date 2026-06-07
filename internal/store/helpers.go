@@ -55,7 +55,7 @@ func FilterValidLocks(s3 ObjectStore, objects []types.Object) (firstKey string, 
 		if err := json.Unmarshal(raw, &o); err != nil {
 			continue
 		}
-		if o.GetRemainingTimeInSeconds() <= 0 {
+		if o.ExpiryTime > 0 && o.GetRemainingTimeInSeconds() <= 0 {
 			_ = s3.DeleteObject(*obj.Key)
 			continue
 		}

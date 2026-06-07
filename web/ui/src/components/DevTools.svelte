@@ -10,6 +10,7 @@
   let activeDialog: 'volume' | 'snapshot' | 'lock' | null = null;
   let inputName = '';
   let inputOwner = 'test-user';
+  let lockDurationMins = 0;
   let devEl: HTMLElement;
 
   function toggle() { open = !open; }
@@ -31,6 +32,7 @@
     activeDialog = d;
     inputName = d === 'volume' ? '' : d === 'lock' ? volume : defaultVolume('test/example');
     inputOwner = 'test-user';
+    lockDurationMins = 0;
   }
 
   function closeDialog() { activeDialog = null; inputName = ''; inputOwner = ''; }
@@ -53,7 +55,7 @@
   function submitLock() {
     const vol = inputName.trim();
     const owner = inputOwner.trim();
-    if (vol && owner) void submit(() => api.createLock(vol, owner));
+    if (vol && owner) void submit(() => api.createLock(vol, owner, lockDurationMins));
   }
 </script>
 
@@ -87,9 +89,13 @@
           on:keydown={(e) => e.key === 'Enter' && (activeDialog === 'volume' ? submitVolume() : activeDialog === 'snapshot' ? submitSnapshot() : submitLock())} />
         {#if activeDialog === 'lock'}
           <input class="input modal-input" type="text" placeholder="Owner"
-            style="margin-bottom:12px;"
+            style="margin-bottom:8px;"
             bind:value={inputOwner}
             on:keydown={(e) => e.key === 'Enter' && submitLock()} />
+          <label style="display:flex;align-items:center;font-size:0.85rem;color:var(--muted);margin-bottom:12px;">
+            Duration (min):
+            <input class="input modal-input" type="number" bind:value={lockDurationMins} min="0" placeholder="0 = none" style="width:80px;margin-left:8px;" />
+          </label>
         {/if}
         <div class="modal-footer">
           <Button.Root class="button button-secondary" onclick={closeDialog}>Cancel</Button.Root>

@@ -8,6 +8,9 @@ type LockOwner struct {
 }
 
 func (l *LockOwner) GetRemainingTimeInSeconds() int64 {
+	if l.ExpiryTime == 0 {
+		return 1<<62 - 1
+	}
 	return l.ExpiryTime - time.Now().Unix()
 }
 

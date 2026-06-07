@@ -94,11 +94,11 @@ export async function fetchAllLockStatus(): Promise<Record<string, LockStatus>> 
   return data.locks ?? {};
 }
 
-export async function createLock(volume: string, owner?: string): Promise<void> {
+export async function createLock(volume: string, owner?: string, durationMinutes?: number): Promise<void> {
   await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner }),
+    body: JSON.stringify({ owner, lock_duration_mins: durationMinutes ?? 0 }),
   });
 }
 

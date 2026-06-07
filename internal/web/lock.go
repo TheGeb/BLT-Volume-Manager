@@ -71,7 +71,8 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, status)
 	case http.MethodPost:
 		var reqBody struct {
-			Owner string `json:"owner"`
+			Owner            string `json:"owner"`
+			LockDurationMins int    `json:"lock_duration_mins"`
 		}
 		if r.Body != nil {
 			if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
@@ -79,7 +80,7 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		lock, err := s.createVolumeLock(volumeName, reqBody.Owner)
+		lock, err := s.createVolumeLock(volumeName, reqBody.Owner, reqBody.LockDurationMins)
 		if err != nil {
 			respondError(w, err, http.StatusInternalServerError)
 			return
@@ -197,7 +198,9 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]any, error) {
 	if key != "" && owner != nil {
 		result["locked"] = true
 		result["owner"] = owner.Name
-		result["expires_in"] = owner.GetRemainingTimeInSeconds()
+		if owner.ExpiryTime > 0 {
+			result["expires_in"] = owner.GetRemainingTimeInSeconds()
+		}
 	}
 
 	return result, nil
@@ -222,7 +225,7 @@ func (s *Server) handleVolumesLocks(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, map[string]any{"locks": locks})
 }
 
-func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]any, error) {
+func (s *Server) createVolumeLock(volumeName, ownerName string, lockDurationMins int) (map[string]any, error) {
 	if s.s3Bucket == "" {
 		return nil, errors.New("S3_LOCK_BUCKET, RESTIC_REPOSITORY, or S3_ENDPOINT must be configured")
 	}
@@ -235,7 +238,10 @@ func (s *Server) createVolumeLock(volumeName, ownerName string) (map[string]any,
 	if ownerName == "" {
 		ownerName = fmt.Sprintf("webadmin-%s-%d", store.Hostname(), os.Getpid())
 	}
-	expiry := time.Now().Add(24 * time.Hour).Unix()
+	var expiry int64
+	if lockDurationMins > 0 {
+		expiry = time.Now().Add(time.Duration(lockDurationMins) * time.Minute).Unix()
+	}
 	folder := store.LockFolder(volumeName)
 	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, time.Now().UnixNano())
 
