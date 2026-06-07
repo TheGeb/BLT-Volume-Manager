@@ -27,11 +27,15 @@ func requireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return vol, true
 }
 
+type VersionRange struct {
+	Major int
+	Minor int
+}
+
 type SnapshotFilter struct {
-	TimeFrom, TimeTo                 *time.Time
-	TimeOfDayFrom, TimeOfDayTo       *int
-	VersionFromMajor, VersionToMajor *int
-	VersionFromMinor, VersionToMinor *int
+	TimeFrom, TimeTo           *time.Time
+	TimeOfDayFrom, TimeOfDayTo *int
+	VersionFrom, VersionTo     *VersionRange
 }
 
 func parseVersionParam(s string) (major, minor int, ok bool) {
@@ -45,6 +49,17 @@ func parseVersionParam(s string) (major, minor int, ok bool) {
 		return 0, 0, false
 	}
 	return maj, min, true
+}
+
+func parseVersionTag(tags []string) (major, minor int, ok bool) {
+	for _, t := range tags {
+		if rest, found := strings.CutPrefix(t, "v"); found {
+			if maj, min, ok := parseVersionParam(rest); ok {
+				return maj, min, true
+			}
+		}
+	}
+	return 0, 0, false
 }
 
 func applySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Snapshot {
@@ -68,30 +83,18 @@ func applySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Sn
 				continue
 			}
 		}
-		if f.VersionFromMajor != nil || f.VersionToMajor != nil {
-			vt := findVersionTag(sn.Tags)
-			if vt == "" {
-				continue
-			}
-			maj, min, ok := parseVersionParam(vt)
+		if f.VersionFrom != nil || f.VersionTo != nil {
+			maj, min, ok := parseVersionTag(sn.Tags)
 			if !ok {
 				continue
 			}
-			if f.VersionFromMajor != nil {
-				fmaj, fmin := *f.VersionFromMajor, 0
-				if f.VersionFromMinor != nil {
-					fmin = *f.VersionFromMinor
-				}
-				if maj < fmaj || (maj == fmaj && min < fmin) {
+			if f.VersionFrom != nil {
+				if maj < f.VersionFrom.Major || (maj == f.VersionFrom.Major && min < f.VersionFrom.Minor) {
 					continue
 				}
 			}
-			if f.VersionToMajor != nil {
-				tmaj, tmin := *f.VersionToMajor, 0
-				if f.VersionToMinor != nil {
-					tmin = *f.VersionToMinor
-				}
-				if maj > tmaj || (maj == tmaj && min > tmin) {
+			if f.VersionTo != nil {
+				if maj > f.VersionTo.Major || (maj == f.VersionTo.Major && min > f.VersionTo.Minor) {
 					continue
 				}
 			}
@@ -99,23 +102,6 @@ func applySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Sn
 		out = append(out, sn)
 	}
 	return out
-}
-
-func findVersionTag(tags []string) string {
-	for _, t := range tags {
-		if strings.HasPrefix(t, "v") {
-			rest := t[1:]
-			parts := strings.SplitN(rest, ".", 2)
-			if len(parts) == 2 {
-				if _, err := strconv.Atoi(parts[0]); err == nil {
-					if _, err := strconv.Atoi(parts[1]); err == nil {
-						return rest
-					}
-				}
-			}
-		}
-	}
-	return ""
 }
 
 func (s *Server) snapshotListResponse(volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (map[string]any, error) {
@@ -180,45 +166,48 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 	}
 
 	var filter *SnapshotFilter
+	ensureFilter := func() {
+		if filter == nil {
+			filter = &SnapshotFilter{}
+		}
+	}
 
 	if tf := r.URL.Query().Get("timeFrom"); tf != "" {
 		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
 			t := time.UnixMilli(n)
-			filter = initFilter(filter)
+			ensureFilter()
 			filter.TimeFrom = &t
 		}
 	}
 	if tf := r.URL.Query().Get("timeTo"); tf != "" {
 		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
 			t := time.UnixMilli(n)
-			filter = initFilter(filter)
+			ensureFilter()
 			filter.TimeTo = &t
 		}
 	}
 	if tod := r.URL.Query().Get("timeOfDayFrom"); tod != "" {
 		if n, err := strconv.Atoi(tod); err == nil {
-			filter = initFilter(filter)
+			ensureFilter()
 			filter.TimeOfDayFrom = &n
 		}
 	}
 	if tod := r.URL.Query().Get("timeOfDayTo"); tod != "" {
 		if n, err := strconv.Atoi(tod); err == nil {
-			filter = initFilter(filter)
+			ensureFilter()
 			filter.TimeOfDayTo = &n
 		}
 	}
 	if vf := r.URL.Query().Get("versionFrom"); vf != "" {
 		if maj, min, ok := parseVersionParam(vf); ok {
-			filter = initFilter(filter)
-			filter.VersionFromMajor = &maj
-			filter.VersionFromMinor = &min
+			ensureFilter()
+			filter.VersionFrom = &VersionRange{Major: maj, Minor: min}
 		}
 	}
 	if vt := r.URL.Query().Get("versionTo"); vt != "" {
 		if maj, min, ok := parseVersionParam(vt); ok {
-			filter = initFilter(filter)
-			filter.VersionToMajor = &maj
-			filter.VersionToMinor = &min
+			ensureFilter()
+			filter.VersionTo = &VersionRange{Major: maj, Minor: min}
 		}
 	}
 
@@ -232,13 +221,6 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 		opts = &restic.ListSnapshotsOpts{Hosts: hosts, Latest: latest, Tags: tags}
 	}
 	return opts, filter, offset, limit
-}
-
-func initFilter(f *SnapshotFilter) *SnapshotFilter {
-	if f == nil {
-		return &SnapshotFilter{}
-	}
-	return f
 }
 
 func respondError(w http.ResponseWriter, err error, status int) {

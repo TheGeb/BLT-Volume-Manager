@@ -10,11 +10,10 @@
   import { parseVersion } from '$lib/util';
   import DropSelect from '../../components/DropSelect.svelte';
   import DateTimeRange from './DateTimeRange.svelte';
+  import VersionRangeInputs from '../../components/VersionRangeInputs.svelte';
 
   let host = $hostFilter;
   let tags: string[] = $typeFilter !== 'all' ? [$typeFilter] : [];
-  let vfMajor = ''; let vfMinor = '';
-  let vtMajor = ''; let vtMinor = '';
   let committedVfMajor = ''; let committedVfMinor = '';
   let committedVtMajor = ''; let committedVtMinor = '';
   let dateOpen = false;
@@ -23,6 +22,7 @@
   let localTimeTo: number | undefined = undefined;
   let localTimeOfDayFrom: number | undefined = undefined;
   let localTimeOfDayTo: number | undefined = undefined;
+  let versionInputs: VersionRangeInputs;
 
   $: dateLabel = computeDateLabel(localTimeFrom, localTimeTo, localTimeOfDayFrom, localTimeOfDayTo);
 
@@ -31,7 +31,7 @@
     tdf: number | undefined, tdt: number | undefined,
   ): string {
     if (tdf !== undefined || tdt !== undefined) {
-      return fmtSOT(tdf) + '–' + fmtSOT(tdt);
+      return fmtSOT(tdf) + '\u2013' + fmtSOT(tdt);
     }
     if (tf !== undefined || tt !== undefined) {
       const from = fmtTS(tf);
@@ -40,9 +40,9 @@
         const ft = timePart(tf);
         const ttPart = timePart(tt);
         if (!ft && !ttPart) return from;
-        return from.split(' (')[0] + ' (' + (ft || '12 AM') + ' – ' + (ttPart || '12 AM') + ')';
+        return from.split(' (')[0] + ' (' + (ft || '12 AM') + ' \u2013 ' + (ttPart || '12 AM') + ')';
       }
-      return from + ' – ' + to;
+      return from + ' \u2013 ' + to;
     }
     return 'Any date';
   }
@@ -67,7 +67,7 @@
   }
 
   function fmtTS(ts: number | undefined): string {
-    if (ts === undefined) return '…';
+    if (ts === undefined) return '\u2026';
     const d = new Date(ts);
     const date = String(d.getUTCMonth() + 1) + '/' + String(d.getUTCDate());
     const h = d.getUTCHours();
@@ -100,20 +100,6 @@
 
   $: versionLabel = computeVersionLabel(committedVfMajor, committedVfMinor, committedVtMajor, committedVtMinor);
   $: versionActive = versionLabel !== 'Any version';
-  $: versionChanged = (() => {
-    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
-    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
-    return from !== $versionFrom || to !== $versionTo;
-  })();
-  $: versionInvalid = (() => {
-    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
-    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
-    if (!from || !to) return false;
-    const fp = parseVersion(from);
-    const tp = parseVersion(to);
-    if (!fp || !tp) return false;
-    return tp.major < fp.major || (tp.major === fp.major && tp.minor < fp.minor);
-  })();
 
   function computeVersionLabel(fm: string, fn: string, tm: string, tn: string): string {
     const from = fmtVersion(fm, fn);
@@ -135,19 +121,24 @@
     return trimmed ? `${mNum}.${trimmed}` : String(mNum);
   }
 
-  function clearVersionPanel() {
-    vfMajor = ''; vfMinor = '';
-    vtMajor = ''; vtMinor = '';
-    committedVfMajor = ''; committedVfMinor = '';
-    committedVtMajor = ''; committedVtMinor = '';
+  function handleVersionOpenChange(o: boolean) {
+    versionOpen = o;
+    if (o) versionInputs?.loadFields();
   }
 
-  function commitVersion() {
-    if (versionInvalid) return;
-    committedVfMajor = vfMajor;
-    committedVfMinor = vfMinor;
-    committedVtMajor = vtMajor;
-    committedVtMinor = vtMinor;
+  function commitVersion(from: string, to: string) {
+    const f = parseVersion(from);
+    committedVfMajor = f ? String(f.major) : '';
+    committedVfMinor = f ? String(f.minor) : '';
+    const t = parseVersion(to);
+    committedVtMajor = t ? String(t.major) : '';
+    committedVtMinor = t ? String(t.minor) : '';
+    versionOpen = false;
+  }
+
+  function clearVersionPreview() {
+    committedVfMajor = ''; committedVfMinor = '';
+    committedVtMajor = ''; committedVtMinor = '';
   }
 
   function handleTimeFilter(from?: number, to?: number) {
@@ -176,15 +167,11 @@
 
   function loadVersionFields() {
     const f = parseVersion($versionFrom);
-    vfMajor = f ? String(f.major) : '';
-    vfMinor = f ? String(f.minor) : '';
-    committedVfMajor = vfMajor;
-    committedVfMinor = vfMinor;
+    committedVfMajor = f ? String(f.major) : '';
+    committedVfMinor = f ? String(f.minor) : '';
     const t = parseVersion($versionTo);
-    vtMajor = t ? String(t.major) : '';
-    vtMinor = t ? String(t.minor) : '';
-    committedVtMajor = vtMajor;
-    committedVtMinor = vtMinor;
+    committedVtMajor = t ? String(t.major) : '';
+    committedVtMinor = t ? String(t.minor) : '';
   }
 
   function toggleTag(tag: string) {
@@ -207,11 +194,14 @@
     || $tableVersionFilterActive;
 
   function search() {
-    commitVersion();
+    if (versionInputs) {
+      const vals = versionInputs.getValues();
+      commitVersion(vals.from, vals.to);
+    }
     hostFilter.set(host);
     typeFilter.set(tags.length > 0 ? tags[0]! : 'all');
-    const from = vfMajor || vfMinor ? `${vfMajor || '0'}.${vfMinor || '0'}` : '';
-    const to = vtMajor || vtMinor ? `${vtMajor || '0'}.${vtMinor || '0'}` : '';
+    const from = committedVfMajor || committedVfMinor ? `${committedVfMajor || '0'}.${committedVfMinor || '0'}` : '';
+    const to = committedVtMajor || committedVtMinor ? `${committedVtMajor || '0'}.${committedVtMinor || '0'}` : '';
     versionFrom.set(from);
     versionTo.set(to);
     const overrides: Record<string, number | undefined> = {};
@@ -225,8 +215,6 @@
   function clear() {
     host = '';
     tags = [];
-    vfMajor = ''; vfMinor = '';
-    vtMajor = ''; vtMinor = '';
     committedVfMajor = ''; committedVfMinor = '';
     committedVtMajor = ''; committedVtMinor = '';
     localTimeFrom = undefined;
@@ -243,10 +231,6 @@
     timeOfDayTo.set(undefined);
     versionFilterClearKey.update(n => n + 1);
     reloadWithFilters();
-  }
-
-  function cleanDigits(v: string): string {
-    return v.replace(/[^0-9]/g, '');
   }
 </script>
 
@@ -280,36 +264,19 @@
   </div>
   <div class="search-field">
     <span class="search-label">Version</span>
-    <Popover.Root open={versionOpen} onOpenChange={(o) => versionOpen = o}>
+    <Popover.Root bind:open={versionOpen} onOpenChange={handleVersionOpenChange}>
       <Popover.Trigger class="version-trigger {versionActive ? 'version-trigger-active' : ''}">
         {versionLabel}
         <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
       </Popover.Trigger>
       <Popover.Content class="version-popover">
-        <div class="version-range-filter">
-          <div class="version-range-section">
-            <span class="filter-label">from</span>
-            <div class="version-input-group">
-              <span class="version-prefix">v</span>
-              <input type="text" placeholder="0" class="version-segment version-num" bind:value={vfMajor} on:input={() => { vfMajor = cleanDigits(vfMajor); }} size={vfMajor.length || 1}>
-              <span class="version-dot">.</span>
-              <input type="text" placeholder="0" class="version-segment version-num" bind:value={vfMinor} on:input={() => { vfMinor = cleanDigits(vfMinor); }} size={vfMinor.length || 1}>
-            </div>
-          </div>
-          <div class="version-range-section">
-            <span class="filter-label">to</span>
-            <div class="version-input-group">
-              <span class="version-prefix">v</span>
-              <input type="text" placeholder="0" class="version-segment version-num" bind:value={vtMajor} on:input={() => { vtMajor = cleanDigits(vtMajor); }} size={vtMajor.length || 1}>
-              <span class="version-dot">.</span>
-              <input type="text" placeholder="0" class="version-segment version-num" bind:value={vtMinor} on:input={() => { vtMinor = cleanDigits(vtMinor); }} size={vtMinor.length || 1}>
-            </div>
-          </div>
-          <div class="filter-actions">
-            <Popover.Close class="apply-btn {versionChanged && !versionInvalid ? 'apply-btn-active' : ''} {versionInvalid ? 'apply-btn-invalid' : ''}" onclick={commitVersion}>Apply</Popover.Close>
-            <button class="clear-btn" class:clear-btn-active={!!(vfMajor || vfMinor || vtMajor || vtMinor)} on:click={clearVersionPanel}>Clear</button>
-          </div>
-        </div>
+        <VersionRangeInputs
+          bind:this={versionInputs}
+          from={committedVfMajor || committedVfMinor ? `${committedVfMajor || '0'}.${committedVfMinor || '0'}` : ''}
+          to={committedVtMajor || committedVtMinor ? `${committedVtMajor || '0'}.${committedVtMinor || '0'}` : ''}
+          onApply={commitVersion}
+          onClear={clearVersionPreview}
+        />
       </Popover.Content>
     </Popover.Root>
   </div>
@@ -386,80 +353,45 @@
     color: #fff;
   }
 
-  .version-input-group {
+  :global(.version-trigger) {
     display: inline-flex;
     align-items: center;
-    gap: 1px;
-    padding: 5px 8px;
+    gap: 8px;
+    padding: 8px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--surface-strong);
-    transition: background 0.15s, border-color 0.15s;
+    color: var(--muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
   }
 
-  .version-input-group:hover {
+  :global(.version-trigger:hover) {
     background: var(--hover-bg);
+    color: var(--text);
     border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
   }
 
-  .version-input-group:focus-within {
+  :global(.version-trigger[data-state="open"]) {
     background: var(--hover-bg);
+    color: var(--text);
     border-color: var(--muted);
   }
 
-  .version-prefix,
-  .version-dot {
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.85rem;
-    color: var(--muted);
-    padding: 0 1px;
-    user-select: none;
-  }
-
-  .version-segment {
-    padding: 1px 2px;
-    border-radius: 3px;
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: var(--text);
-    white-space: pre;
-  }
-
-  .version-segment:hover {
-    background: var(--hover-bg);
-  }
-
-  .version-segment:focus {
+  :global(.version-trigger-active) {
     background: var(--hover-bg);
     color: var(--text);
+    border-color: var(--muted);
   }
 
-  .version-num {
-    width: auto;
-    min-width: 20px;
-    max-width: 80px;
-    background: transparent;
-    border: none;
-    color: inherit;
-    font: inherit;
-    font-weight: 400;
-    text-align: center;
-    padding: 0 1px;
-  }
-
-  .version-num::placeholder {
-    color: var(--muted);
-  }
-
-  .version-num:focus {
-    outline: none;
+  :global(.version-trigger-active:hover) {
     background: var(--hover-bg);
-    border-radius: 3px;
-  }
-
-  .version-num:focus::placeholder {
-    opacity: 0;
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
   }
 
   :global(.date-trigger) {
@@ -508,47 +440,6 @@
     opacity: 0.6;
   }
 
-  :global(.version-trigger) {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface-strong);
-    color: var(--muted);
-    font-size: 0.85rem;
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
-    font-family: inherit;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-  }
-
-  :global(.version-trigger:hover) {
-    background: var(--hover-bg);
-    color: var(--text);
-    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
-  }
-
-  :global(.version-trigger[data-state="open"]) {
-    background: var(--hover-bg);
-    color: var(--text);
-    border-color: var(--muted);
-  }
-
-  :global(.version-trigger-active) {
-    background: var(--hover-bg);
-    color: var(--text);
-    border-color: var(--muted);
-  }
-
-  :global(.version-trigger-active:hover) {
-    background: var(--hover-bg);
-    color: var(--text);
-    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
-  }
-
   :global(.version-popover) {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -556,93 +447,6 @@
     padding: 8px 12px;
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     z-index: 100;
-  }
-
-  .version-range-filter {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .version-range-section {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .filter-label {
-    font-size: 0.65rem;
-    color: var(--muted);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .filter-actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 2px;
-  }
-
-  :global(.version-popover .apply-btn) {
-    background: var(--hover-bg);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.15s, color 0.15s;
-  }
-
-  :global(.version-popover .apply-btn:hover) {
-    background: var(--hover-bg);
-  }
-
-  :global(.version-popover .apply-btn-active) {
-    background: var(--accent);
-    color: #fff;
-    border-color: transparent;
-  }
-
-  :global(.version-popover .apply-btn-active:hover) {
-    background: color-mix(in srgb, var(--accent) 80%, #000);
-  }
-
-  :global(.version-popover .apply-btn-invalid) {
-    background: var(--hover-bg);
-    color: var(--muted);
-    border-color: var(--border);
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .clear-btn {
-    background: var(--hover-bg);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 0.75rem;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-
-  .clear-btn:hover {
-    background: var(--hover-bg);
-  }
-
-  .clear-btn-active {
-    background: var(--red-bg);
-    color: var(--red);
-    border-color: var(--red);
-  }
-
-  .clear-btn-active:hover {
-    background: rgb(248 113 113 / 20%);
   }
 
   :global(.date-popover) {

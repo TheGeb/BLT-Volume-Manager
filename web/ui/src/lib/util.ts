@@ -47,3 +47,24 @@ export function parseVersion(v: string): { major: number; minor: number } | null
 	if (isNaN(major) || isNaN(minor)) return null;
 	return { major, minor };
 }
+
+export function matchesVersionRange(
+	tags: string[],
+	from?: string,
+	to?: string,
+): boolean {
+	if (!from && !to) return true;
+	const vt = tags.find(t => /^v\d+\.\d+$/.test(t));
+	if (!vt) return false;
+	const sv = parseVersion(vt);
+	if (!sv) return false;
+	if (from) {
+		const fv = parseVersion(from);
+		if (fv && (sv.major < fv.major || (sv.major === fv.major && sv.minor < fv.minor))) return false;
+	}
+	if (to) {
+		const tv = parseVersion(to);
+		if (tv && (sv.major > tv.major || (sv.major === tv.major && sv.minor > tv.minor))) return false;
+	}
+	return true;
+}

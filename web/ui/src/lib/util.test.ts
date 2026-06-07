@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatDuration, escapeHtml } from './util';
+import { formatBytes, formatDuration, escapeHtml, versionTag, parseVersion, matchesVersionRange } from './util';
 
 describe('formatBytes', () => {
   it('formats zero bytes', () => {
@@ -132,5 +132,72 @@ describe('escapeHtml', () => {
     expect(escapeHtml('<a href="test">click</a>')).toBe(
       '&lt;a href="test"&gt;click&lt;/a&gt;'
     );
+  });
+});
+
+describe('versionTag', () => {
+  it('finds vM.N tag', () => {
+    expect(versionTag(['hot', 'v1.2', 'cold'])).toBe('v1.2');
+  });
+
+  it('returns undefined when no version tag', () => {
+    expect(versionTag(['hot', 'cold'])).toBeUndefined();
+  });
+
+  it('skips tags without dot', () => {
+    expect(versionTag(['v1'])).toBeUndefined();
+  });
+
+  it('skips non-numeric tags', () => {
+    expect(versionTag(['vx.y'])).toBeUndefined();
+  });
+});
+
+describe('parseVersion', () => {
+  it('parses v1.2', () => {
+    expect(parseVersion('v1.2')).toEqual({ major: 1, minor: 2 });
+  });
+
+  it('parses 3.0', () => {
+    expect(parseVersion('3.0')).toEqual({ major: 3, minor: 0 });
+  });
+
+  it('returns null for invalid', () => {
+    expect(parseVersion('abc')).toBeNull();
+  });
+});
+
+describe('matchesVersionRange', () => {
+  const tags = ['v2.5', 'hot'];
+
+  it('returns true when no range specified', () => {
+    expect(matchesVersionRange(tags)).toBe(true);
+    expect(matchesVersionRange(tags, '', '')).toBe(true);
+  });
+
+  it('returns false when no version tag present', () => {
+    expect(matchesVersionRange(['hot'], 'v1.0')).toBe(false);
+  });
+
+  it('filters by from only', () => {
+    expect(matchesVersionRange(tags, 'v2.0')).toBe(true);
+    expect(matchesVersionRange(tags, 'v3.0')).toBe(false);
+  });
+
+  it('filters by to only', () => {
+    expect(matchesVersionRange(tags, undefined, 'v2.0')).toBe(false);
+    expect(matchesVersionRange(tags, undefined, 'v3.0')).toBe(true);
+  });
+
+  it('filters by range', () => {
+    expect(matchesVersionRange(tags, 'v2.0', 'v3.0')).toBe(true);
+    expect(matchesVersionRange(tags, 'v3.0', 'v4.0')).toBe(false);
+  });
+
+  it('handles minor version comparison', () => {
+    expect(matchesVersionRange(['v2.5'], 'v2.5')).toBe(true);
+    expect(matchesVersionRange(['v2.5'], 'v2.6')).toBe(false);
+    expect(matchesVersionRange(['v2.5'], undefined, 'v2.4')).toBe(false);
+    expect(matchesVersionRange(['v2.5'], undefined, 'v2.5')).toBe(true);
   });
 });
