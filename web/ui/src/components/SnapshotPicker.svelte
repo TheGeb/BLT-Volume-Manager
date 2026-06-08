@@ -420,65 +420,51 @@
     {:else if pickerSnapshots.length === 0}
       <div class="picker-empty">No snapshots found</div>
     {:else}
-      {#each pickerSnapshots as sn (sn.id)}
-        {#if mode === 'single'}
-          <button type="button"
-            class="picker-row"
-            class:selected={isSelected(sn.id)}
-            class:disabled={sn.id === disabledId}
-            class:restore-point={sn.id === (pickerRestorePointID || restorePointID) || sn.short_id === (pickerRestorePointID || restorePointID)}
-            disabled={sn.id === disabledId}
-            onclick={() => handleSelect(sn.id)}
-          >
-            <span class="picker-version">{versionTag(sn.tags) ?? 'v_._?'}</span>
-            <span class="picker-sid" title="ID: {sn.id}">{sn.short_id}</span>
-            <span class="picker-type">
-              {#if sn.tags.includes('hot')}
-                <span class="picker-badge">Hot</span>
-              {:else if sn.tags.includes('cold')}
-                <span class="picker-badge">Cold</span>
+      <table class="picker-table">
+        <tbody>
+          {#each pickerSnapshots as sn (sn.id)}
+            <tr
+              class="picker-row"
+              class:selected={isSelected(sn.id)}
+              class:disabled={sn.id === disabledId}
+              class:restore-point={sn.id === (pickerRestorePointID || restorePointID) || sn.short_id === (pickerRestorePointID || restorePointID)}
+              class:disabled-click={sn.id === disabledId}
+              onclick={() => !(sn.id === disabledId) && handleSelect(sn.id)}
+              onkeydown={(e) => e.key === 'Enter' && !(sn.id === disabledId) && handleSelect(sn.id)}
+              role="button"
+              tabindex={sn.id === disabledId ? -1 : 0}
+            >
+              {#if mode === 'multi'}
+                <td class="picker-cell-checkbox">
+                  <input
+                    type="checkbox"
+                    class="picker-input"
+                    checked={isSelected(sn.id)}
+                    disabled={sn.id === disabledId}
+                    onchange={() => handleSelect(sn.id)}
+                    name="snap-picker"
+                  />
+                </td>
               {/if}
-              {#if sn.id === restorePointID || sn.short_id === restorePointID}
-                <span class="picker-rp">RP</span>
-              {/if}
-            </span>
-            <span class="picker-date">{new Date(sn.time).toLocaleDateString()}</span>
-            <span class="picker-time">{new Date(sn.time).toLocaleTimeString()}</span>
-            <span class="picker-host">{sn.hostname}</span>
-          </button>
-        {:else}
-          <label
-            class="picker-row"
-            class:selected={isSelected(sn.id)}
-            class:disabled={sn.id === disabledId}
-            class:restore-point={sn.id === (pickerRestorePointID || restorePointID) || sn.short_id === (pickerRestorePointID || restorePointID)}
-          >
-            <input
-              type="checkbox"
-              class="picker-input"
-              checked={isSelected(sn.id)}
-              disabled={sn.id === disabledId}
-              onchange={() => handleSelect(sn.id)}
-              name="snap-picker"
-            />
-            <span class="picker-version">{versionTag(sn.tags) ?? 'v_._?'}</span>
-            <span class="picker-sid" title="ID: {sn.id}">{sn.short_id}</span>
-            <span class="picker-type">
-              {#if sn.tags.includes('hot')}
-                <span class="picker-badge">Hot</span>
-              {:else if sn.tags.includes('cold')}
-                <span class="picker-badge">Cold</span>
-              {/if}
-              {#if sn.id === restorePointID || sn.short_id === restorePointID}
-                <span class="picker-rp">RP</span>
-              {/if}
-            </span>
-            <span class="picker-date">{new Date(sn.time).toLocaleDateString()}</span>
-            <span class="picker-time">{new Date(sn.time).toLocaleTimeString()}</span>
-            <span class="picker-host">{sn.hostname}</span>
-          </label>
-        {/if}
-      {/each}
+              <td class="picker-cell-version">{versionTag(sn.tags) ?? 'v_._?'}</td>
+              <td class="picker-cell-sid" title="ID: {sn.id}">{sn.short_id}</td>
+              <td class="picker-cell-type">
+                {#if sn.tags.includes('hot')}
+                  <span class="picker-badge">Hot</span>
+                {:else if sn.tags.includes('cold')}
+                  <span class="picker-badge">Cold</span>
+                {/if}
+                {#if sn.id === restorePointID || sn.short_id === restorePointID}
+                  <span class="picker-rp">RP</span>
+                {/if}
+              </td>
+              <td class="picker-cell-date">{new Date(sn.time).toLocaleDateString()}</td>
+              <td class="picker-cell-time">{new Date(sn.time).toLocaleTimeString()}</td>
+              <td class="picker-cell-host" title={sn.hostname}>{sn.hostname}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     {/if}
   </div>
   <div class="picker-footer">
@@ -505,7 +491,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--surface);
-    overflow: hidden;
+    overflow: auto;
   }
 
   .picker-search-bar {
@@ -608,9 +594,9 @@
   .filter-tag-btn {
     padding: 4px 8px;
     font-size: 0.75rem;
-    border-radius: 5px;
+    border-radius: 6px;
     border: 1px solid var(--border);
-    background: transparent;
+    background: var(--surface-strong);
     color: var(--muted);
     cursor: pointer;
     font-family: inherit;
@@ -639,14 +625,19 @@
     gap: 6px;
     padding: 4px 8px;
     border: 1px solid var(--border);
-    border-radius: 5px;
-    background: rgb(255 255 255 / 4%);
+    border-radius: 6px;
+    background: var(--surface-strong);
     color: var(--muted);
     font-size: 0.75rem;
     cursor: pointer;
     white-space: nowrap;
     font-family: inherit;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  :global(.picker-filters .drop-select-trigger) {
+    padding: 4px 8px;
+    font-size: 0.75rem;
   }
 
   :global(.picker-filters .filter-trigger:hover) {
@@ -725,31 +716,16 @@
     text-align: center;
   }
 
-  .picker-row {
-    display: grid;
-    grid-template-columns: auto 10ch 10ch minmax(0, 1fr) auto auto 1fr;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    font-size: 0.78rem;
-    cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.1s;
-    user-select: none;
+  .picker-table {
     width: 100%;
-    text-align: left;
-    background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    border-radius: 0;
-    font-family: inherit;
-    color: inherit;
-    line-height: inherit;
+    border-collapse: collapse;
+    table-layout: fixed;
   }
 
-  .picker-row:last-child {
-    border-bottom: none;
+  .picker-row {
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
   }
 
   .picker-row:hover {
@@ -762,6 +738,9 @@
 
   .picker-row.disabled {
     opacity: 0.4;
+  }
+
+  .picker-row.disabled-click {
     cursor: not-allowed;
     pointer-events: none;
   }
@@ -774,28 +753,46 @@
     background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
 
+  .picker-row td {
+    padding: 6px 4px;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .picker-row:last-child td {
+    border-bottom: none;
+  }
+
+  .picker-cell-checkbox {
+    width: 5%;
+    text-align: center;
+  }
+
   .picker-input {
     margin: 0;
-    flex-shrink: 0;
     accent-color: var(--accent);
+    vertical-align: middle;
   }
 
-  .picker-version {
+  .picker-row td.picker-cell-version {
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     color: var(--accent);
+    width: 14%;
+    text-align: left;
+    padding-left: 10px;
   }
 
-  .picker-sid {
+  .picker-cell-sid {
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     color: var(--muted);
     font-size: 0.72rem;
+    width: 11%;
   }
 
-  .picker-type {
-    display: flex;
-    gap: 3px;
-    align-items: center;
-    justify-self: center;
+  .picker-cell-type {
+    text-align: center;
+    width: 14%;
   }
 
   .picker-badge {
@@ -820,19 +817,24 @@
     white-space: nowrap;
   }
 
-  .picker-date {
+  .picker-cell-date {
     color: var(--muted);
+    width: 15%;
   }
 
-  .picker-time {
+  .picker-cell-time {
     color: var(--muted);
     opacity: 0.7;
+    width: 18%;
   }
 
-  .picker-host {
+  .picker-cell-host {
     color: var(--muted);
-    text-align: right;
+    text-align: left;
     font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .picker-footer {

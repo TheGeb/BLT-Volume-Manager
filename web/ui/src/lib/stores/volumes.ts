@@ -6,7 +6,6 @@ import { showToast } from './toast';
 export const volumes = writable<string[]>([]);
 export const selectedVolume = writable('');
 export const volumeFilter = writable('');
-export const hostname = writable('');
 export const landingShown = writable(true);
 export const volumesLoading = writable(false);
 export const volumeLockInfo = writable<Record<string, VolumeLockInfo>>({});
@@ -47,7 +46,7 @@ export async function loadVolumes() {
   }
 }
 
-export async function fetchAllVolumeLockInfo() {
+async function fetchAllVolumeLockInfo() {
   const vols = get(volumes);
   if (vols.length === 0) return;
   const allLocks = await api.fetchAllLockStatus();

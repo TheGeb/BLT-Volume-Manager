@@ -8,7 +8,6 @@ import { snapshots, loadSnapshots } from './snapshots';
 export const loading = writable(true);
 export const activeTab = writable<'snapshots' | 'repo'>('snapshots');
 export const themeDark = writable(true);
-export const prevStats = writable<StatsResponse | null>(null);
 export const lockStatus = writable<LockStatus | null>(null);
 export const stats = writable<StatsResponse | null>(null);
 export const statsLoading = writable(false);
@@ -43,7 +42,6 @@ export async function loadStats(volume: string) {
   try {
     const s = await api.fetchStats(volume);
     stats.set(s);
-    prevStats.set(s);
   } catch { /* stale stats ok */ } finally {
     statsLoading.set(false);
   }

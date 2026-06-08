@@ -556,6 +556,7 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-strong);
+    white-space: nowrap;
     transition: background 0.15s, border-color 0.15s;
   }
 
@@ -627,6 +628,8 @@
     font-size: 0.8rem;
     font-weight: 600;
     user-select: none;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: background 0.1s;
   }
 

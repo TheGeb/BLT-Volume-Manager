@@ -11,7 +11,7 @@
     viewerOpen, snapsLoading, restorePointLoading,
     sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
     selectedForDeletion, onAddTag, onRemoveTag,
-    toggleForDeletion, openBulkDeleteModal, handleComputeAllSizes,
+    toggleForDeletion, openBulkDeleteModal, handleSizeLoaded,
     pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
@@ -102,7 +102,7 @@
       onRemoveTag={onRemoveTag}
       onToggleDeletion={toggleForDeletion}
       onDeleteSelected={openBulkDeleteModal}
-      onComputeAllSizes={handleComputeAllSizes}
+      onSizeLoaded={handleSizeLoaded}
       page={$currentPage}
       pageSize={$pageSize}
       hasMore={$hasMore}

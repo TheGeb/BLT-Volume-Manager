@@ -92,7 +92,7 @@ export function buildTree(allNodes: FileNode[], diff: DiffResult | null): TreeNo
   return root;
 }
 
-export function computeDirDiffTypes(node: TreeNode, dm: Map<string, string> | null): void {
+function computeDirDiffTypes(node: TreeNode, dm: Map<string, string> | null): void {
   if (!node.children) return;
   for (const child of Object.values(node.children)) {
     if (child.children) computeDirDiffTypes(child, dm);

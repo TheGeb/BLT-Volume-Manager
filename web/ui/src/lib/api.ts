@@ -1,4 +1,4 @@
-import type { Snapshot, LockStatus, RepoStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
+import type { Snapshot, LockStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
 export interface SnapshotListParams {
   host?: string;
@@ -76,15 +76,6 @@ export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<st
 	if (!resp.ok) throw new Error('Failed to fetch hosts');
 	const data = await resp.json() as string[];
 	return data;
-}
-
-export async function fetchRepoStatus(volume: string): Promise<RepoStatus> {
-  const resp = await fetch(`/api/repo/status?volume=${encodeURIComponent(volume)}`);
-  return resp.json() as Promise<RepoStatus>;
-}
-
-export async function initRepo(): Promise<void> {
-  await fetch('/api/repo/init', { method: 'POST' });
 }
 
 export async function fetchLockStatus(volume: string): Promise<LockStatus> {
@@ -181,12 +172,6 @@ export async function removeTag(snapshotId: string, tag: string, volume: string)
 	const data = await resp.json() as SnapshotsResponse;
 	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
 	return { snapshots, restorePointID: data.restorePointID ?? '' };
-}
-
-export async function deleteSnapshot(snapshotId: string, volume: string): Promise<void> {
-  const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/delete?volume=${encodeURIComponent(volume)}`;
-  const resp = await fetch(url, { method: 'DELETE' });
-  if (!resp.ok) throw new Error('Failed to delete snapshot');
 }
 
 export async function deleteSnapshots(volume: string, ids: string[]): Promise<BatchDeleteResponse> {

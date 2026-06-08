@@ -21,7 +21,7 @@
   function onActionsEnter() {
     actionsReady = false;
     clearTimeout(readyTimer);
-    readyTimer = setTimeout(() => { actionsReady = true; }, 250);
+    readyTimer = setTimeout(() => { actionsReady = true; }, 200);
   }
 
   function onActionsLeave() {
@@ -587,7 +587,7 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.10s, color 0.15s;
   }
 
   .vol-action-btn:hover {

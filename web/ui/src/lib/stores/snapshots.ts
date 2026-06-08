@@ -50,34 +50,6 @@ export async function loadHosts(volume: string) {
   }
 }
 
-export async function handleComputeAllSizes(ids: string[]) {
-  const vol = get(selectedVolume);
-  if (!vol || ids.length === 0) return;
-  const loadingMap: Record<string, boolean> = {};
-  for (const id of ids) loadingMap[id] = true;
-  sizeLoading.update(s => ({ ...s, ...loadingMap }));
-  try {
-    const data = await api.fetchSnapshotSizes(vol, ids);
-    const newSizes: Record<string, string> = {};
-    for (const id of ids) {
-      newSizes[id] = data[id] != null ? formatBytes(data[id]) : 'err';
-    }
-    sizes.update(s => ({ ...s, ...newSizes }));
-  } catch {
-    const errMap: Record<string, string> = {};
-    for (const id of ids) errMap[id] = 'err';
-    sizes.update(s => ({ ...s, ...errMap }));
-  } finally {
-    sizeLoading.update(s => {
-      const n = { ...s };
-      for (const id of ids) { // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-        delete n[id];
-      }
-      return n;
-    });
-  }
-}
-
 export function filterSnapshots(
   snapshots: Snapshot[],
   query: string,
@@ -164,21 +136,7 @@ export async function loadSnapshots(volume: string, params?: SnapshotListParams)
   }
 }
 
-export async function goToNextPage() {
-  if (!get(hasMore)) return;
-  await goToPage(get(currentPage) + 1);
-}
-
-export async function goToPrevPage() {
-  if (get(currentPage) <= 1) return;
-  await goToPage(get(currentPage) - 1);
-}
-
-export async function goToFirstPage() {
-  await goToPage(1);
-}
-
-export async function goToLastPage() {
+async function goToLastPage() {
   const vol = get(selectedVolume);
   if (!vol) return;
   snapsLoading.set(true);

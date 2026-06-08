@@ -14,7 +14,7 @@
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
   export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
-  export let onComputeAllSizes: (ids: string[]) => void = () => {};
+  export let onSizeLoaded: (id: string) => void = () => {};
   export let restorePointID = '';
   export let selectedForDeletion: Set<string> = new Set();
   export let onToggleDeletion: (sn: Snapshot) => void = () => {};
@@ -72,23 +72,7 @@
           </th>
           <th>Version</th>
           <th>Type</th>
-          <th style="text-align:center;">
-            <span style="display:inline-flex;align-items:center;gap:4px;">
-              Size
-              <button class="size-header-btn" title="Compute all sizes" onclick={() => onComputeAllSizes(snapshots.map(s => s.id))}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="4" y="2" width="16" height="20" rx="2"/>
-                  <line x1="8" y1="6" x2="16" y2="6"/>
-                  <line x1="8" y1="11" x2="10" y2="11"/>
-                  <line x1="14" y1="11" x2="16" y2="11"/>
-                  <line x1="8" y1="15" x2="10" y2="15"/>
-                  <line x1="14" y1="15" x2="16" y2="15"/>
-                  <line x1="8" y1="19" x2="10" y2="19"/>
-                  <line x1="14" y1="19" x2="16" y2="19"/>
-                </svg>
-              </button>
-            </span>
-          </th>
+          <th style="text-align:center;">Size</th>
           <th>Host</th>
           <th>Date</th>
           <th>Actions</th>
@@ -136,15 +120,27 @@
                    {:else}—
                    {/each}
                  </td>
-                <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
-                  {#if sizes[sn.id]}
-                    {sizes[sn.id]}
-                  {:else if sizeLoading[sn.id]}
-                    <Spinner size={16} />
-                  {:else}
-                    <span style="color:var(--muted);">—</span>
-                  {/if}
-                </td>
+                 <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                   {#if sizes[sn.id]}
+                     {sizes[sn.id]}
+                   {:else if sizeLoading[sn.id]}
+                     <Spinner size={16} />
+                   {:else}
+                     <button type="button" class="size-btn" title="Compute size"
+                       onclick={() => onSizeLoaded(sn.id)}>
+                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                         <rect x="4" y="2" width="16" height="20" rx="2"/>
+                         <line x1="8" y1="6" x2="16" y2="6"/>
+                         <line x1="8" y1="11" x2="10" y2="11"/>
+                         <line x1="14" y1="11" x2="16" y2="11"/>
+                         <line x1="8" y1="15" x2="10" y2="15"/>
+                         <line x1="14" y1="15" x2="16" y2="15"/>
+                         <line x1="8" y1="19" x2="10" y2="19"/>
+                         <line x1="14" y1="19" x2="16" y2="19"/>
+                       </svg>
+                     </button>
+                   {/if}
+                 </td>
                 <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '—'}</td>
                 <td>{new Date(sn.time).toLocaleDateString()}<br>
                   <span style="font-size:0.85rem;color:var(--muted);">{new Date(sn.time).toLocaleTimeString()}</span>
@@ -309,21 +305,24 @@
   }
   .rp-btn:disabled { cursor: default; }
 
-  .size-header-btn {
+  .size-btn {
     background: none;
     border: none;
-    padding: 2px;
+    padding: 0;
     cursor: pointer;
-    border-radius: 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    opacity: 0.5;
     color: var(--muted);
-    transition: color 0.15s, background 0.15s;
+    line-height: 0;
   }
 
-  .size-header-btn:hover {
-    color: var(--text);
+  .size-btn:hover {
+    opacity: 1;
     background: var(--hover-bg);
   }
 

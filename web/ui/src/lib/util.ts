@@ -8,31 +8,10 @@ export function formatBytes(b: number): string {
   return `${formatted} ${units[i]!}`;
 }
 
-export function formatDuration(totalSeconds: number): string {
-  if (totalSeconds <= 0) return 'expired';
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${String(days)}d`);
-  if (hours > 0 || days > 0) parts.push(`${String(hours)}h`);
-  if (minutes > 0 || hours > 0 || days > 0) parts.push(`${String(minutes)}m`);
-  parts.push(`${String(secs)}s`);
-  return parts.join(' ') + ' remaining';
-}
-
 export function formatExpiration(totalSeconds: number): string {
   if (totalSeconds <= 0) return 'Expired';
   const expDate = new Date(Date.now() + totalSeconds * 1000);
   return `Expires: ${expDate.toLocaleString()}`;
-}
-
-export function escapeHtml(s: string | undefined): string {
-	if (!s) return '';
-	const div = document.createElement('div');
-	div.textContent = s;
-	return div.innerHTML;
 }
 
 export function versionTag(tags: string[]): string | undefined {
