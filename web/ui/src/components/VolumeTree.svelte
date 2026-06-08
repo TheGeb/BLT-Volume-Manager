@@ -2,25 +2,20 @@
   import { slide } from 'svelte/transition';
   import { formatExpiration } from '$lib/util';
   import type { VolumeLockInfo } from '$lib/types';
-  import { volumes as allVolumes, landingShown, openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
-  import DropSelect from '../../components/DropSelect.svelte';
-  import LandingPanel from './LandingPanel.svelte';
+  import { openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
+  import DropSelect from './DropSelect.svelte';
 
-  export let volumes: string[] = [];
-  export let loading = false;
-  export let onSelect: (vol: string) => void = () => {};
-  export let filter = '';
-  export let onFilterChange: (f: string) => void;
-  export let volumeLockInfo: Record<string, VolumeLockInfo> = {};
-  export let onCreateTestVolume: (name: string) => void = () => {};
-  export let creatingTest = false;
-  export let testStatus = '';
+  let {
+    volumes = [] as string[],
+    loading = false,
+    onSelect = (_vol: string) => {},
+    volumeLockInfo = {} as Record<string, VolumeLockInfo>,
+  } = $props();
 
-  let filterVal = '';
-  let statusFilter = 'all';
-  let hostFilterVal = '';
-  let showLockBorders = true;
-  let actionsReady = false;
+  let statusFilter: 'all' | 'locked' | 'unlocked' = $state('all');
+  let hostFilterVal = $state('');
+  let showLockBorders = $state(true);
+  let actionsReady = $state(false);
   let readyTimer: ReturnType<typeof setTimeout>;
 
   function onActionsEnter() {
@@ -42,34 +37,21 @@
     localStorage.setItem('showLockBorders', JSON.stringify(showLockBorders));
   }
 
-  $: filterVal = filter;
+  let currentVolumeLockInfo = $derived(volumeLockInfo);
 
-  function handleInput() { onFilterChange(filterVal); }
-  function handleKeydown(e: KeyboardEvent) { if (e.key === 'Escape') { filterVal = ''; onFilterChange(''); } }
+  let hosts = $derived([...new Set(Object.values(currentVolumeLockInfo).map(i => i.owner).filter(Boolean))].sort());
 
-  $: hosts = [...new Set(Object.values(volumeLockInfo).map(i => i.owner).filter(Boolean))].sort();
-
-  $: filtered = volumes.filter(v => {
-    if (filter && !v.toLowerCase().includes(filter.toLowerCase())) return false;
-    const lockInfo = volumeLockInfo[v];
+  let filtered = $derived(volumes.filter(v => {
+    const lockInfo = currentVolumeLockInfo[v];
     if (!lockInfo) return true;
     if (statusFilter === 'locked' && !lockInfo.locked) return false;
     if (statusFilter === 'unlocked' && lockInfo.locked) return false;
     if (hostFilterVal && lockInfo.owner !== hostFilterVal) return false;
     return true;
-  });
+  }));
 
   interface TreeNode { name: string; path: string; children?: TreeNode[]; }
   interface FlatItem { name: string; path: string; depth: number; isGroup: boolean; }
-
-  $: tree = buildTree(filtered);
-  $: fullTree = buildTree($allVolumes);
-  let autoExpanded = false;
-  $: if (!autoExpanded && Object.keys(expanded).length === 0 && tree.length > 0) {
-    expanded = allExpanded(tree);
-    autoExpanded = true;
-  }
-  $: flatItems = flatten(tree, expanded, 0);
 
   function buildTree(names: string[]): TreeNode[] {
     const root: Record<string, any> = {};
@@ -116,11 +98,36 @@
     return all;
   }
 
-  let expanded: Record<string, boolean> = {};
+  let expanded: Record<string, boolean> = $state({});
+  let autoExpanded = $state(false);
 
-  $: if (filter || statusFilter !== 'all' || hostFilterVal) {
-    expanded = allExpanded(tree);
-  }
+  let tree = $derived(buildTree(filtered));
+
+  $effect(() => {
+    if (!autoExpanded && Object.keys(expanded).length === 0 && tree.length > 0) {
+      expanded = allExpanded(tree);
+      autoExpanded = true;
+    }
+  });
+
+  $effect(() => {
+    if (statusFilter !== 'all' || hostFilterVal) {
+      expanded = allExpanded(tree);
+    }
+  });
+
+  let flatItems = $derived.by(() => {
+    function flatten(nodes: TreeNode[], exp: Record<string, boolean>, depth: number): FlatItem[] {
+      const items: FlatItem[] = [];
+      for (const node of nodes) {
+        const isGroup = !!node.children;
+        items.push({ name: node.name, path: node.path, depth, isGroup });
+        if (isGroup && exp[node.path]) items.push(...flatten(node.children!, exp, depth + 1));
+      }
+      return items;
+    }
+    return flatten(tree, expanded, 0);
+  });
 
   function toggle(path: string) {
     expanded = { ...expanded, [path]: !expanded[path] };
@@ -142,16 +149,6 @@
 
   function collapseAllGroups() {
     expanded = {};
-  }
-
-  function flatten(nodes: TreeNode[], exp: Record<string, boolean>, depth: number): FlatItem[] {
-    const items: FlatItem[] = [];
-    for (const node of nodes) {
-      const isGroup = !!node.children;
-      items.push({ name: node.name, path: node.path, depth, isGroup });
-      if (isGroup && exp[node.path]) items.push(...flatten(node.children!, exp, depth + 1));
-    }
-    return items;
   }
 
   function collectLeafVolumes(nodes: TreeNode[]): string[] {
@@ -181,9 +178,9 @@
     return result;
   }
 
-  $: folderLocks = computeFolderLocks(fullTree, volumeLockInfo);
+  let folderLocks = $derived(computeFolderLocks(tree, currentVolumeLockInfo));
 
-  $: flatItemLocks = flatItems.map(item => {
+  let flatItemLocks = $derived(flatItems.map(item => {
     let owner = '';
     let status = '';
     if (item.isGroup) {
@@ -193,31 +190,31 @@
         status = 'locked';
       }
     } else {
-      const li = volumeLockInfo[item.path];
+      const li = currentVolumeLockInfo[item.path];
       if (li && li.locked) {
         owner = li.owner;
         status = li.status;
       }
     }
     return { path: item.path, owner, status };
-  });
+  }));
 
-  $: lockStyles = flatItemLocks.map((curr, idx) => {
+  let lockStyles = $derived(flatItemLocks.map((curr, idx) => {
     if (!curr.owner) return null;
-    
+
     const prev = idx > 0 ? flatItemLocks[idx - 1] : null;
     const next = idx < flatItemLocks.length - 1 ? flatItemLocks[idx + 1] : null;
-    
+
     const isSameAsPrev = prev && prev.owner === curr.owner;
     const isSameAsNext = next && next.owner === curr.owner;
-    
+
     if (isSameAsPrev && isSameAsNext) return 'middle';
     if (isSameAsPrev && !isSameAsNext) return 'end';
     if (!isSameAsPrev && isSameAsNext) return 'start';
     return 'single';
-  });
+  }));
 
-  $: labelAtIdx = (() => {
+  let labelAtIdx = $derived.by(() => {
     const map: Record<number, boolean> = {};
     for (let i = 0; i < lockStyles.length; i++) {
       const style = lockStyles[i];
@@ -234,9 +231,9 @@
       }
     }
     return map;
-  })();
+  });
 
-  $: labelOffset = (() => {
+  let labelOffset = $derived.by(() => {
     const map: Record<number, string> = {};
     for (let i = 0; i < lockStyles.length; i++) {
       const style = lockStyles[i];
@@ -254,7 +251,7 @@
       }
     }
     return map;
-  })();
+  });
 
   function handleOutroStart(e: Event) {
     const el = e.target as HTMLElement;
@@ -271,22 +268,16 @@
   }
 </script>
 
-{#if $landingShown}
-  {#if volumes.length === 0 && !loading && !filter}
-    <LandingPanel {onCreateTestVolume} {creatingTest} {testStatus} />
-  {:else}
-<section class="panel" class:lock-mode={showLockBorders}>
+<section class="panel volume-tree-panel" class:lock-mode={showLockBorders}>
   <div class="filter-row">
-    <input class="filter-input" type="search" placeholder="Filter volumes..."
-      bind:value={filterVal} on:input={handleInput} on:keydown={handleKeydown} />
     <DropSelect
       options={[
-        { value: 'All statuses', label: 'All statuses' },
-        { value: 'Locked', label: 'Locked' },
-        { value: 'Unlocked', label: 'Unlocked' },
+        { value: 'all', label: 'All statuses' },
+        { value: 'locked', label: 'Locked' },
+        { value: 'unlocked', label: 'Unlocked' },
       ]}
       value={statusFilter}
-      onValueChange={(v) => statusFilter = v as 'All statuses' | 'Locked' | 'Unlocked'}
+      onValueChange={(v) => statusFilter = v as 'all' | 'locked' | 'unlocked'}
     />
     {#if hosts.length > 0}
       <DropSelect
@@ -301,15 +292,15 @@
   </div>
   <div class="tree-toolbar">
     <div class="tree-actions">
-      <button class="button button-secondary button-xs btn-icon-sm" on:click={expandAllGroups}>
+      <button class="button button-secondary button-xs btn-icon-sm" onclick={expandAllGroups}>
         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
         Expand
       </button>
-      <button class="button button-secondary button-xs btn-icon-sm" on:click={collapseAllGroups}>
+      <button class="button button-secondary button-xs btn-icon-sm" onclick={collapseAllGroups}>
         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
         Collapse
       </button>
-      <button class="button button-secondary button-xs btn-icon-sm lock-toggle" on:click={toggleLockBorders}>
+      <button class="button button-secondary button-xs btn-icon-sm lock-toggle" onclick={toggleLockBorders}>
         {showLockBorders ? 'Hide' : 'Show'} locks
       </button>
     </div>
@@ -324,7 +315,7 @@
         </div>
       {/each}
     </div>
-  {:else if flatItems.length === 0 && !filter && statusFilter === 'all' && !hostFilterVal}
+  {:else if flatItems.length === 0 && statusFilter === 'all' && !hostFilterVal}
     <p class="empty">No volumes found</p>
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
@@ -332,10 +323,10 @@
     <div class="tree-scroll-root" style="height:calc(100vh - 360px);overflow:hidden auto;">
       <div class="tree">
         {#each flatItems as item, idx (item.path)}
-          <div class="tree-row-wrap" transition:slide|local on:outrostart={handleOutroStart} on:introend={handleIntroEnd}>
+          <div class="tree-row-wrap" transition:slide|local onoutrostart={handleOutroStart} onintroend={handleIntroEnd}>
             <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
                 {#if item.isGroup}
-                  <button class="tree-group" on:click={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
+                  <button class="tree-group" onclick={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
                   <div style="width:22px; display:flex; justify-content:center; align-items:center;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
                       style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5; transition:transform 0.15s;">
@@ -349,8 +340,8 @@
                   </button>
                 {:else}
                   <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
-                    on:click={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}
-                    on:mousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}>
+                    onclick={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}
+                    onmousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}>
                     <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
                       <ellipse cx="12" cy="5" rx="9" ry="3"/>
@@ -358,25 +349,23 @@
                       <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                     </svg>
                     <span class="tree-name">{item.name}</span>
-                    {#if !item.isGroup}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span class="vol-actions" on:mouseenter={onActionsEnter} on:mouseleave={onActionsLeave}>
+                    <span class="vol-actions" onmouseenter={onActionsEnter} onmouseleave={onActionsLeave}>
                       <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
-                        on:click|stopPropagation={() => { if (actionsReady) openCopyVolModal(item.path); }}
-                        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
+                        onclick={(e) => { e.stopPropagation(); if (actionsReady) openCopyVolModal(item.path); }}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
                       </span>
                       <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
-                        on:click|stopPropagation={() => { if (actionsReady) openRenameVolModal(item.path); }}
-                        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
+                        onclick={(e) => { e.stopPropagation(); if (actionsReady) openRenameVolModal(item.path); }}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
                         </svg>
                       </span>
                     </span>
-                    {/if}
                   </button>
                 {/if}
               </div>
@@ -393,13 +382,13 @@
                 </span>
               {:else}
                 <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
-                  {#if volumeLockInfo[item.path]}
+                  {#if currentVolumeLockInfo[item.path]}
                     {#if !lockStyles[idx] || labelAtIdx[idx]}
-                      <span class="lock-badge lock-{volumeLockInfo[item.path]!.status}">
-                        <span class="lock-text">{volumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                      <span class="lock-badge lock-{currentVolumeLockInfo[item.path]!.status}">
+                        <span class="lock-text">{currentVolumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
                       </span>
-                      {#if volumeLockInfo[item.path]!.owner}
-                        <span class="lock-owner">{volumeLockInfo[item.path]!.owner}</span>
+                      {#if currentVolumeLockInfo[item.path]!.owner}
+                        <span class="lock-owner">{currentVolumeLockInfo[item.path]!.owner}</span>
                       {/if}
                     {/if}
                   {:else if !loading && !lockStyles[idx]}
@@ -413,19 +402,11 @@
     </div>
   {/if}
 </section>
-  {/if}
-{/if}
 
 <style>
   .filter-row {
     display: flex; gap: 10px; flex-wrap: wrap; padding: 0 0 16px;
   }
-
-  .filter-input {
-    flex: 1 1 240px; min-width: 160px;
-    padding: 10px 16px;
-  }
-  .filter-input:focus { border-color: var(--accent); }
 
   .tree-toolbar {
     display: flex; align-items: center; gap: 8px;
@@ -437,7 +418,6 @@
   .lock-toggle { border-color: color-mix(in srgb, var(--purple), rgb(255 255 255 / 10%)); color: var(--purple); }
   .lock-toggle:hover { background: var(--purple-bg); border-color: var(--accent); }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
   .tree-scroll-root::-webkit-scrollbar {
@@ -475,7 +455,7 @@
 
   :global(.lock-mode) .tree-row { width: 75%; }
 
-  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) {
+  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) {
     border-color: var(--surface);
     background: var(--surface);
   }
@@ -512,10 +492,6 @@
     overflow: hidden;
   }
 
-  /* :global(.tree-row[data-fading="true"]) {
-    transition: none;
-  } */
-
 .tree-row > * { flex-shrink: 0; }
 
   .tree-group, .tree-volume {
@@ -538,8 +514,8 @@
     background: color-mix(in srgb, var(--purple-bg), rgb(255 255 255 / 10%));
   }
 
-  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
-  .panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-volume:hover {
+  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
+  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-volume:hover {
     background: rgb(255 255 255 / 6%);
   }
 
@@ -618,5 +594,4 @@
     background: rgb(255 255 255 / 10%);
     color: var(--text);
   }
-
 </style>

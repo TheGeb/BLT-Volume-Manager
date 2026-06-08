@@ -4,12 +4,13 @@
   import {
     hostFilter, typeFilter, versionFrom, versionTo, reloadWithFilters, allHosts, loadHosts,
     timeFrom, timeTo, timeOfDayFrom, timeOfDayTo, versionFilterClearKey, tableVersionFilterActive,
+    hostsLoading,
   } from '$lib/stores/snapshots';
 
   import { selectedVolume } from '$lib/stores/volumes';
   import { parseVersion } from '$lib/util';
   import DropSelect from '../../components/DropSelect.svelte';
-  import DateTimeRange from './DateTimeRange.svelte';
+  import DateTimeRange from '../../components/DateTimeRange.svelte';
   import VersionRangeInputs from '../../components/VersionRangeInputs.svelte';
 
   let host = $hostFilter;
@@ -240,6 +241,7 @@
     <DropSelect
       options={[
         { value: '', label: 'Any host' },
+        ...($hostsLoading ? [{ value: '__loading__', label: 'Loading...', disabled: true }] : []),
         ...($allHosts ?? []).map(h => ({ value: h, label: h })),
       ]}
       value={host}

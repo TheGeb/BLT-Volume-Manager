@@ -3,20 +3,20 @@
   import { slide } from 'svelte/transition';
   import { Button, RadioGroup } from 'bits-ui';
   import { Toaster } from 'svelte-sonner';
-  import VolumeList from './routes/volumes/index.svelte';
-  import SnapshotsPage from './routes/snapshots/index.svelte';
-  import RepoPage from './routes/repo/index.svelte';
+  import VolumesPage from './routes/volumes/VolumesPage.svelte';
+  import SnapshotsPage from './routes/snapshots/SnapshotsPage.svelte';
+  import RepoPage from './routes/repo/RepoPage.svelte';
   import DevTools from './components/DevTools.svelte';
   import Modal from './components/Modal.svelte';
+  import SnapshotPicker from './components/SnapshotPicker.svelte';
   import { get } from 'svelte/store';
   import { showToast } from '$lib/stores/toast';
-  import { versionTag } from '$lib/util';
   import {
-    volumes, selectedVolume, volumeFilter, volumeLockInfo, volumesLoading,
+    volumes, selectedVolume, volumeLockInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
     copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError,
     copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
-    loadVolumes, onFilterChange,
+    loadVolumes,
     confirmCopyVolume, confirmRenameVolume
   } from '$lib/stores/volumes';
   import {
@@ -139,56 +139,6 @@
     }
   }
 
-  .snap-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    font-size: 0.78rem;
-    cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.1s;
-    white-space: nowrap;
-  }
-  .snap-row:last-child { border-bottom: none; }
-  .snap-row:hover { background: rgb(255 255 255 / 4%); }
-  .snap-row.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-  .snap-row input { margin: 0; flex-shrink: 0; }
-
-  .snap-short-id {
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-    color: var(--accent);
-    flex-shrink: 0;
-  }
-  .snap-date { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
-  .snap-tags { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
-
-  .snap-rp-badge {
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    color: var(--accent);
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-  }
-
-  .snap-tag-badge {
-    background: color-mix(in srgb, var(--muted) 20%, transparent);
-    color: var(--muted);
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    text-transform: capitalize;
-  }
-  .snap-row.restore-point { background: color-mix(in srgb, var(--accent) 4%, transparent); }
-  .snap-row.restore-point:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-  .snap-host { color: var(--muted); margin-left: auto; flex-shrink: 0; }
-
   :global(.radio-item) {
     display: flex;
     align-items: center;
@@ -270,12 +220,10 @@
   <Toaster position="bottom-right" visibleToasts={3} toastOptions={{ style: 'padding:18px 28px;font-size:1rem;font-weight:500;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:0 6px 24px rgb(0 0 0 / 30%);' }} />
 
   {#if !$selectedVolume}
-    <VolumeList
+    <VolumesPage
       volumes={$filteredVolumes}
       loading={$volumesLoading}
       onSelect={onSelectVolume}
-      filter={$volumeFilter}
-      onFilterChange={onFilterChange}
       volumeLockInfo={$volumeLockInfo}
       onCreateTestVolume={handleCreateTestVolume}
       creatingTest={$creatingTest}
@@ -360,35 +308,14 @@
     <div style="margin-bottom:8px;" transition:slide>
       {#if $copySnapshotsLoading}
         <p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:12px;">Loading snapshots…</p>
-      {:else if $copySnapshots.length === 0}
-        <p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:12px;">No snapshots found</p>
       {:else}
-        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
-          {#each $copySnapshots as sn (sn.id)}
-            <label class="snap-row" class:selected={$copySelectedSnapshotIds.includes(sn.id)} class:restore-point={sn.id === $copyRestorePointID || sn.short_id === $copyRestorePointID}>
-              <input type="checkbox" checked={$copySelectedSnapshotIds.includes(sn.id)}
-                on:change={(e) => {
-                  const checked = e.currentTarget.checked;
-                  $copySelectedSnapshotIds = checked
-                    ? [...$copySelectedSnapshotIds, sn.id]
-                    : $copySelectedSnapshotIds.filter(id => id !== sn.id);
-                }} />
-              <span class="snap-short-id" title="{sn.id}">{versionTag(sn.tags) ?? 'v_._?'}</span>
-              <span class="snap-date">{new Date(sn.time).toLocaleDateString()} {new Date(sn.time).toLocaleTimeString()}</span>
-              {#each sn.tags.filter(t => t !== 'restore-point') as tag (tag)}
-                {#if tag === 'hot' || tag === 'cold'}
-                  <span class="snap-tag-badge">{tag}</span>
-                {:else}
-                  <span class="snap-tags">{tag}</span>
-                {/if}
-              {/each}
-              {#if sn.id === $copyRestorePointID || sn.short_id === $copyRestorePointID}
-                <span class="snap-rp-badge" title="Restore point">Restore Point</span>
-              {/if}
-              <span class="snap-host">{sn.hostname}</span>
-            </label>
-          {/each}
-        </div>
+        <SnapshotPicker
+          mode="multi"
+          value={$copySelectedSnapshotIds}
+          onValueChange={(v: string | string[]) => $copySelectedSnapshotIds = v as string[]}
+          volume={$copyRenameSource}
+          restorePointID={$copyRestorePointID}
+        />
       {/if}
     </div>
   {/if}

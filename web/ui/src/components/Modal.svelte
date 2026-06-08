@@ -4,6 +4,7 @@
   export let show = false;
   export let onClose: () => void = () => {};
   export let wide = false;
+  export let xwide = false;
 
   function handleOpenChange(open: boolean) {
     if (!open) onClose();
@@ -13,7 +14,7 @@
 <Dialog.Root open={show} onOpenChange={handleOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class="modal-overlay" />
-    <Dialog.Content class="modal {wide ? 'modal-wide' : ''}">
+    <Dialog.Content class="modal {wide ? 'modal-wide' : xwide ? 'modal-xwide' : ''}">
       <slot />
     </Dialog.Content>
   </Dialog.Portal>
@@ -44,5 +45,10 @@
 
   :global(.modal-wide) {
     max-width: 600px;
+  }
+
+  :global(.modal-xwide) {
+    max-width: 90vw;
+    width: 90%;
   }
 </style>

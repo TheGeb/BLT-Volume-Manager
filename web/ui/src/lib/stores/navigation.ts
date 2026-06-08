@@ -159,6 +159,12 @@ export function onCloseViewer() {
 }
 
 export function setDiffTarget(id: string) {
+  if (!id) {
+    diffTargetId.set('');
+    diffTargetFallbackHash.set('');
+    syncUrl();
+    return;
+  }
   const snap = findSnapshot(get(allSnapshots), id);
   if (!snap) return;
   diffTargetFallbackHash.set(snap.fallbackHash ?? '');

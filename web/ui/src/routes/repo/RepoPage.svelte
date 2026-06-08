@@ -1,5 +1,5 @@
 <script lang="ts">
-  import StatsGrid from './StoragePanel.svelte';
+  import StatsGrid from '../../components/StoragePanel.svelte';
   import LockPanel from './LockPanel.svelte';
   import TroubleshootPanel from './ActionsPanel.svelte';
   import { onSelectVolume, switchTab } from '$lib/stores/navigation';

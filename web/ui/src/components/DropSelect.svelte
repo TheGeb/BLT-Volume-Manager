@@ -27,7 +27,7 @@
   </Select.Trigger>
   <Select.Portal>
     <Select.Content class="drop-select-content">
-      {#each options as opt (opt.value)}
+      {#each options as opt, i (i)}
         <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
           {opt.label}
         </Select.Item>
@@ -66,7 +66,7 @@
     padding: 4px;
     min-width: var(--bits-select-anchor-width);
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
-    z-index: 50;
+    z-index: 1050;
   }
 
   :global(.drop-select-item) {

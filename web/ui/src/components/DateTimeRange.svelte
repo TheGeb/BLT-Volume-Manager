@@ -197,10 +197,10 @@
 {#if !triggerless}
   <div class="filter-wrap">
     <button class="th-label sort-btn" on:click={onToggleSort}>
+      Date
       <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
         <path d="M3 2l5 6 5-6H3z"/>
       </svg>
-      Date
     </button>
     <button
       bind:this={triggerEl}
@@ -327,7 +327,6 @@
   }
 
   .sort-btn {
-    position: relative;
     font-size: 0.95rem;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -338,7 +337,9 @@
     font-family: inherit;
     padding: 0;
     white-space: nowrap;
-    display: inline;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     appearance: none;
   }
 
@@ -347,16 +348,12 @@
   }
 
   .sort-chevron {
-    position: absolute;
-    left: -18px;
-    top: 50%;
-    transform: translateY(-50%);
     opacity: 0.8;
     transition: transform 0.15s;
   }
 
   .sort-desc {
-    transform: translateY(-50%) rotate(180deg);
+    transform: rotate(180deg);
   }
 
   :global(.filter-btn) {
@@ -646,26 +643,23 @@
   }
 
   .apply-btn {
-    background: var(--hover-bg);
+    background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 12px;
     font-size: 0.75rem;
     font-weight: 600;
-    cursor: pointer;
+    cursor: default;
     font-family: inherit;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
 
   .apply-btn-active {
     background: var(--accent);
     color: #fff;
     border-color: transparent;
-  }
-
-  .apply-btn:hover {
-    background: var(--hover-bg);
+    cursor: pointer;
   }
 
   .apply-btn-active:hover {
@@ -673,13 +667,13 @@
   }
 
   .clear-btn {
-    background: var(--hover-bg);
+    background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 10px;
     font-size: 0.75rem;
-    cursor: pointer;
+    cursor: default;
     font-family: inherit;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
@@ -688,10 +682,7 @@
     background: var(--red-bg);
     color: var(--red);
     border-color: var(--red);
-  }
-
-  .clear-btn:hover {
-    background: var(--hover-bg);
+    cursor: pointer;
   }
 
   .clear-btn-active:hover {

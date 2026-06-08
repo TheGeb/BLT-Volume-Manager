@@ -3,30 +3,43 @@
   import SnapshotTable from './SnapshotTable.svelte';
   import SnapshotViewer from './SnapshotViewer.svelte';
   import SnapshotSearch from './SnapshotSearch.svelte';
+  import Modal from '../../components/Modal.svelte';
+  import SnapshotPicker from '../../components/SnapshotPicker.svelte';
   import { onSelectVolume, onOpenViewer, onCloseViewer, switchTab, setDiffTarget, syncUrl } from '$lib/stores/navigation';
   import {
-    sortNewestFirst, sizes, currentSnapshot, allSnapshots,
+    sizes, currentSnapshot,
     viewerOpen, snapsLoading, restorePointLoading,
     sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
-    selectedForDeletion, onToggleSort, onAddTag, onRemoveTag,
-    toggleForDeletion, openBulkDeleteModal, handleSizeLoaded, timeFrom, timeTo, onTimeFilter,
-    timeOfDayFrom, timeOfDayTo, onTimeOfDayFilter,
-    typeFilter, hostFilter, hosts, onTypeFilter, onHostFilter,
+    selectedForDeletion, onAddTag, onRemoveTag,
+    toggleForDeletion, openBulkDeleteModal, handleComputeAllSizes,
     pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
+
+  let pickerDialogOpen = $state(false);
+
+  function handleOpenViewer(sn: import('$lib/types').Snapshot) {
+    onOpenViewer(sn);
+  }
+
+  function handleDiffTargetPicked(targetId: string) {
+    if (!targetId) return;
+    diffTargetId.set(targetId);
+    setDiffTarget(targetId);
+    pickerDialogOpen = false;
+  }
 </script>
 
 <div id="volume-view">
   <div class="tab-bar">
-    <button class="tab" on:click={() => onSelectVolume('')} title="Back to volumes">
+    <button class="tab" onclick={() => onSelectVolume('')} title="Back to volumes">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
         <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
       </svg>
     </button>
-    <button class="tab" class:tab-active={$activeTab === 'snapshots'} on:click={() => switchTab('snapshots')}>Volume</button>
-    <button class="tab" class:tab-active={$activeTab === 'repo'} on:click={() => switchTab('repo')}>Repo</button>
+    <button class="tab" class:tab-active={$activeTab === 'snapshots'} onclick={() => switchTab('snapshots')}>Volume</button>
+    <button class="tab" class:tab-active={$activeTab === 'repo'} onclick={() => switchTab('repo')}>Repo</button>
   </div>
 
   <div class="tab-panel">
@@ -35,17 +48,14 @@
         {#if $currentSnapshot}
           <SnapshotViewer
             snapshot={$currentSnapshot}
-            allSnapshots={$allSnapshots}
             onClose={onCloseViewer}
             initialDiffTarget={$diffTargetId}
             onDiffChange={setDiffTarget}
-            onSwapDiff={(newSnapshotId, newDiffId, newSnapshotHash, newDiffHash) => {
-              const newSnap = $allSnapshots.find(s => s.id === newSnapshotId);
-              if (!newSnap) return;
-              if (newSnapshotHash) newSnap.fallbackHash = newSnapshotHash;
-              currentSnapshot.set(newSnap);
+            onOpenDiffPicker={() => pickerDialogOpen = true}
+            onSwapDiff={(snap, newDiffId, newSnapshotHash) => {
+              if (newSnapshotHash) snap.fallbackHash = newSnapshotHash;
+              currentSnapshot.set(snap);
               diffTargetId.set(newDiffId);
-              if (newDiffHash) diffTargetFallbackHash.set(newDiffHash);
               syncUrl();
             }}
           />
@@ -66,35 +76,33 @@
       </div>
     {/if}
 
+    <Modal show={pickerDialogOpen} onClose={() => pickerDialogOpen = false} wide>
+      <SnapshotPicker
+        mode="single"
+        value=""
+        onValueChange={(v: string | string[]) => handleDiffTargetPicked(v as string)}
+        disabledId={$currentSnapshot?.id ?? ''}
+        volume={$selectedVolume}
+        restorePointID={$restorePointID}
+      />
+    </Modal>
+
     <SnapshotSearch />
     <SnapshotTable
       snapshots={$displayedSnapshots}
       sizes={$sizes}
       selectedVolume={$selectedVolume}
-      sortNewestFirst={$sortNewestFirst}
-      typeFilter={$typeFilter}
-      hostFilter={$hostFilter}
-      hosts={$hosts}
       loading={$snapsLoading}
       restorePointLoading={$restorePointLoading}
       sizeLoading={$sizeLoading}
       restorePointID={$restorePointID}
       selectedForDeletion={$selectedForDeletion}
-      onToggleSort={onToggleSort}
-      onTypeFilter={onTypeFilter}
-      onHostFilter={onHostFilter}
-      onOpenViewer={onOpenViewer}
+      onOpenViewer={handleOpenViewer}
       onAddTag={onAddTag}
       onRemoveTag={onRemoveTag}
       onToggleDeletion={toggleForDeletion}
       onDeleteSelected={openBulkDeleteModal}
-      onSizeLoaded={handleSizeLoaded}
-      timeFrom={$timeFrom}
-      timeTo={$timeTo}
-      onTimeFilter={onTimeFilter}
-      timeOfDayFrom={$timeOfDayFrom}
-      timeOfDayTo={$timeOfDayTo}
-      onTimeOfDayFilter={onTimeOfDayFilter}
+      onComputeAllSizes={handleComputeAllSizes}
       page={$currentPage}
       pageSize={$pageSize}
       hasMore={$hasMore}
@@ -103,7 +111,3 @@
     />
   </div>
 </div>
-
-<style>
-  .viewer-skeleton :global(.skeleton) { display: block; }
-</style>

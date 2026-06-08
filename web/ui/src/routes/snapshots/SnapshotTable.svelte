@@ -1,73 +1,24 @@
 <script lang="ts">
-  import { Button, Popover, ScrollArea } from 'bits-ui';
+  import { Button, ScrollArea } from 'bits-ui';
   import type { Snapshot } from '$lib/types';
-  import DateRangeFilter from './DateTimeRange.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
-  import { versionFilterClearKey, tableVersionFilterActive } from '$lib/stores/snapshots';
-  import { versionTag, matchesVersionRange } from '$lib/util';
-  import VersionRangeInputs from '../../components/VersionRangeInputs.svelte';
+  import { versionTag } from '$lib/util';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
   export let selectedVolume = '';
-  export let sortNewestFirst = true;
-  export let typeFilter = 'all';
-  export let hostFilter = '';
-  export let hosts: string[] = [];
   export let loading = false;
   export let restorePointLoading: Record<string, boolean> = {};
   export let sizeLoading: Record<string, boolean> = {};
-  export let onToggleSort: () => void = () => {};
-  export let onTypeFilter: (t: string) => void = () => {};
-  export let onHostFilter: (h: string) => void = () => {};
-  let tableVersionFrom = '';
-  let tableVersionTo = '';
-  let versionOpen = false;
-  let versionInputs: VersionRangeInputs;
-
-  let _vcKey = 0;
-  $: if (_vcKey !== $versionFilterClearKey) {
-    _vcKey = $versionFilterClearKey;
-    clearVersionFilter();
-  }
-
-  function handleVersionOpenChange(o: boolean) {
-    versionOpen = o;
-    if (o) versionInputs?.loadFields();
-  }
-
-  $: tableVersionFilterActive.set(!!(tableVersionFrom || tableVersionTo));
-
-  $: versionFilteredSnapshots = tableVersionFrom || tableVersionTo
-    ? snapshots.filter(sn => matchesVersionRange(sn.tags, tableVersionFrom, tableVersionTo))
-    : snapshots;
-
-  function applyVersionFilter(from: string, to: string) {
-    tableVersionFrom = from;
-    tableVersionTo = to;
-    versionOpen = false;
-  }
-
-  function clearVersionFilter() {
-    tableVersionFrom = '';
-    tableVersionTo = '';
-    versionOpen = false;
-  }
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
   export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
   export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
-  export let onSizeLoaded: (id: string) => void = () => {};
+  export let onComputeAllSizes: (ids: string[]) => void = () => {};
   export let restorePointID = '';
   export let selectedForDeletion: Set<string> = new Set();
   export let onToggleDeletion: (sn: Snapshot) => void = () => {};
   export let onDeleteSelected: () => void = () => {};
-  export let timeFrom: number | undefined = undefined;
-  export let timeTo: number | undefined = undefined;
-  export let onTimeFilter: (from?: number, to?: number) => void = () => {};
-  export let timeOfDayFrom: number | undefined = undefined;
-  export let timeOfDayTo: number | undefined = undefined;
-  export let onTimeOfDayFilter: (from?: number, to?: number) => void = () => {};
   export let page = 1;
   export let pageSize = 25;
   export let hasMore = false;
@@ -119,77 +70,27 @@
             Restore Point
             <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time.">i</span>
           </th>
-          <th>
-            <div class="filter-wrap">
-              <span class="th-label">Version</span>
-              <Popover.Root bind:open={versionOpen} onOpenChange={handleVersionOpenChange}>
-                <Popover.Trigger class={"filter-btn" + (tableVersionFrom || tableVersionTo ? ' active' : '')}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                  </svg>
-                </Popover.Trigger>
-                <Popover.Content class="filter-dropdown">
-                  <VersionRangeInputs
-                    bind:this={versionInputs}
-                    from={tableVersionFrom}
-                    to={tableVersionTo}
-                    onApply={applyVersionFilter}
-                    onClear={clearVersionFilter}
-                  />
-                </Popover.Content>
-              </Popover.Root>
-            </div>
+          <th>Version</th>
+          <th>Type</th>
+          <th style="text-align:center;">
+            <span style="display:inline-flex;align-items:center;gap:4px;">
+              Size
+              <button class="size-header-btn" title="Compute all sizes" onclick={() => onComputeAllSizes(snapshots.map(s => s.id))}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="2" width="16" height="20" rx="2"/>
+                  <line x1="8" y1="6" x2="16" y2="6"/>
+                  <line x1="8" y1="11" x2="10" y2="11"/>
+                  <line x1="14" y1="11" x2="16" y2="11"/>
+                  <line x1="8" y1="15" x2="10" y2="15"/>
+                  <line x1="14" y1="15" x2="16" y2="15"/>
+                  <line x1="8" y1="19" x2="10" y2="19"/>
+                  <line x1="14" y1="19" x2="16" y2="19"/>
+                </svg>
+              </button>
+            </span>
           </th>
-          <th>
-            <div class="filter-wrap">
-              <span class="th-label">Type</span>
-              <Popover.Root>
-                <Popover.Trigger class={"filter-btn" + (typeFilter !== 'all' ? ' active' : '')}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                  </svg>
-                </Popover.Trigger>
-                <Popover.Content class="filter-dropdown">
-                  {#each ['all', 'hot', 'cold'] as opt (opt)}
-                    <Popover.Close class="filter-opt {typeFilter === opt ? 'selected' : ''}" onclick={() => onTypeFilter(opt)}>
-                      {opt === 'all' ? 'All' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                    </Popover.Close>
-                  {/each}
-                </Popover.Content>
-              </Popover.Root>
-            </div>
-          </th>
-          <th style="text-align:center;">Size</th>
-          <th>
-            <div class="filter-wrap">
-              <span class="th-label">Host</span>
-              <Popover.Root>
-                <Popover.Trigger class={"filter-btn" + (hostFilter !== '' ? ' active' : '')}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                  </svg>
-                </Popover.Trigger>
-                <Popover.Content class="filter-dropdown">
-                  <Popover.Close class="filter-opt {hostFilter === '' ? 'selected' : ''}" onclick={() => onHostFilter('')}>All</Popover.Close>
-                  {#each hosts as h (h)}
-                    <Popover.Close class="filter-opt {hostFilter === h ? 'selected' : ''}" onclick={() => onHostFilter(h)}>{h}</Popover.Close>
-                  {/each}
-                </Popover.Content>
-              </Popover.Root>
-            </div>
-          </th>
-          <th>
-            <DateRangeFilter
-              {timeFrom}
-              {timeTo}
-              {sortNewestFirst}
-              {onToggleSort}
-              {onTimeFilter}
-              {timeOfDayFrom}
-              {timeOfDayTo}
-              {onTimeOfDayFilter}
-            />
-          </th>
+          <th>Host</th>
+          <th>Date</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -201,7 +102,7 @@
         <table class="body-table">
           {@render columns()}
           <tbody style="opacity:{loading ? 0.4 : 1};transition:opacity 0.15s ease;">
-            {#each versionFilteredSnapshots as sn (sn.id)}
+            {#each snapshots as sn (sn.id)}
               <tr class:del-row={selectedForDeletion.has(sn.id)}>
                  <td style="text-align:center">
                    {#if restorePointLoading[sn.id]}
@@ -212,7 +113,7 @@
                         </svg>
                       </span>
                    {:else}
-                      <button type="button" class="rp-btn" title="Toggle restore point" on:click|stopPropagation={() => handleRPClick(sn)} disabled={restorePointLoading[sn.id]}>
+                      <button type="button" class="rp-btn" title="Toggle restore point" onclick={(e) => { e.stopPropagation(); handleRPClick(sn); }} disabled={restorePointLoading[sn.id]}>
                         <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
                           <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
                             stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
@@ -224,7 +125,7 @@
                    {/if}
                  </td>
                  <td class="copy-id" title="{sn.id}"
-                  on:click={() => { navigator.clipboard.writeText(sn.id); }}>
+                  onclick={() => { navigator.clipboard.writeText(sn.id); }}>
                   {versionTag(sn.tags) ?? 'v_._?'}
                 </td>
                  <td style="color:var(--muted);font-size:0.9rem;">
@@ -238,16 +139,10 @@
                 <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
                   {#if sizes[sn.id]}
                     {sizes[sn.id]}
-                    {:else if sizeLoading[sn.id]}
-                      <Spinner size={16} />
-                   {:else}
-                    <button type="button" class="size-btn" title="Compute size"
-                      on:click|stopPropagation={() => onSizeLoaded(sn.id)}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                      </svg>
-                    </button>
+                  {:else if sizeLoading[sn.id]}
+                    <Spinner size={16} />
+                  {:else}
+                    <span style="color:var(--muted);">—</span>
                   {/if}
                 </td>
                 <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '—'}</td>
@@ -260,7 +155,7 @@
                      <button
                        class="del-toggle"
                        class:del-selected={selectedForDeletion.has(sn.id)}
-                       on:click={() => onToggleDeletion(sn)}>
+                        onclick={() => onToggleDeletion(sn)}>
                        {selectedForDeletion.has(sn.id) ? '×' : 'Delete'}
                      </button>
                    </div>
@@ -288,19 +183,19 @@
         <tr>
           <td class="snap-total" colspan="3">
             <div class="pagination">
-              <button class="page-btn" disabled={page <= 1} on:click={() => onGoToPage(1)} title="First page">&laquo;</button>
-              <button class="page-btn" disabled={page <= 1} on:click={() => onGoToPage(page - 1)} title="Previous page">&lsaquo;</button>
+              <button class="page-btn" disabled={page <= 1} onclick={() => onGoToPage(1)} title="First page">&laquo;</button>
+              <button class="page-btn" disabled={page <= 1} onclick={() => onGoToPage(page - 1)} title="Previous page">&lsaquo;</button>
               <input
                 class="page-input"
                 type="text"
                 inputmode="numeric"
                 value={pageDisplay}
-                on:input={onPageInput}
-                on:keydown={(e) => e.key === 'Enter' && commitPageInput()}
-                on:blur={commitPageInput}
+                oninput={onPageInput}
+                onkeydown={(e) => e.key === 'Enter' && commitPageInput()}
+                onblur={commitPageInput}
               />
-              <button class="page-btn" disabled={!hasMore} on:click={() => onGoToPage(page + 1)} title="Next page">&rsaquo;</button>
-              <button class="page-btn" disabled={!hasMore} on:click={() => onGoToPage(-1)} title="Last page">&raquo;</button>
+              <button class="page-btn" disabled={!hasMore} onclick={() => onGoToPage(page + 1)} title="Next page">&rsaquo;</button>
+              <button class="page-btn" disabled={!hasMore} onclick={() => onGoToPage(-1)} title="Last page">&raquo;</button>
               <DropSelect
                 options={[
                   { value: '10', label: '10' },
@@ -402,81 +297,7 @@
     color: var(--accent);
   }
 
-  .th-label {
-    white-space: nowrap;
-  }
-
-  :global(.filter-btn) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 26px;
-    border-radius: 6px;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 0;
-    line-height: 0;
-    outline: none;
-    transition: color 0.15s, background 0.15s;
-  }
-
-  :global(.filter-btn.active) {
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
-  }
-
-  :global(.filter-btn:hover) {
-    background: var(--hover-bg);
-    color: var(--text);
-  }
-
-  :global(.filter-btn[data-state="open"]) {
-    background: var(--hover-bg);
-    color: var(--text);
-  }
-
-  :global(.filter-btn:active) {
-    background: var(--hover-bg);
-    color: var(--text);
-  }
-
-  :global(.filter-dropdown) {
-    z-index: 20;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 4px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
-    min-width: 100px;
-  }
-
-  :global(.filter-opt) {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 4px 10px;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text);
-    font-size: 0.85rem;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  :global(.filter-opt:hover) {
-    background: var(--hover-bg);
-  }
-
-  :global(.filter-opt.selected) {
-    color: var(--accent);
-    font-weight: 600;
-  }
-
-  .rp-btn, .size-btn {
+  .rp-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
     line-height: 0;
@@ -488,11 +309,23 @@
   }
   .rp-btn:disabled { cursor: default; }
 
-  .size-btn {
-    width: 22px; height: 22px; border-radius: 4px; opacity: 0.5;
+  .size-header-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--muted);
+    transition: color 0.15s, background 0.15s;
   }
-  .size-btn:hover { opacity: 1; background: var(--hover-bg); }
+
+  .size-header-btn:hover {
+    color: var(--text);
+    background: var(--hover-bg);
+  }
 
   .restore-point-info {
     position: relative; display: inline-flex; align-items: center; justify-content: center;

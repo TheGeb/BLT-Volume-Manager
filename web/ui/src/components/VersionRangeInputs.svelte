@@ -190,26 +190,23 @@
   }
 
   .apply-btn {
-    background: var(--hover-bg);
+    background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 12px;
     font-size: 0.75rem;
     font-weight: 600;
-    cursor: pointer;
+    cursor: default;
     font-family: inherit;
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .apply-btn:hover {
-    background: var(--hover-bg);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
 
   .apply-btn-active {
     background: var(--accent);
     color: #fff;
     border-color: transparent;
+    cursor: pointer;
   }
 
   .apply-btn-active:hover {
@@ -225,25 +222,22 @@
   }
 
   .clear-btn {
-    background: var(--hover-bg);
+    background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 10px;
     font-size: 0.75rem;
-    cursor: pointer;
+    cursor: default;
     font-family: inherit;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-
-  .clear-btn:hover {
-    background: var(--hover-bg);
   }
 
   .clear-btn-active {
     background: var(--red-bg);
     color: var(--red);
     border-color: var(--red);
+    cursor: pointer;
   }
 
   .clear-btn-active:hover {

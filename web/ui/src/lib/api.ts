@@ -14,6 +14,7 @@ export interface SnapshotListParams {
   timeOfDayTo?: number;
   versionFrom?: string;
   versionTo?: string;
+  query?: string;
 }
 
 export async function fetchVolumes(): Promise<string[]> {
@@ -56,6 +57,9 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 		}
 		if (params.versionTo) {
 			p.set('versionTo', params.versionTo);
+		}
+		if (params.query) {
+			p.set('query', params.query);
 		}
 	}
 	const resp = await fetch(`/api/snapshots?${p.toString()}`);

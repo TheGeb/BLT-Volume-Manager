@@ -34,16 +34,48 @@ export const currentPage = writable(1);
 export const hasMore = writable(false);
 export const totalCount = writable(0);
 export const allHosts = writable<string[]>([]);
+export const hostsLoading = writable(false);
 export const versionFilterClearKey = writable(0);
 export const tableVersionFilterActive = writable(false);
 
 export async function loadHosts(volume: string) {
+	hostsLoading.set(true);
 	try {
 		const hosts = await api.fetchSnapshotHosts(volume);
 		allHosts.set(hosts);
 	} catch {
 		// leave current hosts unchanged on failure
-	}
+	} finally {
+		hostsLoading.set(false);
+  }
+}
+
+export async function handleComputeAllSizes(ids: string[]) {
+  const vol = get(selectedVolume);
+  if (!vol || ids.length === 0) return;
+  const loadingMap: Record<string, boolean> = {};
+  for (const id of ids) loadingMap[id] = true;
+  sizeLoading.update(s => ({ ...s, ...loadingMap }));
+  try {
+    const data = await api.fetchSnapshotSizes(vol, ids);
+    const newSizes: Record<string, string> = {};
+    for (const id of ids) {
+      newSizes[id] = data[id] != null ? formatBytes(data[id]) : 'err';
+    }
+    sizes.update(s => ({ ...s, ...newSizes }));
+  } catch {
+    const errMap: Record<string, string> = {};
+    for (const id of ids) errMap[id] = 'err';
+    sizes.update(s => ({ ...s, ...errMap }));
+  } finally {
+    sizeLoading.update(s => {
+      const n = { ...s };
+      for (const id of ids) { // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete n[id];
+      }
+      return n;
+    });
+  }
 }
 
 export function filterSnapshots(
@@ -72,7 +104,8 @@ export function filterSnapshots(
     }
     if (!query) return true;
     const q = query.toLowerCase();
-    return sn.short_id.toLowerCase().includes(q) ||
+    return sn.id.toLowerCase().includes(q) ||
+      sn.short_id.toLowerCase().includes(q) ||
       sn.tags.some(t => t.toLowerCase().includes(q)) ||
       (typeof sn.hostname === 'string' && sn.hostname.toLowerCase().includes(q));
   });
@@ -107,33 +140,6 @@ export const hosts = derived(snapshots, $s => extractHosts($s));
 
 function reconcileViewerSnapshots() {
   if (!get(viewerOpen) || !get(currentSnapshot)) return;
-
-  const $snapshots = get(snapshots);
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const $current = get(currentSnapshot)!;
-  const $diffId = get(diffTargetId);
-
-  const found = findSnapshot($snapshots, $current.short_id, $current.fallbackHash)
-    ?? findSnapshot($snapshots, $current.id, $current.fallbackHash);
-
-  if (found) {
-    currentSnapshot.set(found);
-  } else {
-    currentSnapshot.set(null);
-    viewerOpen.set(false);
-    diffTargetId.set('');
-    return;
-  }
-
-  if ($diffId) {
-    const dtSnap = findSnapshot($snapshots, $diffId, get(diffTargetFallbackHash));
-    if (dtSnap) {
-      diffTargetId.set(dtSnap.id);
-    } else {
-      diffTargetId.set('');
-      diffTargetFallbackHash.set('');
-    }
-  }
 }
 
 export async function loadSnapshots(volume: string, params?: SnapshotListParams) {

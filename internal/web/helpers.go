@@ -36,6 +36,7 @@ type SnapshotFilter struct {
 	TimeFrom, TimeTo           *time.Time
 	TimeOfDayFrom, TimeOfDayTo *int
 	VersionFrom, VersionTo     *VersionRange
+	Query                      *string
 }
 
 func parseVersionParam(s string) (major, minor int, ok bool) {
@@ -97,6 +98,22 @@ func applySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Sn
 				if maj > f.VersionTo.Major || (maj == f.VersionTo.Major && min > f.VersionTo.Minor) {
 					continue
 				}
+			}
+		}
+		if f.Query != nil && *f.Query != "" {
+			q := strings.ToLower(*f.Query)
+			idMatch := strings.Contains(strings.ToLower(sn.ID), q)
+			shortMatch := strings.Contains(strings.ToLower(sn.ShortID), q)
+			tagMatch := false
+			for _, t := range sn.Tags {
+				if strings.Contains(strings.ToLower(t), q) {
+					tagMatch = true
+					break
+				}
+			}
+			hostMatch := strings.Contains(strings.ToLower(sn.Hostname), q)
+			if !idMatch && !shortMatch && !tagMatch && !hostMatch {
+				continue
 			}
 		}
 		out = append(out, sn)
@@ -209,6 +226,11 @@ func parseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 			ensureFilter()
 			filter.VersionTo = &VersionRange{Major: maj, Minor: min}
 		}
+	}
+
+	if q := r.URL.Query().Get("query"); q != "" {
+		ensureFilter()
+		filter.Query = &q
 	}
 
 	latest := 0

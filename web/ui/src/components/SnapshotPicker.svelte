@@ -1,0 +1,898 @@
+<script lang="ts">
+  import { slide } from 'svelte/transition';
+  import { tick } from 'svelte';
+  import { Popover } from 'bits-ui';
+  import type { Snapshot } from '$lib/types';
+  import type { SnapshotListParams } from '$lib/api';
+  import * as api from '$lib/api';
+  import { versionTag, parseVersion } from '$lib/util';
+  import HostDropdown from './HostDropdown.svelte';
+  import VersionRangeInputs from './VersionRangeInputs.svelte';
+  import DateTimeRange from './DateTimeRange.svelte';
+
+  let {
+    mode = 'single' as 'single' | 'multi',
+    value = mode === 'single' ? '' : ([] as string | string[]),
+    onValueChange = (_v: string | string[]) => {},
+    disabledId = '',
+    volume = '',
+    restorePointID = '',
+  } = $props();
+
+  let filtersExpanded = $state(true);
+
+  let searchQuery = $state('');
+  let hostFilter = $state('');
+  let typeTags = $state<string[]>([]);
+  let committedVfMajor = $state(''); let committedVfMinor = $state('');
+  let committedVtMajor = $state(''); let committedVtMinor = $state('');
+  let localTimeFrom: number | undefined = $state(undefined);
+  let localTimeTo: number | undefined = $state(undefined);
+  let localTimeOfDayFrom: number | undefined = $state(undefined);
+  let localTimeOfDayTo: number | undefined = $state(undefined);
+  let dateOpen = $state(false);
+  let versionOpen = $state(false);
+  let versionInputs = $state<VersionRangeInputs | null>(null);
+
+  let typeFilter = $derived(typeTags[0] ?? 'all');
+  let versionFrom = $derived(committedVfMajor || committedVfMinor ? `${committedVfMajor || '0'}.${committedVfMinor || '0'}` : '');
+  let versionTo = $derived(committedVtMajor || committedVtMinor ? `${committedVtMajor || '0'}.${committedVtMinor || '0'}` : '');
+
+  let dateLabel = $derived(computeDateLabel(localTimeFrom, localTimeTo, localTimeOfDayFrom, localTimeOfDayTo));
+  let dateActive = $derived(localTimeFrom !== undefined || localTimeTo !== undefined || localTimeOfDayFrom !== undefined || localTimeOfDayTo !== undefined);
+
+  let versionLabel = $derived(computeVersionLabel(committedVfMajor, committedVfMinor, committedVtMajor, committedVtMinor));
+  let versionActive = $derived(versionLabel !== 'Any version');
+
+  let hasActiveFilters = $derived(!!(searchQuery || hostFilter || typeTags.length > 0 || dateActive || versionActive));
+
+  let searchDebounced = $state('');
+
+  $effect(() => {
+    const q = searchQuery;
+    const t = setTimeout(() => { searchDebounced = q; }, 300);
+    return () => clearTimeout(t);
+  });
+
+  let pickerSnapshots: Snapshot[] = $state([]);
+  let pickerHasMore = $state(false);
+  let pickerLoading = $state(false);
+  let pickerRestorePointID = $state('');
+
+  async function fetchPickerData() {
+    if (!volume) {
+      pickerSnapshots = [];
+      pickerHasMore = false;
+      pickerLoading = false;
+      return;
+    }
+    pickerLoading = true;
+    const p: SnapshotListParams = {
+      offset: (pickerPage - 1) * pickerPageSize,
+      limit: pickerPageSize,
+    };
+    if (hostFilter) p.host = hostFilter;
+    if (typeFilter !== 'all') p.tag = typeFilter;
+    if (localTimeFrom !== undefined) p.timeFrom = localTimeFrom;
+    if (localTimeTo !== undefined) p.timeTo = localTimeTo;
+    if (localTimeOfDayFrom !== undefined) p.timeOfDayFrom = localTimeOfDayFrom;
+    if (localTimeOfDayTo !== undefined) p.timeOfDayTo = localTimeOfDayTo;
+    if (versionFrom) p.versionFrom = versionFrom;
+    if (versionTo) p.versionTo = versionTo;
+    if (searchDebounced) p.query = searchDebounced;
+    try {
+      const r = await api.fetchSnapshots(volume, p);
+      pickerSnapshots = r.snapshots;
+      pickerHasMore = r.hasMore ?? false;
+      pickerRestorePointID = r.restorePointID ?? '';
+    } catch {
+      pickerSnapshots = [];
+      pickerHasMore = false;
+    } finally {
+      pickerLoading = false;
+    }
+  }
+
+  $effect(() => {
+    searchDebounced;
+    hostFilter;
+    typeFilter;
+    localTimeFrom; localTimeTo;
+    localTimeOfDayFrom; localTimeOfDayTo;
+    versionFrom; versionTo;
+
+    pickerPage = 1;
+  });
+
+  $effect(() => {
+    searchDebounced;
+    hostFilter;
+    typeFilter;
+    localTimeFrom; localTimeTo;
+    localTimeOfDayFrom; localTimeOfDayTo;
+    versionFrom; versionTo;
+    pickerPage;
+    pickerPageSize;
+    volume;
+
+    if (volume) {
+      const timer = setTimeout(() => fetchPickerData(), 0);
+      return () => clearTimeout(timer);
+    }
+  });
+
+  $effect(() => {
+    if (versionOpen) {
+      tick().then(() => versionInputs?.loadFields());
+    }
+  });
+
+  function computeDateLabel(tf: number | undefined, tt: number | undefined, tdf: number | undefined, tdt: number | undefined): string {
+    if (tdf !== undefined || tdt !== undefined) {
+      return fmtSOT(tdf) + '\u2013' + fmtSOT(tdt);
+    }
+    if (tf !== undefined || tt !== undefined) {
+      const from = fmtTS(tf);
+      const to = fmtTS(tt);
+      if (tf && tt && sameUTCDay(tf, tt)) {
+        const ft = timePart(tf);
+        const ttPart = timePart(tt);
+        if (!ft && !ttPart) return from;
+        return from.split(' (')[0] + ' (' + (ft || '12 AM') + ' \u2013 ' + (ttPart || '12 AM') + ')';
+      }
+      return from + ' \u2013 ' + to;
+    }
+    return 'Any date';
+  }
+
+  function sameUTCDay(a: number, b: number): boolean {
+    const da = new Date(a);
+    const db = new Date(b);
+    return da.getUTCFullYear() === db.getUTCFullYear() && da.getUTCMonth() === db.getUTCMonth() && da.getUTCDate() === db.getUTCDate();
+  }
+
+  function timePart(ts: number | undefined): string {
+    if (ts === undefined) return '';
+    const d = new Date(ts);
+    const h = d.getUTCHours();
+    const m = d.getUTCMinutes();
+    const s = d.getUTCSeconds();
+    if (h === 0 && m === 0 && s === 0) return '';
+    if (h === 23 && m === 59 && s === 59) return '';
+    return formatTime(h, m, s);
+  }
+
+  function fmtTS(ts: number | undefined): string {
+    if (ts === undefined) return '\u2026';
+    const d = new Date(ts);
+    const date = String(d.getUTCMonth() + 1) + '/' + String(d.getUTCDate());
+    const h = d.getUTCHours();
+    const m = d.getUTCMinutes();
+    const s = d.getUTCSeconds();
+    const isDefault = (h === 0 && m === 0 && s === 0) || (h === 23 && m === 59 && s === 59);
+    if (isDefault) return date;
+    return date + ' (' + formatTime(h, m, s) + ')';
+  }
+
+  function fmtSOT(s: number | undefined): string {
+    if (s === undefined) return '--:--';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return formatTime(h, m, sec);
+  }
+
+  function formatTime(h: number, m: number, s: number): string {
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    let result = String(h12);
+    if (m !== 0 || s !== 0) result += ':' + String(m).padStart(2, '0');
+    if (s !== 0) result += ':' + String(s).padStart(2, '0');
+    return result + ' ' + ampm;
+  }
+
+  function computeVersionLabel(fm: string, fn: string, tm: string, tn: string): string {
+    const from = fmtVersion(fm, fn);
+    const to = fmtVersion(tm, tn);
+    const fromEmpty = !from || from === '0';
+    const toEmpty = !to || to === '0';
+    if (!fromEmpty && !toEmpty) return `v${from} - v${to}`;
+    if (!fromEmpty) return `v${from}`;
+    if (!toEmpty) return `v${to}`;
+    return 'Any version';
+  }
+
+  function fmtVersion(major: string, minor: string): string {
+    const mNum = parseInt(major || '0', 10);
+    const nStr = minor || '0';
+    const nNum = parseInt(nStr, 10);
+    if (nNum === 0) return String(mNum);
+    const trimmed = nStr.replace(/0+$/, '');
+    return trimmed ? `${mNum}.${trimmed}` : String(mNum);
+  }
+
+  function commitVersion(from: string, to: string) {
+    const f = parseVersion(from);
+    committedVfMajor = f ? String(f.major) : '';
+    committedVfMinor = f ? String(f.minor) : '';
+    const t = parseVersion(to);
+    committedVtMajor = t ? String(t.major) : '';
+    committedVtMinor = t ? String(t.minor) : '';
+    versionOpen = false;
+  }
+
+  function clearVersionPreview() {
+    committedVfMajor = ''; committedVfMinor = '';
+    committedVtMajor = ''; committedVtMinor = '';
+  }
+
+  function handleTimeFilter(from?: number, to?: number) {
+    localTimeFrom = from;
+    localTimeTo = to;
+  }
+
+  function handleTimeOfDayFilter(from?: number, to?: number) {
+    localTimeOfDayFrom = from;
+    localTimeOfDayTo = to;
+  }
+
+  function handleDateClose() {
+    dateOpen = false;
+  }
+
+  function toggleTag(tag: string) {
+    if (typeTags.includes(tag)) {
+      typeTags = typeTags.filter(t => t !== tag);
+    } else {
+      typeTags = typeTags.filter(t => t !== 'hot' && t !== 'cold');
+      typeTags = [...typeTags, tag];
+    }
+  }
+
+  let pickerPage = $state(1);
+  let pickerPageSize = $state(10);
+  let pendingPickerPage: string | undefined = $state(undefined);
+  let pickerPageDisplay = $derived(pendingPickerPage ?? String(pickerPage));
+  let lastPageFetching = $state(false);
+
+  function onPickerPageInput(e: Event) {
+    pendingPickerPage = (e.target as HTMLInputElement).value;
+  }
+
+  function commitPickerPage() {
+    if (pendingPickerPage !== undefined) {
+      const n = parseInt(pendingPickerPage, 10);
+      if (!isNaN(n) && n >= 1) {
+        pickerPage = n;
+      }
+      pendingPickerPage = undefined;
+    }
+  }
+
+  async function goToLastPickerPage() {
+    if (!volume || lastPageFetching) return;
+    lastPageFetching = true;
+    try {
+      const countParams: SnapshotListParams = { offset: 0, limit: 0 };
+      if (hostFilter) countParams.host = hostFilter;
+      if (typeFilter !== 'all') countParams.tag = typeFilter;
+      if (localTimeFrom !== undefined) countParams.timeFrom = localTimeFrom;
+      if (localTimeTo !== undefined) countParams.timeTo = localTimeTo;
+      if (localTimeOfDayFrom !== undefined) countParams.timeOfDayFrom = localTimeOfDayFrom;
+      if (localTimeOfDayTo !== undefined) countParams.timeOfDayTo = localTimeOfDayTo;
+      if (versionFrom) countParams.versionFrom = versionFrom;
+      if (versionTo) countParams.versionTo = versionTo;
+      if (searchDebounced) countParams.query = searchDebounced;
+      const r = await api.fetchSnapshots(volume, countParams);
+      const total = r.snapshots.length;
+      const lastPage = Math.max(1, Math.ceil(total / pickerPageSize));
+      pickerPage = lastPage;
+    } catch {
+      // ignore
+    } finally {
+      lastPageFetching = false;
+    }
+  }
+
+  function clearFilters() {
+    searchQuery = '';
+    hostFilter = '';
+    typeTags = [];
+    committedVfMajor = ''; committedVfMinor = '';
+    committedVtMajor = ''; committedVtMinor = '';
+    localTimeFrom = undefined;
+    localTimeTo = undefined;
+    localTimeOfDayFrom = undefined;
+    localTimeOfDayTo = undefined;
+  }
+
+  function isSelected(id: string): boolean {
+    if (mode === 'single') return value === id;
+    return (value as string[]).includes(id);
+  }
+
+  function handleSelect(id: string) {
+    if (mode === 'single') {
+      onValueChange(id);
+    } else {
+      const arr = value as string[];
+      if (arr.includes(id)) {
+        onValueChange(arr.filter(v => v !== id));
+      } else {
+        onValueChange([...arr, id]);
+      }
+    }
+  }
+</script>
+
+<div class="snap-picker">
+  <div class="picker-search-bar">
+    <input
+      type="search"
+      class="picker-search-input"
+      placeholder="Search snapshots..."
+      bind:value={searchQuery}
+    />
+    <button
+      class="picker-filter-toggle"
+      class:filter-active={hasActiveFilters}
+      onclick={() => filtersExpanded = !filtersExpanded}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
+      </svg>
+      Filters
+      {#if hasActiveFilters}
+        <span class="filter-dot"></span>
+      {/if}
+    </button>
+  </div>
+
+  {#if filtersExpanded}
+    <div class="picker-filters">
+      <div transition:slide>
+          <div class="filter-row">
+            <div class="filter-field">
+              <span class="filter-label">Host</span>
+              <HostDropdown
+                value={hostFilter}
+                onValueChange={(v: string) => hostFilter = v}
+                {volume}
+              />
+            </div>
+            <div class="filter-field">
+              <span class="filter-label">Type</span>
+              <div class="filter-toggles">
+                <button class="filter-tag-btn" class:tag-on={typeTags.includes('hot')} onclick={() => toggleTag('hot')}>Hot</button>
+                <button class="filter-tag-btn" class:tag-on={typeTags.includes('cold')} onclick={() => toggleTag('cold')}>Cold</button>
+              </div>
+            </div>
+            <div class="filter-field">
+              <span class="filter-label">Version</span>
+              <Popover.Root bind:open={versionOpen}>
+                <Popover.Trigger class="filter-trigger {versionActive ? 'filter-trigger-active' : ''}">
+                  {versionLabel}
+                  <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+                </Popover.Trigger>
+                <Popover.Content class="filter-popover">
+                  <VersionRangeInputs
+                    bind:this={versionInputs}
+                    from={versionFrom}
+                    to={versionTo}
+                    onApply={commitVersion}
+                    onClear={clearVersionPreview}
+                  />
+                </Popover.Content>
+              </Popover.Root>
+            </div>
+            <div class="filter-field">
+              <span class="filter-label">Date/Time</span>
+              <Popover.Root bind:open={dateOpen}>
+                <Popover.Trigger class="filter-trigger {dateActive ? 'filter-trigger-active' : ''}">
+                  {dateLabel}
+                  <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+                </Popover.Trigger>
+                <Popover.Content class="filter-popover-date">
+                  <DateTimeRange
+                    triggerless
+                    timeFrom={localTimeFrom}
+                    timeTo={localTimeTo}
+                    timeOfDayFrom={localTimeOfDayFrom}
+                    timeOfDayTo={localTimeOfDayTo}
+                    onTimeFilter={handleTimeFilter}
+                    onTimeOfDayFilter={handleTimeOfDayFilter}
+                    onClose={handleDateClose}
+                  />
+                </Popover.Content>
+              </Popover.Root>
+            </div>
+            {#if hasActiveFilters}
+              <button class="picker-clear-filters" onclick={clearFilters}>Clear</button>
+            {/if}
+          </div>
+        </div>
+      </div>
+  {/if}
+
+  <div class="picker-list" class:empty={pickerSnapshots.length === 0}>
+    {#if pickerLoading}
+      <div class="picker-empty">Loading...</div>
+    {:else if pickerSnapshots.length === 0}
+      <div class="picker-empty">No snapshots found</div>
+    {:else}
+      {#each pickerSnapshots as sn (sn.id)}
+        {#if mode === 'single'}
+          <button type="button"
+            class="picker-row"
+            class:selected={isSelected(sn.id)}
+            class:disabled={sn.id === disabledId}
+            class:restore-point={sn.id === (pickerRestorePointID || restorePointID) || sn.short_id === (pickerRestorePointID || restorePointID)}
+            disabled={sn.id === disabledId}
+            onclick={() => handleSelect(sn.id)}
+          >
+            <span class="picker-version">{versionTag(sn.tags) ?? 'v_._?'}</span>
+            <span class="picker-sid" title="ID: {sn.id}">{sn.short_id}</span>
+            <span class="picker-type">
+              {#if sn.tags.includes('hot')}
+                <span class="picker-badge">Hot</span>
+              {:else if sn.tags.includes('cold')}
+                <span class="picker-badge">Cold</span>
+              {/if}
+              {#if sn.id === restorePointID || sn.short_id === restorePointID}
+                <span class="picker-rp">RP</span>
+              {/if}
+            </span>
+            <span class="picker-date">{new Date(sn.time).toLocaleDateString()}</span>
+            <span class="picker-time">{new Date(sn.time).toLocaleTimeString()}</span>
+            <span class="picker-host">{sn.hostname}</span>
+          </button>
+        {:else}
+          <label
+            class="picker-row"
+            class:selected={isSelected(sn.id)}
+            class:disabled={sn.id === disabledId}
+            class:restore-point={sn.id === (pickerRestorePointID || restorePointID) || sn.short_id === (pickerRestorePointID || restorePointID)}
+          >
+            <input
+              type="checkbox"
+              class="picker-input"
+              checked={isSelected(sn.id)}
+              disabled={sn.id === disabledId}
+              onchange={() => handleSelect(sn.id)}
+              name="snap-picker"
+            />
+            <span class="picker-version">{versionTag(sn.tags) ?? 'v_._?'}</span>
+            <span class="picker-sid" title="ID: {sn.id}">{sn.short_id}</span>
+            <span class="picker-type">
+              {#if sn.tags.includes('hot')}
+                <span class="picker-badge">Hot</span>
+              {:else if sn.tags.includes('cold')}
+                <span class="picker-badge">Cold</span>
+              {/if}
+              {#if sn.id === restorePointID || sn.short_id === restorePointID}
+                <span class="picker-rp">RP</span>
+              {/if}
+            </span>
+            <span class="picker-date">{new Date(sn.time).toLocaleDateString()}</span>
+            <span class="picker-time">{new Date(sn.time).toLocaleTimeString()}</span>
+            <span class="picker-host">{sn.hostname}</span>
+          </label>
+        {/if}
+      {/each}
+    {/if}
+  </div>
+  <div class="picker-footer">
+    <div class="picker-pagination">
+      <button class="page-btn" disabled={pickerPage <= 1} onclick={() => pickerPage = 1} title="First page">&laquo;</button>
+      <button class="page-btn" disabled={pickerPage <= 1} onclick={() => pickerPage--} title="Previous page">&lsaquo;</button>
+      <input
+        class="page-input"
+        type="text"
+        inputmode="numeric"
+        value={pickerPageDisplay}
+        oninput={onPickerPageInput}
+        onkeydown={(e) => e.key === 'Enter' && commitPickerPage()}
+        onblur={commitPickerPage}
+      />
+      <button class="page-btn" disabled={!pickerHasMore || lastPageFetching} onclick={() => pickerPage++} title="Next page">&rsaquo;</button>
+      <button class="page-btn" disabled={lastPageFetching} onclick={goToLastPickerPage} title="Last page">&raquo;</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .snap-picker {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .picker-search-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .picker-search-input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: rgb(255 255 255 / 4%);
+    color: var(--text);
+    font-size: 0.8rem;
+    outline: none;
+    min-width: 0;
+  }
+
+  .picker-search-input:hover {
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
+  .picker-search-input:focus {
+    border-color: var(--muted);
+  }
+
+  .picker-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: rgb(255 255 255 / 4%);
+    color: var(--muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    position: relative;
+  }
+
+  .picker-filter-toggle:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
+  .picker-filter-toggle.filter-active {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .filter-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+
+  .picker-filters {
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .filter-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .filter-toggles {
+    display: flex;
+    gap: 3px;
+  }
+
+  .filter-tag-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.12s;
+  }
+
+  .filter-tag-btn:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  .filter-tag-btn.tag-on {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  .filter-tag-btn.tag-on:hover {
+    background: color-mix(in srgb, var(--accent) 80%, #000);
+  }
+
+  :global(.picker-filters .filter-trigger) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: rgb(255 255 255 / 4%);
+    color: var(--muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  :global(.picker-filters .filter-trigger:hover) {
+    background: var(--hover-bg);
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
+  :global(.picker-filters .filter-trigger[data-state="open"]),
+  :global(.picker-filters .filter-trigger-active) {
+    background: var(--hover-bg);
+    color: var(--text);
+    border-color: var(--muted);
+  }
+
+  :global(.picker-filters .filter-popover) {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+    z-index: 1010;
+  }
+
+  :global(.picker-filters .filter-popover-date) {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+    z-index: 1010;
+    max-width: 90vw;
+  }
+
+  .chevron {
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+
+  .picker-clear-filters {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    border: 1px solid var(--red);
+    background: transparent;
+    color: var(--red);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    transition: background 0.12s;
+    height: fit-content;
+    align-self: flex-end;
+  }
+
+  .picker-clear-filters:hover {
+    background: rgb(248 113 113 / 15%);
+  }
+
+  .picker-list {
+    overflow: hidden auto;
+    scrollbar-gutter: stable;
+    min-height: 280px;
+  }
+
+  .picker-list.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+  }
+
+  .picker-empty {
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .picker-row {
+    display: grid;
+    grid-template-columns: auto 10ch 10ch minmax(0, 1fr) auto auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    user-select: none;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    font-family: inherit;
+    color: inherit;
+    line-height: inherit;
+  }
+
+  .picker-row:last-child {
+    border-bottom: none;
+  }
+
+  .picker-row:hover {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .picker-row.selected {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .picker-row.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .picker-row.restore-point {
+    background: color-mix(in srgb, var(--accent) 4%, transparent);
+  }
+
+  .picker-row.restore-point:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  .picker-input {
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+
+  .picker-version {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    color: var(--accent);
+  }
+
+  .picker-sid {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .picker-type {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    justify-self: center;
+  }
+
+  .picker-badge {
+    background: color-mix(in srgb, var(--muted) 18%, transparent);
+    color: var(--muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .picker-rp {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .picker-date {
+    color: var(--muted);
+  }
+
+  .picker-time {
+    color: var(--muted);
+    opacity: 0.7;
+  }
+
+  .picker-host {
+    color: var(--muted);
+    text-align: right;
+    font-size: 0.75rem;
+  }
+
+  .picker-footer {
+    border-top: 1px solid var(--border);
+    padding: 6px 12px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .picker-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  :global(.picker-pagination .page-btn) {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    line-height: 1;
+  }
+
+  :global(.picker-pagination .page-btn:hover:not(:disabled)) {
+    color: var(--text);
+    background: var(--hover-bg);
+    border-color: var(--border);
+  }
+
+  :global(.picker-pagination .page-btn:disabled) {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  :global(.picker-pagination .page-input) {
+    width: 44px;
+    text-align: center;
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 2px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color 0.15s;
+    margin: 0 4px;
+  }
+
+  :global(.picker-pagination .page-input:hover) {
+    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
+  }
+
+  :global(.picker-pagination .page-input:focus) {
+    border-color: var(--muted);
+  }
+</style>

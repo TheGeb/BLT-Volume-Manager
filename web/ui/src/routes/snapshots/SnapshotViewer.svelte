@@ -14,7 +14,6 @@
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
   import Spinner from '../../components/Spinner.svelte';
-  import DropSelect from '../../components/DropSelect.svelte';
 
   function slideFade(node: Element, { duration = 250, direction = 1 } = {}) {
     const opacityEasing = (t: number) => 1 - Math.pow(1 - t, 2);
@@ -29,11 +28,11 @@
   }
 
   export let snapshot: Snapshot;
-  export let allSnapshots: Snapshot[] = [];
   export let onClose: () => void = () => {};
   export let initialDiffTarget: string = '';
   export let onDiffChange: (otherId: string) => void = () => {};
-  export let onSwapDiff: (newSnapshotId: string, newDiffId: string, newSnapshotHash?: string, newDiffHash?: string) => void = () => {};
+  export let onSwapDiff: (snap: Snapshot, newDiffId: string, newSnapshotHash?: string) => void = () => {};
+  export let onOpenDiffPicker: () => void = () => {};
 
   let nodes: FileNode[] = [];
   let loading = true;
@@ -46,13 +45,20 @@
   let diffOtherId = '';
   let compareSnaps: Snapshot[] = [];
   let selectedCompareId = '';
-  let compareLoading = true;
+
   let diffLoading = false;
   let treePanelStartWidth = 280;
-  let selectWrapEl: HTMLDivElement;
+  let selectedCompareSnap: Snapshot | undefined;
+  let compareSnapshotList: Snapshot[] = [];
 
-  $: if (selectWrapEl) {
-    treePanelStartWidth = selectWrapEl.offsetWidth;
+  async function loadCompareSnapshots() {
+    if (!snapshot.volume) return;
+    try {
+      const r = await api.fetchSnapshots(snapshot.volume, {});
+      compareSnapshotList = r.snapshots;
+    } catch {
+      compareSnapshotList = [];
+    }
   }
 
   let snapSizes: Record<string, string> = {};
@@ -169,7 +175,7 @@
 
   $: diffMap = currentDiffResult ? buildDiffMap(currentDiffResult) : null;
   $: rootNode = buildTree(nodes, currentDiffResult);
-  $: diffOtherSnapshot = diffOtherId ? allSnapshots.find(s => s.id === diffOtherId || s.short_id === diffOtherId) : null;
+  $: diffOtherSnapshot = diffOtherId ? compareSnapshotList.find(s => s.id === diffOtherId || s.short_id === diffOtherId) : null;
   $: fileContentDiffType = fileContentPath && diffMap
     ? (diffMap.get(fileContentPath) ?? diffMap.get(fileContentPath.replace(/^\//, '')) ?? '')
     : '';
@@ -181,6 +187,7 @@
   $: if (diffOtherId) loadSnapSize(diffOtherId);
 
   async function open() {
+    hasOpened = false;
     loading = true;
     error = '';
     fileContent = '';
@@ -194,12 +201,16 @@
         const target = compareSnaps.find(s => (s.id === initialDiffTarget || s.short_id === initialDiffTarget) && s.id !== snapshot.id);
         selectedCompareId = target ? target.id : initialDiffTarget;
       }
-      const fetchedNodes = await api.fetchFileTree(snapshot.id, snapshot.volume!, undefined, snapshot.fallbackHash);
+      const [fetchedNodes] = await Promise.all([
+        api.fetchFileTree(snapshot.id, snapshot.volume!, undefined, snapshot.fallbackHash),
+        loadCompareSnapshots(),
+      ]);
       nodes = fetchedNodes;
     } catch (e: any) {
       error = e.message;
     } finally {
       loading = false;
+      hasOpened = true;
     }
     if (initialDiffTarget && selectedCompareId) {
       // eslint-disable-next-line svelte/infinite-reactive-loop
@@ -207,7 +218,8 @@
     }
   }
 
-  $: compareSnaps = allSnapshots;
+  $: compareSnaps = compareSnapshotList;
+  $: selectedCompareSnap = compareSnaps.find(s => s.id === selectedCompareId || s.short_id === selectedCompareId);
   $: if (compareSnaps.length > 0 && !selectedCompareId) {
     const firstEnabled = compareSnaps.find(s => s.id !== snapshot.id);
     selectedCompareId = firstEnabled ? firstEnabled.id : compareSnaps[0]!.id;
@@ -216,8 +228,10 @@
   $: if (initialDiffTarget) {
     const found = compareSnaps.find(s => (s.id === initialDiffTarget || s.short_id === initialDiffTarget) && s.id !== snapshot.id);
     if (found) {
-      if (found.id !== selectedCompareId) {
-        selectedCompareId = found.id;
+      selectedCompareId = found.id;
+      if (hasOpened && found.id !== diffOtherId && !loading && !diffLoading) {
+        // eslint-disable-next-line svelte/infinite-reactive-loop
+        doDiff();
       }
       lastInitialDiffTarget = initialDiffTarget;
     } else {
@@ -226,9 +240,6 @@
   } else if (selectedCompareId && compareSnaps.length > 0 && (!compareSnaps.some(s => s.id === selectedCompareId || s.short_id === selectedCompareId) || selectedCompareId === snapshot.id)) {
     const firstEnabled = compareSnaps.find(s => s.id !== snapshot.id);
     selectedCompareId = firstEnabled ? firstEnabled.id : compareSnaps[0]!.id;
-  }
-  $: if (allSnapshots.length > 0) {
-    compareLoading = false;
   }
   $: if (!loading && !diffLoading && !warmupDone && nodes.length > 0) {
     warmupDone = true;
@@ -260,17 +271,19 @@
     } catch (e: any) {
       error = e.message;
     } finally {
+      // eslint-disable-next-line svelte/infinite-reactive-loop
       diffLoading = false;
     }
   }
 
-  async function clearDiff() {
+  function clearDiff() {
     currentDiffResult = null;
     diffOtherId = '';
     currentDiffHunks = [];
     fileContent = '';
     fileContentPath = '';
     diffLoading = false;
+    selectedCompareId = '';
     onDiffChange('');
   }
 
@@ -278,7 +291,7 @@
     if (!diffOtherId) return;
     const otherSnap = compareSnaps.find(s => s.id === diffOtherId || s.short_id === diffOtherId);
     if (!otherSnap) return;
-    onSwapDiff(otherSnap.id, snapshot.id, otherSnap.fallbackHash, snapshot.fallbackHash);
+    onSwapDiff(otherSnap, snapshot.id, snapshot.fallbackHash);
   }
 
   async function viewFile(path: string) {
@@ -303,7 +316,7 @@
     currentDiffHunks = [];
     error = '';
     try {
-      const snap = allSnapshots.find(s => s.id === id)!;
+      const snap = compareSnapshotList.find(s => s.id === id)!;
       fileContent = await api.fetchFileContent(id, snapshot.volume!, path, snap.fallbackHash);
     } catch (e: any) {
       fileContent = 'Error: ' + e.message;
@@ -320,7 +333,7 @@
     error = '';
     try {
       const snapA = snapshot;
-      const snapB = allSnapshots.find(s => s.id === otherId)!;
+      const snapB = compareSnapshotList.find(s => s.id === otherId)!;
       const [hashA, hashB] = await Promise.all([
         snapA.fallbackHash,
         snapB.fallbackHash
@@ -349,6 +362,7 @@
   let expandToggle = 0;
   let treeOpacity = 1;
   let warmupDone = false;
+  let hasOpened = false;
 
   async function warmupAnimations() {
     treeOpacity = 0;
@@ -379,11 +393,9 @@
   }
 </script>
 
-<section class="panel" style="margin-bottom:16px;position:relative;" bind:this={panelEl}>
-  <Button.Root class="button button-secondary" onclick={onClose} style="position:absolute;top:24px;right:24px;padding:10px 16px;font-size:0.9rem;border-radius:10px;">Close</Button.Root>
-
-  <div style="display:flex;gap:12px;margin-bottom:20px;padding-right:70px;">
-    <div style="flex:1;min-width:0;">
+<section class="panel" style="margin-bottom:16px;" bind:this={panelEl}>
+  <div style="display:flex;gap:16px;margin-bottom:20px;align-items:flex-start;">
+    <div style="min-width:0;">
       <h2 class="eyebrow" style="margin:0 0 4px;">
         <span style="text-transform:none;" title="{snapshot.id}">{(versionTag(snapshot.tags) ?? 'v_._?') + ' (' + snapshot.short_id + ')'}</span>
       </h2>
@@ -396,13 +408,15 @@
         <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
       </div>
     </div>
+    {#if compareSnaps.length > 0}
+      <button class="diff-arrow-btn" title="Select diff target" onclick={onOpenDiffPicker}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+    {/if}
     {#if currentDiffResult && diffOtherSnapshot}
       <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;overflow:hidden;" transition:slideFade>
-        <div style="display:flex;align-items:center;flex-shrink:0;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </div>
         <div class="snap-meta-divider"></div>
         <div style="flex:1;min-width:0;">
           <h2 class="eyebrow" style="margin:0 0 4px;">
@@ -419,33 +433,16 @@
         </div>
       </div>
     {/if}
-  </div>
-
-  {#if compareLoading}
-    <div id="viewerCompareSkeleton" style="display:flex;margin-bottom:12px;gap:8px;align-items:center;">
-      <span class="skeleton-select-bar" style="width:240px;"></span>
-      <span class="skeleton-btn-bar"></span>
-    </div>
-  {:else}
-    <div style="gap:12px;margin-bottom:12px;display:flex;align-items:center;">
-      {#if compareSnaps.length > 0}
-        <div bind:this={selectWrapEl}>
-          <DropSelect
-            options={compareSnaps.map(cs => ({ value: cs.id, label: `${versionTag(cs.tags) ?? 'v_._?'} - ${new Date(cs.time).toLocaleDateString()} ${new Date(cs.time).toLocaleTimeString()} - ${cs.hostname}`, disabled: cs.id === snapshot.id }))}
-            value={selectedCompareId}
-            onValueChange={(v) => selectedCompareId = v}
-          />
-        </div>
-        <Button.Root class="button button-xs btn-sm" onclick={() => doDiff()}>Diff</Button.Root>
-      {/if}
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;padding-top:4px;margin-left:auto;">
       {#if currentDiffResult}
         <div transition:fade style="display:inline-flex;gap:8px;">
           <Button.Root class="button button-xs btn-sm clear-diff-btn" onclick={clearDiff}>Clear diff</Button.Root>
           <Button.Root class="button button-secondary button-xs btn-sm" onclick={handleSwapDiff}>Swap diff</Button.Root>
         </div>
       {/if}
+      <Button.Root class="button button-secondary" onclick={onClose} style="padding:10px 16px;font-size:0.9rem;border-radius:10px;">Close</Button.Root>
     </div>
-  {/if}
+  </div>
 
   {#if error}
     <div style="color:var(--red);">{error}</div>
@@ -455,8 +452,8 @@
     <div style="display:flex;flex:1;min-height:0;">
       <div id="viewerTreePanel" style="flex:0 0 {treePanelStartWidth}px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
          <div style="display:flex;gap:4px;align-items:center;">
-          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery} class="search-files-input" on:keydown={(e) => e.key === 'Enter' && nextSearchResult()} />
-          <button class="button button-secondary button-xs mode-toggle" style="padding:7px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} on:click={() => treeSearchFullPath = !treeSearchFullPath}>
+          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery} class="search-files-input" onkeydown={(e) => e.key === 'Enter' && nextSearchResult()} />
+          <button class="button button-secondary button-xs mode-toggle" style="padding:7px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} onclick={() => treeSearchFullPath = !treeSearchFullPath}>
               {#if treeSearchFullPath}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                   <line x1="17" y1="4" x2="7" y2="20"/>
@@ -471,18 +468,18 @@
             <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;">
               {treeSearchResults.length > 0 ? treeSearchIndex + 1 : 0}/{treeSearchResults.length}
             </span>
-            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} on:click={prevSearchResult}>▲</button>
-            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} on:click={nextSearchResult}>▼</button>
+            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} onclick={prevSearchResult}>▲</button>
+            <button class="button button-secondary button-xs" style="padding:4px 6px;line-height:1;" disabled={treeSearchResults.length === 0} onclick={nextSearchResult}>▼</button>
           {/if}
         </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(true)}>
+          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" onclick={() => toggleAll(true)}>
             <span style="position:absolute;left:8px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
             </span>
             <span style="flex:1;text-align:center;">Expand</span>
           </button>
-          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" on:click={() => toggleAll(false)}>
+          <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" onclick={() => toggleAll(false)}>
             <span style="position:absolute;left:8px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
             </span>
@@ -576,9 +573,6 @@
     text-transform: uppercase;
   }
 
-  .skeleton-select-bar { height: 32px; width: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
-  .skeleton-btn-bar { height: 32px; width: 60px; border-radius: 8px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 37%, var(--surface) 63%); background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; }
-
   .snap-meta {
     display: flex;
     flex-wrap: wrap;
@@ -640,5 +634,34 @@
     background: rgb(255 80 80 / 15%) !important;
     border-color: var(--red) !important;
     opacity: 1;
+  }
+
+  .diff-arrow-btn {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1.5px solid var(--border);
+    padding: 9px;
+    cursor: pointer;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .diff-arrow-btn:hover {
+    background: color-mix(in srgb, var(--muted) 20%, transparent);
+    border-color: var(--muted);
+  }
+
+  .diff-arrow-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .diff-arrow-btn:active {
+    border-color: var(--text);
+    background: color-mix(in srgb, var(--muted) 30%, transparent);
   }
 </style>
