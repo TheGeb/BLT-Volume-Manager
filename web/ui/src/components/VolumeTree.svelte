@@ -501,6 +501,7 @@
     font-family: inherit; cursor: pointer; text-align: left;
     width: 100%; box-sizing: border-box; text-decoration: none;
     overflow: hidden;
+    margin-right: 8px;
     transition: background 0.15s ease;
   }
 

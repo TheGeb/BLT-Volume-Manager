@@ -4,6 +4,7 @@
   import Spinner from '../../components/Spinner.svelte';
   import DropSelect from '../../components/DropSelect.svelte';
   import { versionTag } from '$lib/util';
+  import { showToast } from '$lib/stores/toast';
 
   export let snapshots: Snapshot[] = [];
   export let sizes: Record<string, string> = {};
@@ -108,10 +109,10 @@
                      </button>
                    {/if}
                  </td>
-                 <td class="copy-id" title="{sn.id}"
-                  onclick={() => { navigator.clipboard.writeText(sn.id); }}>
-                  {versionTag(sn.tags) ?? 'v_._?'}
-                </td>
+                  <td class="copy-id" title="Restic ID: {sn.id}"
+                                      onclick={() => { navigator.clipboard.writeText(sn.id); showToast('Snapshot ID copied'); }}>
+                   <span class="copy-id-inner">{versionTag(sn.tags) ?? 'v_._?'}<span class="copy-hint">{sn.short_id}</span></span>
+                 </td>
                  <td style="color:var(--muted);font-size:0.9rem;">
                    {#each ['hot', 'cold'] as t (t)}
                      {#if sn.tags.includes(t)}
@@ -147,7 +148,7 @@
                 </td>
              <td>
                    <div style="display:flex;gap:4px;flex-wrap:nowrap;">
-                      <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View</Button.Root>
+                       <Button.Root class="button button-secondary button-xs" onclick={() => onOpenViewer(sn)}>View/Diff</Button.Root>
                      <button
                        class="del-toggle"
                        class:del-selected={selectedForDeletion.has(sn.id)}
@@ -283,14 +284,43 @@
     border-radius: 0 0 24px;
   }
 
+  .body-table tbody tr {
+    transition: background 0.15s;
+  }
+
+  .body-table tbody tr:hover {
+    background: color-mix(in srgb, var(--muted) 8%, transparent);
+  }
+
   .copy-id {
     cursor: pointer;
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     transition: color 0.15s;
   }
 
-  .copy-id:hover {
-    color: var(--accent);
+  .copy-id-inner {
+    position: relative;
+  }
+
+  .copy-hint {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    font-size: 0.65rem;
+    color: var(--muted);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    transition: opacity 0.35s;
+    letter-spacing: 0.02em;
+  }
+
+  .body-table tbody tr:hover .copy-id {
+    color: var(--purple);
+  }
+
+  .body-table tbody tr:hover .copy-hint {
+    opacity: 0.55;
   }
 
   .rp-btn {
@@ -313,17 +343,19 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    opacity: 0.5;
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    opacity: 0.45;
     color: var(--muted);
     line-height: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
   }
 
-  .size-btn:hover {
+  .body-table tbody tr:hover .size-btn {
     opacity: 1;
-    background: var(--hover-bg);
+    background: color-mix(in srgb, var(--purple) 14%, transparent);
+    color: var(--purple);
   }
 
   .restore-point-info {

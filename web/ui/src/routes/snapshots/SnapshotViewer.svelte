@@ -408,9 +408,12 @@
         <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
       </div>
     </div>
-    <button class="diff-arrow-btn" title="Select diff target" onclick={onOpenDiffPicker}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+    <button class="button button-secondary button-xs mode-toggle" style="padding:8px;line-height:1;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-soft));border:1px solid transparent;" aria-label="Compare with another snapshot" data-tip="Compare with another snapshot" onclick={onOpenDiffPicker}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="2" y1="7" x2="19" y2="7"/>
+        <polyline points="16 4 19 7 16 10"/>
+        <line x1="22" y1="17" x2="5" y2="17"/>
+        <polyline points="8 20 5 17 8 14"/>
       </svg>
     </button>
     {#if currentDiffResult && diffOtherSnapshot}
@@ -634,32 +637,4 @@
     opacity: 1;
   }
 
-  .diff-arrow-btn {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 1.5px solid var(--border);
-    padding: 9px;
-    cursor: pointer;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s, border-color 0.15s;
-    margin-top: 4px;
-    flex-shrink: 0;
-  }
-
-  .diff-arrow-btn:hover {
-    background: color-mix(in srgb, var(--muted) 20%, transparent);
-    border-color: var(--muted);
-  }
-
-  .diff-arrow-btn:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .diff-arrow-btn:active {
-    border-color: var(--text);
-    background: color-mix(in srgb, var(--muted) 30%, transparent);
-  }
 </style>
