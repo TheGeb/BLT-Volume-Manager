@@ -408,13 +408,8 @@
         <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
       </div>
     </div>
-    <button class="button button-secondary button-xs mode-toggle" style="padding:8px;line-height:1;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-soft));border:1px solid transparent;" aria-label="Compare with another snapshot" data-tip="Compare with another snapshot" onclick={onOpenDiffPicker}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="2" y1="7" x2="19" y2="7"/>
-        <polyline points="16 4 19 7 16 10"/>
-        <line x1="22" y1="17" x2="5" y2="17"/>
-        <polyline points="8 20 5 17 8 14"/>
-      </svg>
+    <button class="button button-xs mode-toggle diff-compare-btn" aria-label="Compare with another snapshot" data-tip="Compare with another snapshot" onclick={onOpenDiffPicker}>
+      <img src="/compare-arrows.svg" width="32" height="32" alt="Compare" style="display:block;" />
     </button>
     {#if currentDiffResult && diffOtherSnapshot}
       <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;overflow:hidden;" transition:slideFade>
@@ -603,6 +598,22 @@
 
   .mode-toggle {
     position: relative;
+  }
+
+  .diff-compare-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px;
+    line-height: 1;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+    border: 1px solid transparent;
+  }
+
+  .diff-compare-btn:hover {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
   }
 
   .mode-toggle:hover::after {
