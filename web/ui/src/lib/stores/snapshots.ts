@@ -24,7 +24,6 @@ export const viewerOpen = writable(false);
 export const deleteSnapModal = writable(false);
 export const snapDeleteInput = writable('');
 export const diffTargetId = writable('');
-export const diffTargetFallbackHash = writable('');
 export const sizes = writable<Record<string, string>>({});
 export const restorePointLoading = writable<Record<string, boolean>>({});
 export const restorePointID = writable('');
@@ -296,6 +295,11 @@ export function findSnapshot(snaps: Snapshot[], id: string, hash?: string): Snap
     found = snaps.find(s => s.fallbackHash === hash);
   }
   return found;
+}
+
+export function findSnapshotByVersion(snaps: Snapshot[], version: string): Snapshot | undefined {
+  const tag = version.startsWith('v') ? version : 'v' + version;
+  return snaps.find(s => s.tags.includes(tag));
 }
 
 export function openBulkDeleteModal() {

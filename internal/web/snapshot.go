@@ -187,8 +187,20 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 	rm := s.volumeManager(volName)
 
 	rawID := parts[0]
+	version := r.URL.Query().Get("version")
 	fallbackHash := r.URL.Query().Get("fallbackHash")
 	action := parts[1]
+
+	resolve := func(id, ver, fallback string) string {
+		if ver != "" {
+			if resolved, err := findSnapshotByVersion(rm, ver); err == nil {
+				return resolved
+			}
+		}
+		return id
+	}
+
+	rawID = resolve(rawID, version, fallbackHash)
 
 	switch action {
 	case "ls":
@@ -244,7 +256,11 @@ func (s *Server) handleSnapshotView(w http.ResponseWriter, r *http.Request) {
 		}
 
 		secondID := parts[2]
+		diffVersion := r.URL.Query().Get("diffVersion")
 		diffFallback := r.URL.Query().Get("diffFallbackHash")
+
+		secondID = resolve(secondID, diffVersion, diffFallback)
+
 		result, err := rm.DiffSnapshots(rawID, secondID)
 		if err != nil {
 			resolvedFirst, resolvedSecond := rawID, secondID

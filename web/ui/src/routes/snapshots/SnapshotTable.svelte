@@ -403,12 +403,12 @@
     cursor: help;
     position: relative; top: 5px;
   }
+
   .restore-point-info::before {
     content: '';
     width: 22px; height: 22px;
-    background-color: currentColor;
+    background-color: currentcolor;
     mask: url('/info-circle.svg') no-repeat center / contain;
-    -webkit-mask: url('/info-circle.svg') no-repeat center / contain;
   }
 
   .restore-point-info:hover::after {

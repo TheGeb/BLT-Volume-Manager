@@ -69,17 +69,17 @@
     }
 
     if (volFromUrl && $volumes.includes(volFromUrl)) {
-      const navOpts: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string } = {};
+      const navOpts: { tab?: string; version?: string; diffVersion?: string; snapshotId?: string; diffId?: string } = {};
       const tab = tabFromUrl ?? params.get('tab');
+      if (tab) navOpts.tab = tab;
+      const version = params.get('version');
+      const diffVersion = params.get('diffVersion');
       const snapshotId = params.get('snapshot');
       const diffId = params.get('diff');
-      const fallbackHash = params.get('fallbackHash');
-      const diffFallbackHash = params.get('diffFallbackHash');
-      if (tab) navOpts.tab = tab;
-      if (snapshotId) navOpts.snapshotId = snapshotId;
-      if (diffId) navOpts.diffId = diffId;
-      if (fallbackHash) navOpts.fallbackHash = fallbackHash;
-      if (diffFallbackHash) navOpts.diffFallbackHash = diffFallbackHash;
+      if (version) navOpts.version = version;
+      else if (snapshotId) navOpts.snapshotId = snapshotId;
+      if (diffVersion) navOpts.diffVersion = diffVersion;
+      else if (diffId) navOpts.diffId = diffId;
       await navigateTo(volFromUrl, navOpts);
     }
     loading.set(false);

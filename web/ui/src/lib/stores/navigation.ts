@@ -1,11 +1,12 @@
 import { get } from 'svelte/store';
 import { writable } from 'svelte/store';
 import type { Snapshot } from '../types';
+import { versionTag } from '../util';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
 import { activeTab, loadLockStatus, loadStats, stats as repoStats, doSwitchTab } from './repo';
-import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal, findSnapshot } from './snapshots';
+import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, sizes, deleteSnapModal, findSnapshot, findSnapshotByVersion } from './snapshots';
 
 export const creatingTest = writable(false);
 export const testStatus = writable('');
@@ -19,7 +20,6 @@ export async function loadAll(volume: string) {
   deleteSnapModal.set(false);
   testStatus.set('');
   diffTargetId.set('');
-  diffTargetFallbackHash.set('');
   landingShown.set(!volume);
   syncUrl();
   if (volume) {
@@ -29,7 +29,7 @@ export async function loadAll(volume: string) {
   }
 }
 
-export async function navigateTo(volume: string, params?: { tab?: string; snapshotId?: string; diffId?: string; fallbackHash?: string; diffFallbackHash?: string }) {
+export async function navigateTo(volume: string, params?: { tab?: string; version?: string; diffVersion?: string; snapshotId?: string; diffId?: string }) {
   selectedVolume.set(volume);
   sizes.set({});
   deleteVolModal.set(false);
@@ -40,19 +40,15 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
   const tab = (params?.tab ?? 'snapshots') as 'snapshots' | 'repo';
   activeTab.set(tab);
 
-  if (tab === 'snapshots' && params?.snapshotId) {
+  const hasSnapshot = !!(params?.version ?? params?.snapshotId);
+
+  if (tab === 'snapshots' && hasSnapshot) {
     viewerOpen.set(true);
-    diffTargetId.set(params.diffId ?? '');
-    if (params.diffFallbackHash) {
-      diffTargetFallbackHash.set(params.diffFallbackHash);
-    } else if (!params.diffId) {
-      diffTargetFallbackHash.set('');
-    }
-  } else {
+    diffTargetId.set('');
+  } else if (tab === 'snapshots') {
     viewerOpen.set(false);
     currentSnapshot.set(null);
     diffTargetId.set('');
-    diffTargetFallbackHash.set('');
   }
 
   if (tab === 'repo') {
@@ -60,20 +56,20 @@ export async function navigateTo(volume: string, params?: { tab?: string; snapsh
   } else {
     await loadSnapshots(volume);
 
-    if (params?.snapshotId) {
-      const snap = findSnapshot(get(snapshots), params.snapshotId, params.fallbackHash);
-      if (snap) {
-        snap.fallbackHash = params.fallbackHash ?? '';
-        currentSnapshot.set(snap);
-      }
-      if (params.diffId && params.diffFallbackHash) {
-        const diffSnap = findSnapshot(get(snapshots), params.diffId, params.diffFallbackHash);
-        if (diffSnap) {
-          diffSnap.fallbackHash = diffSnap.fallbackHash ?? params.diffFallbackHash;
-          diffTargetFallbackHash.set(params.diffFallbackHash);
-          diffTargetId.set(diffSnap.id);
-        }
-      }
+    if (params?.version) {
+      const snap = findSnapshotByVersion(get(snapshots), params.version);
+      if (snap) currentSnapshot.set(snap);
+    } else if (params?.snapshotId) {
+      const snap = findSnapshot(get(snapshots), params.snapshotId);
+      if (snap) currentSnapshot.set(snap);
+    }
+
+    if (params?.diffVersion) {
+      const diffSnap = findSnapshotByVersion(get(snapshots), params.diffVersion);
+      if (diffSnap) diffTargetId.set(diffSnap.id);
+    } else if (params?.diffId) {
+      const diffSnap = findSnapshot(get(snapshots), params.diffId);
+      if (diffSnap) diffTargetId.set(diffSnap.id);
     }
   }
 }
@@ -154,20 +150,17 @@ export function onCloseViewer() {
   viewerOpen.set(false);
   currentSnapshot.set(null);
   diffTargetId.set('');
-  diffTargetFallbackHash.set('');
   syncUrl();
 }
 
 export function setDiffTarget(id: string) {
   if (!id) {
     diffTargetId.set('');
-    diffTargetFallbackHash.set('');
     syncUrl();
     return;
   }
   const snap = findSnapshot(get(allSnapshots), id);
   if (!snap) return;
-  diffTargetFallbackHash.set(snap.fallbackHash ?? '');
   diffTargetId.set(snap.id);
   syncUrl();
 }
@@ -182,24 +175,25 @@ function buildUrl(): string {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const snap = get(currentSnapshot)!;
     const p = new URLSearchParams();
-    p.set('snapshot', snap.short_id);
-
-    if (snap.fallbackHash) {
-      p.set('fallbackHash', snap.fallbackHash);
+    const vtag = versionTag(snap.tags);
+    if (vtag) {
+      p.set('version', vtag.replace(/^v/, ''));
+    } else {
+      p.set('snapshot', snap.short_id);
     }
     const dtId = get(diffTargetId);
     if (dtId) {
       const dtSnap = findSnapshot(get(allSnapshots), dtId);
       if (dtSnap) {
-        p.set('diff', dtSnap.short_id);
-        const hash = dtSnap.fallbackHash ?? get(diffTargetFallbackHash);
-        if (hash) {
-          p.set('diffFallbackHash', hash);
+        const dtVtag = versionTag(dtSnap.tags);
+        if (dtVtag) {
+          p.set('diffVersion', dtVtag.replace(/^v/, ''));
+        } else {
+          p.set('diff', dtSnap.short_id);
         }
       }
     }
-    const qs = p.toString();
-    if (qs) url += `?${qs}`;
+    if (p.size > 0) url += `?${p.toString()}`;
   }
   return url;
 }

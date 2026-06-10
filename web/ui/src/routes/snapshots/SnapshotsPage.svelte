@@ -9,7 +9,7 @@
   import {
     sizes, currentSnapshot,
     viewerOpen, snapsLoading, restorePointLoading,
-    sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
+    sizeLoading, displayedSnapshots, diffTargetId, restorePointID,
     selectedForDeletion, onAddTag, onRemoveTag,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded,
     pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize,

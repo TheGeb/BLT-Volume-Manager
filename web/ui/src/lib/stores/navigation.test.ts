@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
 import { selectedVolume, landingShown, deleteVolModal, deleteConfirmText, deleteVolLoading } from './volumes';
-import { currentSnapshot, viewerOpen, diffTargetId, diffTargetFallbackHash, sizes, deleteSnapModal } from './snapshots';
+import { currentSnapshot, viewerOpen, diffTargetId, sizes, deleteSnapModal } from './snapshots';
 import { onSelectVolume, onCloseViewer, confirmDeleteVolume } from './navigation';
 
 describe('onSelectVolume', () => {
@@ -14,7 +14,6 @@ describe('onSelectVolume', () => {
     deleteVolModal.set(false);
     deleteSnapModal.set(false);
     diffTargetId.set('');
-    diffTargetFallbackHash.set('');
   });
 
   it('clears selection when re-selecting the same volume', () => {
@@ -35,7 +34,6 @@ describe('onCloseViewer', () => {
     currentSnapshot.set({ id: '1', short_id: 'a', time: '', tags: [], paths: [], hostname: '' });
     viewerOpen.set(true);
     diffTargetId.set('target');
-    diffTargetFallbackHash.set('hash');
   });
 
   it('closes viewer and clears related state', () => {
@@ -43,7 +41,6 @@ describe('onCloseViewer', () => {
     expect(get(viewerOpen)).toBe(false);
     expect(get(currentSnapshot)).toBe(null);
     expect(get(diffTargetId)).toBe('');
-    expect(get(diffTargetFallbackHash)).toBe('');
   });
 });
 

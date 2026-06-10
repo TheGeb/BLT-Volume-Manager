@@ -39,6 +39,35 @@ type SnapshotFilter struct {
 	Query                      *string
 }
 
+func findSnapshotByVersion(rm *restic.Manager, version string) (string, error) {
+	tag := version
+	if !strings.HasPrefix(version, "v") {
+		tag = "v" + version
+	}
+	snapshots, err := rm.ListSnapshotsWithOpts(&restic.ListSnapshotsOpts{Tags: []string{tag}})
+	if err != nil {
+		return "", err
+	}
+	if len(snapshots) == 0 {
+		return "", &snapshotNotFoundError{version: version}
+	}
+	newest := snapshots[0]
+	for _, s := range snapshots[1:] {
+		if s.Time.After(newest.Time) {
+			newest = s
+		}
+	}
+	return newest.ID, nil
+}
+
+type snapshotNotFoundError struct {
+	version string
+}
+
+func (e *snapshotNotFoundError) Error() string {
+	return "snapshot not found for version " + e.version
+}
+
 func parseVersionParam(s string) (major, minor int, ok bool) {
 	parts := strings.SplitN(s, ".", 2)
 	if len(parts) != 2 {
