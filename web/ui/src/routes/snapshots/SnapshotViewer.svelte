@@ -409,7 +409,7 @@
       </div>
     </div>
     <button class="button button-xs mode-toggle diff-compare-btn" aria-label="Compare with another snapshot" data-tip="Compare with another snapshot" onclick={onOpenDiffPicker}>
-      <img src="/compare-arrows.svg" width="32" height="32" alt="Compare" style="display:block;" />
+      <img src="/compare-arrows.svg" width="24" height="24" alt="Compare" style="transform:scale(1.1);display:block;" />
     </button>
     {#if currentDiffResult && diffOtherSnapshot}
       <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;overflow:hidden;" transition:slideFade>
