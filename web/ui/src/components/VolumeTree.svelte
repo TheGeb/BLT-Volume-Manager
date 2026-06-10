@@ -420,6 +420,10 @@
 
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
+  .tree-scroll-root {
+    scrollbar-gutter: stable;
+  }
+
   .tree-scroll-root::-webkit-scrollbar {
     width: 8px;
   }
@@ -440,7 +444,7 @@
     background-clip: padding-box;
   }
 
-  .tree { display: flex; flex-direction: column; padding-bottom: 4px; min-height: 0; }
+  .tree { display: flex; flex-direction: column; padding-bottom: 4px; padding-right: 8px; min-height: 0; }
 
   .tree-row-wrap { position: relative; display: block; margin-bottom: -2px; }
   .tree-row-wrap:hover { z-index: 10; }
