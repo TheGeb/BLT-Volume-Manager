@@ -12,7 +12,8 @@
     sizeLoading, displayedSnapshots, diffTargetId, diffTargetFallbackHash, restorePointID,
     selectedForDeletion, onAddTag, onRemoveTag,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded,
-    pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize
+    pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize,
+    sortNewestFirst, onToggleSort
   } from '$lib/stores/snapshots';
   import { activeTab } from '$lib/stores/repo';
   import { selectedVolume } from '$lib/stores/volumes';
@@ -108,6 +109,8 @@
       hasMore={$hasMore}
       onGoToPage={goToPage}
       onSetPageSize={setPageSize}
+      sortNewestFirst={$sortNewestFirst}
+      onToggleSort={onToggleSort}
     />
   </div>
 </div>

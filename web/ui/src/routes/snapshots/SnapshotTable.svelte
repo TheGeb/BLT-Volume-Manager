@@ -25,6 +25,8 @@
   export let hasMore = false;
   export let onGoToPage: (page: number) => void = () => {};
   export let onSetPageSize: (size: number) => void = () => {};
+  export let sortNewestFirst = true;
+  export let onToggleSort: () => void = () => {};
 
   let pendingPage: string | undefined = undefined;
   $: pageDisplay = pendingPage ?? String(page);
@@ -69,13 +71,20 @@
         <tr>
           <th style="text-align:center;white-space:nowrap;">
             Restore Point
-            <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time.">i</span>
+            <span class="restore-point-info" data-tip="Each snapshot can optionally be set as the restore point by clicking its radio button. Click an active restore point to unset it. Only one snapshot can be the restore point at a time."></span>
           </th>
           <th>Version</th>
           <th>Type</th>
           <th style="text-align:center;">Size</th>
           <th>Host</th>
-          <th>Date</th>
+          <th>
+            <button type="button" class="sort-btn" onclick={onToggleSort}>
+              Date
+              <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
+                <path d="M3 2l5 6 5-6H3z"/>
+              </svg>
+            </button>
+          </th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -246,6 +255,36 @@
     white-space: nowrap;
   }
 
+  .sort-btn {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    appearance: none;
+  }
+
+  .sort-btn:hover {
+    color: var(--text);
+  }
+
+  .sort-chevron {
+    opacity: 0.8;
+    transition: transform 0.15s;
+  }
+
+  .sort-desc {
+    transform: rotate(180deg);
+  }
+
   .body-table {
     width: 100%;
     border-collapse: collapse;
@@ -359,11 +398,17 @@
   }
 
   .restore-point-info {
-    position: relative; display: inline-flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; border-radius: 50%;
-    border: 1.5px solid var(--muted); color: var(--muted);
-    font-size: 11px; font-weight: 700; cursor: help; font-style: normal;
-    margin-left: 6px; vertical-align: middle;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    cursor: help;
+    position: relative; top: 5px;
+  }
+  .restore-point-info::before {
+    content: '';
+    width: 22px; height: 22px;
+    background-color: currentColor;
+    mask: url('/info-circle.svg') no-repeat center / contain;
+    -webkit-mask: url('/info-circle.svg') no-repeat center / contain;
   }
 
   .restore-point-info:hover::after {
