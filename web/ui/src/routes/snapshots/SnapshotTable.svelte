@@ -63,8 +63,7 @@
   </colgroup>
 {/snippet}
 
-<section class="panel table-panel" style="margin-bottom:0;">
-  <div class="table-scroll-wrapper">
+<div class="table-scroll-wrapper">
     <table class="header-table">
       {@render columns()}
       <thead>
@@ -235,7 +234,6 @@
       </tfoot>
     </table>
   </div>
-</section>
 
 <style>
   .header-table {

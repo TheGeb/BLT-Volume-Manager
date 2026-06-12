@@ -42,10 +42,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 7px 12px;
     min-width: 0;
     white-space: nowrap;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.82rem;
     background: var(--surface-strong);
   }
 

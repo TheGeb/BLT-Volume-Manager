@@ -1,8 +1,8 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
+  import SnapshotSearch from './SnapshotSearch.svelte';
   import SnapshotTable from './SnapshotTable.svelte';
   import SnapshotViewer from './SnapshotViewer.svelte';
-  import SnapshotSearch from './SnapshotSearch.svelte';
   import Modal from '../../components/Modal.svelte';
   import SnapshotPicker from '../../components/SnapshotPicker.svelte';
   import { onSelectVolume, onOpenViewer, onCloseViewer, switchTab, setDiffTarget, syncUrl } from '$lib/stores/navigation';
@@ -88,6 +88,7 @@
       />
     </Modal>
 
+    <section class="panel table-panel">
     <SnapshotSearch />
     <SnapshotTable
       snapshots={$displayedSnapshots}
@@ -112,5 +113,6 @@
       sortNewestFirst={$sortNewestFirst}
       onToggleSort={onToggleSort}
     />
+    </section>
   </div>
 </div>
