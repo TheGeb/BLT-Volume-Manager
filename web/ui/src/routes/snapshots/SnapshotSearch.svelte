@@ -466,15 +466,21 @@
     font-size: 0.85rem;
     font-weight: 600;
     height: auto;
-    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+    background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 35%, var(--accent-soft)));
     color: #fff;
-    border: 1px solid transparent;
+    border: 1px solid var(--accent);
     cursor: pointer;
+    appearance: none;
+    outline: none;
   }
 
   :global(.search-btn:hover) {
-    border-color: var(--accent);
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 85%, #fff), color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, var(--accent-soft)) 85%, #fff));
+  }
+
+  :global(.search-btn:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   :global(.clear-btn) {
@@ -488,6 +494,8 @@
     cursor: default;
     font-family: inherit;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
+    appearance: none;
+    outline: none;
   }
 
   :global(.clear-btn.clear-active) {

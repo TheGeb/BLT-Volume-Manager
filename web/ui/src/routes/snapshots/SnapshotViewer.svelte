@@ -607,13 +607,12 @@
     padding: 7px;
     line-height: 1;
     color: #fff;
-    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-    border: 1px solid transparent;
+    background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 35%, var(--accent-soft)));
+    border: 1px solid var(--accent);
   }
 
   .diff-compare-btn:hover {
-    border-color: var(--accent);
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-soft) 70%, #fff));
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 85%, #fff), color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, var(--accent-soft)) 85%, #fff));
   }
 
   .mode-toggle:hover::after {
