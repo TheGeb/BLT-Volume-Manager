@@ -1,0 +1,97 @@
+package web
+
+import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
+)
+
+const gzipMinSize = 1024
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
+		next.ServeHTTP(lw, r)
+		dur := time.Since(start)
+		level := applog.LevelDebug
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, ".js") {
+			level = applog.LevelTrace
+		}
+		applog.LogEvent(level, applog.Event{
+			Event:      "http_request",
+			Method:     r.Method,
+			Path:       r.URL.Path,
+			Status:     lw.status,
+			DurationMs: dur.Milliseconds(),
+		})
+	})
+}
+
+func nosniffMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		buf := &bufferResponseWriter{ResponseWriter: w, buf: &bytes.Buffer{}, code: http.StatusOK}
+		next.ServeHTTP(buf, r)
+		if buf.code >= 300 || buf.buf.Len() < gzipMinSize {
+			w.WriteHeader(buf.code)
+			_, _ = w.Write(buf.buf.Bytes())
+			return
+		}
+		w.Header().Del("Content-Length")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.WriteHeader(buf.code)
+		gz := gzip.NewWriter(w)
+		_, _ = gz.Write(buf.buf.Bytes())
+		_ = gz.Close()
+	})
+}
+
+type bufferResponseWriter struct {
+	http.ResponseWriter
+	buf  *bytes.Buffer
+	code int
+}
+
+func (b *bufferResponseWriter) Write(p []byte) (int, error) {
+	return b.buf.Write(p)
+}
+
+func (b *bufferResponseWriter) WriteHeader(code int) {
+	b.code = code
+}
+
+func (b *bufferResponseWriter) Flush() {}
+
+func (b *bufferResponseWriter) Hijack() (interface{ Hijack() }, error) {
+	return nil, fmt.Errorf("gzip middleware does not support hijacking")
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (lw *loggingResponseWriter) WriteHeader(code int) {
+	lw.status = code
+	lw.ResponseWriter.WriteHeader(code)
+}

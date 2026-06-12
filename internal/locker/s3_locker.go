@@ -2,7 +2,6 @@ package locker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -54,47 +53,15 @@ func NewS3Locker(bucket string, endpoint string, region string, maxHoldMins int)
 
 func (s *s3Locker) Acquire(ctx context.Context, name string) (Lock, error) {
 	folder := store.LockFolder(name)
-	s3 := s.store
-
 	myName := fmt.Sprintf("%s-%d", store.Hostname(), os.Getpid())
 	expiry := time.Now().Add(time.Minute * time.Duration(s.maxHoldMins+2)).Unix()
-	myKey := fmt.Sprintf("%s%s-%d.json", folder, myName, expiry)
 
-	proposal := store.LockOwner{Name: myName, ExpiryTime: expiry}
-	data, err := json.Marshal(proposal)
+	myKey, err := store.AcquireLock(s.store, folder, myName, expiry)
 	if err != nil {
-		return nil, &LockError{Code: NoLockAcquired, Msg: fmt.Sprintf("marshal proposal: %v", err)}
+		return nil, &LockError{Code: LockHeldByAnother, Msg: err.Error()}
 	}
 
-	if err := s3.PutObject(myKey, data); err != nil {
-		return nil, &LockError{Code: NoLockAcquired, Msg: fmt.Sprintf("create proposal: %v", err)}
-	}
-
-	objects, err := s3.ListObjects(folder)
-	if err != nil {
-		if derr := s3.DeleteObject(myKey); derr != nil {
-			applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
-		}
-		return nil, &LockError{Code: NoLockAcquired, Msg: fmt.Sprintf("list proposals: %v", err)}
-	}
-
-	store.SortLockObjects(objects)
-
-	key, _, _ := store.FilterValidLocksByKey(s3, objects)
-	if key == "" {
-		if derr := s3.DeleteObject(myKey); derr != nil {
-			applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
-		}
-		return nil, &LockError{Code: LockHeldByAnother, Msg: "lock held by another host"}
-	}
-	if key == myKey {
-		return &s3Lock{store: s3, myKey: myKey}, nil
-	}
-
-	if derr := s3.DeleteObject(myKey); derr != nil {
-		applog.Errorf("s3_locker_cleanup_failed", derr, "key=%s", myKey)
-	}
-	return nil, &LockError{Code: LockHeldByAnother, Msg: "lock held by another host"}
+	return &s3Lock{store: s.store, myKey: myKey}, nil
 }
 
 func (l *s3Lock) Release() error {

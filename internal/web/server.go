@@ -124,12 +124,40 @@ func (s *Server) getOrCreateS3StoreWithPrefix(prefix string) (store.S3Store, err
 	return s3Store, nil
 }
 
+func (s *Server) isS3Backend() bool {
+	return strings.HasPrefix(s.resticBase, "s3:")
+}
+
 func (s *Server) volumeManager(volName string) *restic.Manager {
 	m := restic.NewManager(s.resticBase + "/restic/" + volName)
 	if s3, err := s.getOrCreateS3Store(); err == nil && s3 != nil {
-		m.SetS3Store(s3)
+		m.SetRestorePointStore(s3)
 	}
 	return m
+}
+
+func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
+	cfg := store.S3StoreConfig{
+		S3Bucket:       s.s3Bucket,
+		S3LockFolder:   store.LockFolder(volumeName),
+		S3VolumePrefix: store.VolumePrefix,
+		S3Endpoint:     s.s3Endpoint,
+		Region:         s.s3Region,
+		Logger:         s3LogFn(),
+	}
+	return store.NewS3Store(cfg)
+}
+
+func (s *Server) storeForResticData() (store.ObjectStore, error) {
+	if s.s3Bucket == "" {
+		return nil, nil //nolint:nilnil // S3 not configured is not an error
+	}
+	return store.NewS3Store(store.S3StoreConfig{
+		S3Bucket:   s.s3Bucket,
+		S3Endpoint: s.s3Endpoint,
+		Region:     s.s3Region,
+		Logger:     s3LogFn(),
+	})
 }
 
 func (s *Server) nextVersionTags(volName string, major bool) []string {

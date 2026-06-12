@@ -22,14 +22,14 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/volume/")
-	if path == "" || strings.Contains(path, "..") {
+	if !validVolumeName(path) {
 		http.NotFound(w, r)
 		return
 	}
 
 	if strings.HasSuffix(path, "/copy") {
 		volumeName := strings.TrimSuffix(path, "/copy")
-		if volumeName == "" || strings.Contains(volumeName, "..") {
+		if !validVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -39,7 +39,7 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasSuffix(path, "/rename") {
 		volumeName := strings.TrimSuffix(path, "/rename")
-		if volumeName == "" || strings.Contains(volumeName, "..") {
+		if !validVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -57,7 +57,7 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	volumeName := strings.TrimSuffix(path, "/"+constants.LocksDir)
-	if volumeName == "" || strings.Contains(volumeName, "..") {
+	if !validVolumeName(volumeName) {
 		http.NotFound(w, r)
 		return
 	}
@@ -98,61 +98,46 @@ func (s *Server) handleVolumeAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
-	if volumeName == "" || strings.Contains(volumeName, "..") || strings.Contains(volumeName, "/") || strings.Contains(volumeName, "\\") {
-		http.Error(w, "invalid volume name", http.StatusBadRequest)
+func (s *Server) cleanupVolumeData(volumeName string) {
+	if volumeName == "" {
 		return
 	}
-	// 1. Delete S3 locks, volume marker, and restore point
 	if s.s3Bucket != "" {
-		s3, err := store.NewS3Store(store.S3StoreConfig{
-			S3Bucket:       s.s3Bucket,
-			S3VolumePrefix: store.VolumePrefix,
-			S3Endpoint:     s.s3Endpoint,
-			Region:         s.s3Region,
-			Logger:         s3LogFn(),
-		})
-		if err == nil {
-			if err := s3.DeleteObjectsWithPrefix(store.LockFolder(volumeName)); err != nil {
+		if volStore, err := s.storeForVolume(volumeName); err == nil {
+			if err := volStore.DeleteObjectsWithPrefix(store.LockFolder(volumeName)); err != nil {
 				logError("delete_lock_objects_failed", err)
 			}
-			if err := s3.DeleteVolumeMarker(volumeName); err != nil {
+			if err := volStore.DeleteVolumeMarker(volumeName); err != nil {
 				logError("delete_volume_marker_failed", err)
 			}
-			if err := s3.DeleteRestorePoint(volumeName); err != nil {
+			if err := volStore.DeleteRestorePoint(volumeName); err != nil {
 				logError("delete_restore_point_failed", err)
 			}
 		}
-	}
-
-	// 2. Delete S3 restic repo data (if repo is S3-based)
-	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
-		s3, err := store.NewS3Store(store.S3StoreConfig{
-			S3Bucket:   s.s3Bucket,
-			S3Endpoint: s.s3Endpoint,
-			Region:     s.s3Region,
-			Logger:     s3LogFn(),
-		})
-		if err == nil {
-			if err := s3.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/"); err != nil {
-				logError("delete_restic_data_failed", err)
+		if s.isS3Backend() {
+			if dataStore, err := s.storeForResticData(); err == nil && dataStore != nil {
+				if err := dataStore.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/"); err != nil {
+					logError("delete_restic_data_failed", err)
+				}
 			}
 		}
 	}
-
-	// 3. Delete local restic repo directory (if resticBase is a local path)
-	if !strings.HasPrefix(s.resticBase, "s3:") {
+	if !s.isS3Backend() {
 		repoPath := filepath.Join(s.resticBase, constants.ResticDir, volumeName)
-		//nolint:gosec // volumeName is validated above
+		//nolint:gosec // volumeName is validated by caller
 		if err := os.RemoveAll(repoPath); err != nil {
-			respondError(w, fmt.Errorf("delete restic repo: %w", err), http.StatusInternalServerError)
-			return
+			logError("delete_restic_repo_failed", err)
 		}
 	}
+}
 
-	// 4. Refresh caches
+func (s *Server) handleDeleteVolume(w http.ResponseWriter, r *http.Request, volumeName string) {
+	if !validVolumeName(volumeName) || strings.Contains(volumeName, "/") {
+		http.Error(w, "invalid volume name", http.StatusBadRequest)
+		return
+	}
+	s.cleanupVolumeData(volumeName)
 	s.refreshStats()
-
 	respondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
@@ -173,29 +158,14 @@ func (s *Server) getVolumeLock(volumeName string) (map[string]any, error) {
 	}
 
 	store.SortLockObjects(objects)
+	objects = store.FilterStaleLockObjects(s3, objects, constants.DefaultLockTTL)
 
 	result := map[string]any{
 		"volume": volumeName,
 		"locked": false,
 	}
 
-	lockTTL := constants.DefaultLockTTL
-	// Filter out stale objects older than lockTTL
-	validObjects := objects[:0]
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		if obj.LastModified != nil && time.Since(*obj.LastModified) > lockTTL {
-			if err := s3.DeleteObject(*obj.Key); err != nil {
-				logError("delete_stale_lock_failed", err)
-			}
-			continue
-		}
-		validObjects = append(validObjects, obj)
-	}
-
-	key, owner, expiry := store.FilterValidLocksByKey(s3, validObjects)
+	key, owner, expiry := store.FilterValidLocksByKey(s3, objects)
 	if key != "" {
 		result["locked"] = true
 		result["owner"] = owner
@@ -224,35 +194,19 @@ func (s *Server) handleVolumesLocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s3, err := store.NewS3Store(store.S3StoreConfig{
-		S3Bucket:   s.s3Bucket,
-		S3Endpoint: s.s3Endpoint,
-		Region:     s.s3Region,
-		Logger:     s3LogFn(),
-	})
-	if err != nil || s3 == nil {
+	s3Store, err := s.getOrCreateS3Store()
+	if err != nil || s3Store == nil {
 		respondJSON(w, map[string]any{"locks": locks})
 		return
 	}
 
-	objects, listErr := s3.ListObjects(store.LockPrefix)
+	objects, listErr := s3Store.ListObjects(store.LockPrefix)
 	if listErr != nil {
 		respondJSON(w, map[string]any{"locks": locks})
 		return
 	}
 
-	lockTTL := constants.DefaultLockTTL
-	var kept []types.Object
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		if obj.LastModified != nil && time.Since(*obj.LastModified) > lockTTL {
-			_ = s3.DeleteObject(*obj.Key)
-			continue
-		}
-		kept = append(kept, obj)
-	}
+	kept := store.FilterStaleLockObjects(s3Store, objects, constants.DefaultLockTTL)
 
 	grouped := make(map[string][]types.Object)
 	for _, obj := range kept {
@@ -268,7 +222,7 @@ func (s *Server) handleVolumesLocks(w http.ResponseWriter, r *http.Request) {
 
 	for vol, objs := range grouped {
 		store.SortLockObjects(objs)
-		key, owner, expiry := store.FilterValidLocksByKey(s3, objs)
+		key, owner, expiry := store.FilterValidLocksByKey(s3Store, objs)
 		if key != "" {
 			result := map[string]any{
 				"volume": vol,
@@ -306,54 +260,11 @@ func (s *Server) createVolumeLock(volumeName, ownerName string, lockDurationMins
 	if lockDurationMins > 0 {
 		expiry = time.Now().Add(time.Duration(lockDurationMins) * time.Minute).Unix()
 	}
+
 	folder := store.LockFolder(volumeName)
-	myKey := fmt.Sprintf("%s%s-%d.json", folder, ownerName, expiry)
-
-	proposal := store.LockOwner{Name: ownerName, ExpiryTime: expiry}
-	data, err := json.Marshal(proposal)
+	_, err = store.AcquireLock(s3, folder, ownerName, expiry)
 	if err != nil {
-		return nil, fmt.Errorf("marshal proposal: %w", err)
-	}
-	if err := s3.PutObject(myKey, data); err != nil {
-		return nil, fmt.Errorf("create proposal: %w", err)
-	}
-
-	objects, err := s3.ListObjects(folder)
-	if err != nil {
-		if derr := s3.DeleteObject(myKey); derr != nil {
-			logError("cleanup_proposal_failed", derr)
-		}
-		return nil, fmt.Errorf("list proposals: %w", err)
-	}
-
-	store.SortLockObjects(objects)
-
-	// Delete stale proposals from the same owner
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		k := *obj.Key
-		if k == myKey || !strings.Contains(k, ownerName) {
-			continue
-		}
-		if err := s3.DeleteObject(k); err != nil {
-			logError("cleanup_stale_proposal_failed", err)
-		}
-	}
-
-	// Re-list after cleanup
-	objects, err = s3.ListObjects(folder)
-	if err == nil {
-		store.SortLockObjects(objects)
-	}
-
-	key, _, _ := store.FilterValidLocksByKey(s3, objects)
-	if key != myKey {
-		if err := s3.DeleteObject(myKey); err != nil {
-			logError("cleanup_proposal_failed", err)
-		}
-		return nil, errors.New("another lock proposal was earlier")
+		return nil, err
 	}
 
 	return map[string]any{
@@ -361,19 +272,6 @@ func (s *Server) createVolumeLock(volumeName, ownerName string, lockDurationMins
 		"owner":      ownerName,
 		"expires_at": expiry,
 	}, nil
-}
-
-func (s *Server) storeForVolume(volumeName string) (store.S3Store, error) {
-	cfg := store.S3StoreConfig{
-		S3Bucket:       s.s3Bucket,
-		S3LockFolder:   store.LockFolder(volumeName),
-		S3VolumePrefix: store.VolumePrefix,
-		S3Endpoint:     s.s3Endpoint,
-		Region:         s.s3Region,
-		Logger:         s3LogFn(),
-	}
-
-	return store.NewS3Store(cfg)
 }
 
 func (s *Server) isVolumeLocked(volumeName string) (bool, string, error) {
@@ -406,11 +304,7 @@ func (s *Server) handleCopyVolume(w http.ResponseWriter, r *http.Request, volume
 		respondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
 		return
 	}
-	if req.Target == "" {
-		respondError(w, fmt.Errorf("missing target volume name"), http.StatusBadRequest)
-		return
-	}
-	if strings.Contains(req.Target, "..") {
+	if !validVolumeName(req.Target) {
 		respondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
 		return
 	}
@@ -509,11 +403,7 @@ func (s *Server) handleRenameVolume(w http.ResponseWriter, r *http.Request, volu
 		respondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
 		return
 	}
-	if req.Target == "" {
-		respondError(w, fmt.Errorf("missing target volume name"), http.StatusBadRequest)
-		return
-	}
-	if strings.Contains(req.Target, "..") {
+	if !validVolumeName(req.Target) {
 		respondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
 		return
 	}
@@ -562,61 +452,19 @@ func (s *Server) handleRenameVolume(w http.ResponseWriter, r *http.Request, volu
 	}
 
 	// Write target volume marker
-	s3, err := s.getOrCreateS3StoreWithPrefix(store.VolumePrefix)
+	vs, err := s.getOrCreateS3StoreWithPrefix(store.VolumePrefix)
 	if err != nil {
 		respondError(w, fmt.Errorf("create s3 store: %w", err), http.StatusInternalServerError)
 		return
 	}
-	if s3 != nil {
-		if err := s3.WriteVolumeMarker(req.Target); err != nil {
+	if vs != nil {
+		if err := vs.WriteVolumeMarker(req.Target); err != nil {
 			respondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
 			return
 		}
-		// Delete source volume marker
-		if err := s3.DeleteVolumeMarker(volumeName); err != nil {
-			logError("delete_volume_marker_failed", err)
-		}
-		// Delete source restore point
-		rpS3, rpErr := s.storeForVolume(volumeName)
-		if rpErr == nil {
-			if err := rpS3.DeleteRestorePoint(volumeName); err != nil {
-				logError("delete_restore_point_failed", err)
-			}
-		}
 	}
 
-	// Delete source locks
-	if s.s3Bucket != "" {
-		lockS3, err := s.storeForVolume(volumeName)
-		if err == nil {
-			if err := lockS3.DeleteLockObjects(); err != nil {
-				logError("delete_lock_objects_failed", err)
-			}
-		}
-	}
-
-	// Delete source restic repo data
-	if s.s3Bucket != "" && strings.HasPrefix(s.resticBase, "s3:") {
-		s3, err := store.NewS3Store(store.S3StoreConfig{
-			S3Bucket:   s.s3Bucket,
-			S3Endpoint: s.s3Endpoint,
-			Region:     s.s3Region,
-			Logger:     s3LogFn(),
-		})
-		if err == nil {
-			if err := s3.DeleteObjectsWithPrefix(constants.ResticDir + "/" + volumeName + "/"); err != nil {
-				logError("delete_restic_data_failed", err)
-			}
-		}
-	}
-	if !strings.HasPrefix(s.resticBase, "s3:") {
-		repoPath := filepath.Join(s.resticBase, constants.ResticDir, volumeName)
-		//nolint:gosec // volumeName is validated above
-		if err := os.RemoveAll(repoPath); err != nil {
-			logError("delete_restic_repo_failed", err)
-		}
-	}
-
+	s.cleanupVolumeData(volumeName)
 	s.refreshStats()
 
 	respondJSON(w, map[string]any{

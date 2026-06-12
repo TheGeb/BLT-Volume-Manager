@@ -61,7 +61,7 @@ type Manager struct {
 
 // SetS3Store configures the restore point store. Deprecated: prefer SetRestorePointStore.
 func (m *Manager) SetS3Store(rps store.RestorePointStore) {
-	m.restorePts = rps
+	m.SetRestorePointStore(rps)
 }
 
 // SetRestorePointStore configures the restore point store.

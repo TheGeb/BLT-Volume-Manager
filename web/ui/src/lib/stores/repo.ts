@@ -24,9 +24,15 @@ export async function loadDevMode() {
 }
 
 export function toggleTheme() {
+  document.documentElement.classList.add('no-theme-transition');
   themeDark.update(v => !v);
   document.body.classList.toggle('light', !get(themeDark));
   localStorage.setItem('themeDark', JSON.stringify(get(themeDark)));
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove('no-theme-transition');
+    });
+  });
 }
 
 interface AccentColorDef {

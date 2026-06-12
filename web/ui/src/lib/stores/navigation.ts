@@ -29,7 +29,7 @@ export async function loadAll(volume: string) {
   }
 }
 
-export async function navigateTo(volume: string, params?: { tab?: string; version?: string; diffVersion?: string; snapshotId?: string; diffId?: string }) {
+export async function navigateTo(volume: string, params?: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; diffId?: string }) {
   selectedVolume.set(volume);
   sizes.set({});
   deleteVolModal.set(false);
@@ -40,7 +40,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; versio
   const tab = (params?.tab ?? 'snapshots') as 'snapshots' | 'repo';
   activeTab.set(tab);
 
-  const hasSnapshot = !!(params?.version ?? params?.snapshotId);
+  const hasSnapshot = !!(params?.tag ?? params?.snapshotId);
 
   if (tab === 'snapshots' && hasSnapshot) {
     viewerOpen.set(true);
@@ -56,16 +56,16 @@ export async function navigateTo(volume: string, params?: { tab?: string; versio
   } else {
     await loadSnapshots(volume);
 
-    if (params?.version) {
-      const snap = findSnapshotByVersion(get(snapshots), params.version);
+    if (params?.tag) {
+      const snap = findSnapshotByVersion(get(snapshots), params.tag);
       if (snap) currentSnapshot.set(snap);
     } else if (params?.snapshotId) {
       const snap = findSnapshot(get(snapshots), params.snapshotId);
       if (snap) currentSnapshot.set(snap);
     }
 
-    if (params?.diffVersion) {
-      const diffSnap = findSnapshotByVersion(get(snapshots), params.diffVersion);
+    if (params?.diffTag) {
+      const diffSnap = findSnapshotByVersion(get(snapshots), params.diffTag);
       if (diffSnap) diffTargetId.set(diffSnap.id);
     } else if (params?.diffId) {
       const diffSnap = findSnapshot(get(snapshots), params.diffId);
@@ -177,7 +177,7 @@ function buildUrl(): string {
     const p = new URLSearchParams();
     const vtag = versionTag(snap.tags);
     if (vtag) {
-      p.set('version', vtag.replace(/^v/, ''));
+      p.set('tag', vtag);
     } else {
       p.set('snapshot', snap.short_id);
     }
@@ -187,7 +187,7 @@ function buildUrl(): string {
       if (dtSnap) {
         const dtVtag = versionTag(dtSnap.tags);
         if (dtVtag) {
-          p.set('diffVersion', dtVtag.replace(/^v/, ''));
+          p.set('diffTag', dtVtag);
         } else {
           p.set('diff', dtSnap.short_id);
         }

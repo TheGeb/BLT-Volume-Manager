@@ -34,7 +34,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create real s3 store: %v", err)
 	}
-	rm.SetS3Store(realStore)
+	rm.SetRestorePointStore(realStore)
 
 	if err := rm.Init(); err != nil {
 		t.Fatalf("init: %v", err)

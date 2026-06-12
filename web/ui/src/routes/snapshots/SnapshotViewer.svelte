@@ -13,6 +13,7 @@
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';
   import FileDiff from './FileDiff.svelte';
+  import FilterInput from '../../components/FilterInput.svelte';
   import Spinner from '../../components/Spinner.svelte';
 
   function slideFade(node: Element, { duration = 250, direction = 1 } = {}) {
@@ -448,18 +449,7 @@
     <div style="display:flex;flex:1;min-height:0;">
       <div id="viewerTreePanel" style="flex:0 0 {treePanelStartWidth}px;display:flex;flex-direction:column;gap:6px;min-width:0;" bind:this={treePanelEl}>
          <div style="display:flex;gap:4px;align-items:center;">
-          <input type="search" placeholder="Search files..." bind:value={treeSearchQuery} class="search-files-input" onkeydown={(e) => e.key === 'Enter' && nextSearchResult()} />
-          <button class="button button-secondary button-xs mode-toggle" style="padding:7px;line-height:1;color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);" data-tip={treeSearchFullPath ? 'Full path search (on)' : 'Full path search (off)'} onclick={() => treeSearchFullPath = !treeSearchFullPath}>
-              {#if treeSearchFullPath}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-                  <line x1="17" y1="4" x2="7" y2="20"/>
-                </svg>
-              {:else}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-              {/if}
-            </button>
+          <FilterInput fill bind:value={treeSearchQuery} bind:fullPath={treeSearchFullPath} placeholder="Search files..." onEnter={nextSearchResult} />
           {#if treeSearchQuery}
             <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;">
               {treeSearchResults.length > 0 ? treeSearchIndex + 1 : 0}/{treeSearchResults.length}
@@ -541,26 +531,6 @@
 </section>
 
 <style>
-  .search-files-input {
-    flex: 1;
-    padding: 6px 8px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: rgb(255 255 255 / 4%);
-    color: var(--text);
-    font-size: 0.8rem;
-    outline: none;
-    min-width: 0;
-  }
-
-  .search-files-input:hover {
-    border-color: color-mix(in srgb, var(--muted), var(--bg) 40%);
-  }
-
-  .search-files-input:focus {
-    border-color: var(--muted);
-  }
-
   .eyebrow {
     margin: 0 0 8px;
     color: var(--accent);
@@ -613,25 +583,6 @@
 
   .diff-compare-btn:hover {
     background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 85%, #fff), color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, var(--accent-soft)) 85%, #fff));
-  }
-
-  .mode-toggle:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--surface-strong);
-    color: var(--text);
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 400;
-    white-space: nowrap;
-    z-index: 10;
-    pointer-events: none;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
-    margin-bottom: 6px;
   }
 
   :global(.clear-diff-btn) {

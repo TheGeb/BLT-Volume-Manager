@@ -55,6 +55,9 @@
       themeDark.set(false);
     }
     if (!$themeDark) document.body.classList.add('light');
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove('no-theme-transition');
+    });
     const savedAccent = localStorage.getItem('accentColor');
     if (savedAccent) {
       setAccentColor(savedAccent);
@@ -83,16 +86,16 @@
     }
 
     if (volFromUrl && $volumes.includes(volFromUrl)) {
-      const navOpts: { tab?: string; version?: string; diffVersion?: string; snapshotId?: string; diffId?: string } = {};
+      const navOpts: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; diffId?: string } = {};
       const tab = tabFromUrl ?? params.get('tab');
       if (tab) navOpts.tab = tab;
-      const version = params.get('version');
-      const diffVersion = params.get('diffVersion');
+      const tag = params.get('tag');
+      const diffTag = params.get('diffTag');
       const snapshotId = params.get('snapshot');
       const diffId = params.get('diff');
-      if (version) navOpts.version = version;
+      if (tag) navOpts.tag = tag;
       else if (snapshotId) navOpts.snapshotId = snapshotId;
-      if (diffVersion) navOpts.diffVersion = diffVersion;
+      if (diffTag) navOpts.diffTag = diffTag;
       else if (diffId) navOpts.diffId = diffId;
       await navigateTo(volFromUrl, navOpts);
     }

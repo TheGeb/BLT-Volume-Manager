@@ -13,9 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// ErrRestorePointNotFound is returned when a restore point does not exist.
-var ErrRestorePointNotFound = errors.New("restore point not found")
-
 // LockFolder returns the S3 prefix for a volume's lock objects.
 func LockFolder(volumeName string) string {
 	return LockPrefix + volumeName + "/"
@@ -42,35 +39,7 @@ func SortLockObjects(objects []types.Object) {
 	})
 }
 
-// FilterValidLocks reads lock objects, deletes expired ones, and returns
-// the first valid lock owner and its key. Returns ("", nil, 0) if no valid lock.
-func FilterValidLocks(s3 ObjectStore, objects []types.Object) (firstKey string, firstOwner *LockOwner) {
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		raw, err := s3.ReadObject(*obj.Key)
-		if err != nil || raw == nil {
-			continue
-		}
-		var o LockOwner
-		if err := json.Unmarshal(raw, &o); err != nil {
-			continue
-		}
-		if o.ExpiryTime > 0 && o.GetRemainingTimeInSeconds() <= 0 {
-			_ = s3.DeleteObject(*obj.Key)
-			continue
-		}
-		return *obj.Key, &o
-	}
-	return "", nil
-}
-
-// LockKey extracts volume name, owner, and expiry unix timestamp from a lock
-// key created with the format: blt-volume-manager/locks/<volume>/<owner>-<expiry>.json
-//
-// Expiry is the unix timestamp when the lock expires, or 0 for permanent locks.
-// Returns ErrOldLockKeyFormat for keys still using the legacy nanosecond timestamp.
+// ErrOldLockKeyFormat is returned for keys using the legacy nanosecond timestamp.
 var ErrOldLockKeyFormat = errors.New("old lock key format, GET needed")
 
 // ParseLockKey extracts volume, owner, and expiry from a lock object key.
@@ -160,57 +129,4 @@ func ListVolumeMarkers(s3 ObjectStore, prefix string) ([]string, error) {
 		}
 	}
 	return names, nil
-}
-
-// WriteRestorePoint marshals and stores a restore point for the given volume.
-func WriteRestorePoint(s3 ObjectStore, volumeName string, rp RestorePoint) error {
-	data, err := json.Marshal(rp)
-	if err != nil {
-		return fmt.Errorf("marshal restore point: %w", err)
-	}
-	return s3.PutObject(RestorePointPrefix+volumeName+".json", data)
-}
-
-// ReadRestorePoint reads and unmarshals a restore point for the given volume.
-func ReadRestorePoint(s3 ObjectStore, volumeName string) (*RestorePoint, error) {
-	data, err := s3.ReadObject(RestorePointPrefix + volumeName + ".json")
-	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
-			return nil, ErrRestorePointNotFound
-		}
-		return nil, err
-	}
-	var rp RestorePoint
-	if err := json.Unmarshal(data, &rp); err != nil {
-		return nil, fmt.Errorf("parse restore point: %w", err)
-	}
-	return &rp, nil
-}
-
-// DeleteRestorePoint removes the restore point for the given volume.
-func DeleteRestorePoint(s3 ObjectStore, volumeName string) error {
-	return s3.DeleteObject(RestorePointPrefix + volumeName + ".json")
-}
-
-func WriteVersionCounter(s3 ObjectStore, vol string, v VersionCounter) error {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Errorf("marshal version counter: %w", err)
-	}
-	return s3.PutObject(VersionPrefix+vol+".json", data)
-}
-
-func ReadVersionCounter(s3 ObjectStore, vol string) (*VersionCounter, error) {
-	data, err := s3.ReadObject(VersionPrefix + vol + ".json")
-	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
-			return nil, ErrKeyNotFound
-		}
-		return nil, err
-	}
-	var v VersionCounter
-	if err := json.Unmarshal(data, &v); err != nil {
-		return nil, fmt.Errorf("parse version counter: %w", err)
-	}
-	return &v, nil
 }

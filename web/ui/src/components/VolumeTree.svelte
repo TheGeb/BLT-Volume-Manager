@@ -4,6 +4,7 @@
   import type { VolumeLockInfo } from '$lib/types';
   import { openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
   import DropSelect from './DropSelect.svelte';
+  import FilterInput from './FilterInput.svelte';
 
   let {
     volumes = [] as string[],
@@ -17,6 +18,9 @@
   let showLockBorders = $state(true);
   let actionsReady = $state(false);
   let readyTimer: ReturnType<typeof setTimeout>;
+
+  let searchQuery = $state('');
+  let searchFullPath = $state(false);
 
   function onActionsEnter() {
     actionsReady = false;
@@ -47,8 +51,14 @@
     if (statusFilter === 'locked' && !lockInfo.locked) return false;
     if (statusFilter === 'unlocked' && lockInfo.locked) return false;
     if (hostFilterVal && lockInfo.owner !== hostFilterVal) return false;
+    if (searchQuery) {
+      const target = searchFullPath ? v : (v.split('/').pop() || v);
+      if (!target.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    }
     return true;
   }));
+
+
 
   interface TreeNode { name: string; path: string; children?: TreeNode[]; }
   interface FlatItem { name: string; path: string; depth: number; isGroup: boolean; }
@@ -111,7 +121,7 @@
   });
 
   $effect(() => {
-    if (statusFilter !== 'all' || hostFilterVal) {
+    if (statusFilter !== 'all' || hostFilterVal || searchQuery) {
       expanded = allExpanded(tree);
     }
   });
@@ -269,42 +279,45 @@
 </script>
 
 <section class="panel volume-tree-panel" class:lock-mode={showLockBorders}>
-  <div class="filter-row">
-    <DropSelect
-      options={[
-        { value: 'all', label: 'All statuses' },
-        { value: 'locked', label: 'Locked' },
-        { value: 'unlocked', label: 'Unlocked' },
-      ]}
-      value={statusFilter}
-      onValueChange={(v) => statusFilter = v as 'all' | 'locked' | 'unlocked'}
-    />
-    {#if hosts.length > 0}
+  <div class="toolbar-row">
+    <div class="toolbar-left">
+      <div class="tree-actions">
+        <button class="button button-secondary button-xs btn-icon-sm" onclick={expandAllGroups}>
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          Expand
+        </button>
+        <button class="button button-secondary button-xs btn-icon-sm" onclick={collapseAllGroups}>
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+          Collapse
+        </button>
+        <button class="button button-secondary button-xs btn-icon-sm lock-toggle" onclick={toggleLockBorders}>
+          {showLockBorders ? 'Hide' : 'Show'} locks
+        </button>
+      </div>
+      <span class="tree-count">{filtered.length} of {volumes.length}</span>
+    </div>
+    <div class="toolbar-right">
       <DropSelect
         options={[
-          { value: '', label: 'All hosts' },
-          ...hosts.map(h => ({ value: h, label: h })),
+          { value: 'all', label: 'All statuses' },
+          { value: 'locked', label: 'Locked' },
+          { value: 'unlocked', label: 'Unlocked' },
         ]}
-        value={hostFilterVal}
-        onValueChange={(v) => hostFilterVal = v}
+        value={statusFilter}
+        onValueChange={(v) => statusFilter = v as 'all' | 'locked' | 'unlocked'}
       />
-    {/if}
-  </div>
-  <div class="tree-toolbar">
-    <div class="tree-actions">
-      <button class="button button-secondary button-xs btn-icon-sm" onclick={expandAllGroups}>
-        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        Expand
-      </button>
-      <button class="button button-secondary button-xs btn-icon-sm" onclick={collapseAllGroups}>
-        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
-        Collapse
-      </button>
-      <button class="button button-secondary button-xs btn-icon-sm lock-toggle" onclick={toggleLockBorders}>
-        {showLockBorders ? 'Hide' : 'Show'} locks
-      </button>
+      {#if hosts.length > 0}
+        <DropSelect
+          options={[
+            { value: '', label: 'All hosts' },
+            ...hosts.map(h => ({ value: h, label: h })),
+          ]}
+          value={hostFilterVal}
+          onValueChange={(v) => hostFilterVal = v}
+        />
+      {/if}
+      <FilterInput bind:value={searchQuery} bind:fullPath={searchFullPath} placeholder="Filter..." />
     </div>
-    <span class="tree-count">{filtered.length} volume{filtered.length !== 1 ? 's' : ''}</span>
   </div>
 
   {#if loading && volumes.length === 0}
@@ -404,15 +417,16 @@
 </section>
 
 <style>
-  .filter-row {
-    display: flex; gap: 10px; flex-wrap: wrap; padding: 0 0 16px;
+  .toolbar-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    flex-wrap: wrap; padding: 0 0 16px;
   }
+  .toolbar-left { display: flex; align-items: center; gap: 8px; }
+  .toolbar-right { display: flex; align-items: center; gap: 8px; }
 
-  .tree-toolbar {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 12px;
-  }
-  .tree-count { color: var(--muted); font-size: 0.85rem; }
+
+
+  .tree-count { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
   .tree-actions { display: flex; gap: 6px; }
   :global(.btn-icon-sm) { display: inline-flex; align-items: center; gap: 4px; }
   .lock-toggle { border-color: color-mix(in srgb, var(--accent), rgb(255 255 255 / 10%)); color: var(--accent); }
