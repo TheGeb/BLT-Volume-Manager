@@ -11,7 +11,7 @@
     stats?.repo?.total_size && stats?.repo?.total_uncompressed_size
       ? [
           { value: stats.repo.total_size, color: 'var(--accent)', label: 'On Disk', display: formatBytes(stats.repo.total_size) },
-          { value: stats.repo.total_uncompressed_size - stats.repo.total_size, color: 'var(--blue)', label: 'Space saved', display: formatBytes(stats.repo.total_uncompressed_size - stats.repo.total_size) },
+          { value: stats.repo.total_uncompressed_size - stats.repo.total_size, color: 'var(--accent-complement)', label: 'Space saved', display: formatBytes(stats.repo.total_uncompressed_size - stats.repo.total_size) },
         ]
       : []
   );

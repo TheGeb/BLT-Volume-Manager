@@ -110,12 +110,12 @@
                       <button type="button" class="rp-btn" title="Toggle restore point" onclick={(e) => { e.stopPropagation(); handleRPClick(sn); }} disabled={restorePointLoading[sn.id]}>
                         <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
                           <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
-                            stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--border)'} />
+                            stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--muted)'} />
                           {#if sn.id === restorePointID || sn.short_id === restorePointID}
-                           <path d="M6 10 l3 3 l5 -5" stroke="var(--accent)" stroke-width="2" fill="none" />
-                         {/if}
-                       </svg>
-                     </button>
+                            <circle cx="10" cy="10" r="5" fill="var(--accent)" />
+                          {/if}
+                        </svg>
+                      </button>
                    {/if}
                  </td>
                   <td class="copy-id" title="Restic ID: {sn.id}"
@@ -355,7 +355,7 @@
   }
 
   .body-table tbody tr:hover .copy-id {
-    color: var(--purple);
+    color: var(--accent);
   }
 
   .body-table tbody tr:hover .copy-hint {
@@ -393,8 +393,8 @@
 
   .body-table tbody tr:hover .size-btn {
     opacity: 1;
-    background: color-mix(in srgb, var(--purple) 14%, transparent);
-    color: var(--purple);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
   }
 
   .restore-point-info {

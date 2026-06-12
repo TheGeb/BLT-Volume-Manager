@@ -746,11 +746,11 @@
   }
 
   .picker-row.restore-point {
-    background: color-mix(in srgb, var(--accent) 4%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   }
 
   .picker-row.restore-point:hover {
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   }
 
   .picker-row td {
@@ -807,7 +807,7 @@
   }
 
   .picker-rp {
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
     color: var(--accent);
     font-size: 0.6rem;
     font-weight: 700;

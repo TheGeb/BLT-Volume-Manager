@@ -23,7 +23,7 @@
     deleteSnapModal, snapDeleteInput, selectedDeletionCount,
     confirmDeleteSnapshot
   } from '$lib/stores/snapshots';
-  import { themeDark, loading, activeTab, devMode, toggleTheme, loadDevMode } from '$lib/stores/repo';
+  import { themeDark, loading, activeTab, devMode, toggleTheme, loadDevMode, currentAccent, setAccentColor, accentColors } from '$lib/stores/repo';
   import {
     creatingTest, testStatus,
     onSelectVolume, confirmDeleteVolume, handleCreateTestVolume,
@@ -32,6 +32,14 @@
 
   let initialSyncDone = false;
   let refreshing = false;
+  let showColorPicker = false;
+  let colorPickerEl: HTMLDivElement;
+
+  function handleWindowClick(e: MouseEvent) {
+    if (showColorPicker && colorPickerEl && !colorPickerEl.contains(e.target as Node)) {
+      showColorPicker = false;
+    }
+  }
 
   async function doRefresh() {
     refreshing = true;
@@ -47,6 +55,12 @@
       themeDark.set(false);
     }
     if (!$themeDark) document.body.classList.add('light');
+    const savedAccent = localStorage.getItem('accentColor');
+    if (savedAccent) {
+      setAccentColor(savedAccent);
+    } else {
+      setAccentColor('purple');
+    }
     await loadVolumes();
     if ($volumes.length === 0) {
       showToast('No volumes found. Create one with: docker volume create --driver blt-volume-manager --name <name>');
@@ -132,6 +146,61 @@
   }
   .button-icon:disabled { opacity: 0.5; cursor: default; }
 
+  .color-picker-wrapper {
+    position: relative;
+  }
+
+  .color-picker-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+    z-index: 100;
+  }
+
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .color-swatch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    padding: 0;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .color-swatch:hover {
+    transform: scale(1.2);
+  }
+
+  .color-swatch.active {
+    border-color: var(--text);
+    box-shadow: 0 0 0 1px var(--surface);
+  }
+
+  .color-label {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 50%);
+    pointer-events: none;
+  }
+
   @media (width <= 900px) {
     .topbar {
       flex-direction: column;
@@ -174,6 +243,7 @@
 
 </style>
 
+<svelte:window on:click={handleWindowClick}/>
 <div class="page-shell">
   <header class="topbar">
     <h1>BLT Volume Manager</h1>
@@ -182,37 +252,40 @@
         <DevTools volume={$selectedVolume} onAction={doRefresh} />
       {/if}
       <button class="button-icon" title="Refresh" on:click={doRefresh} disabled={refreshing}>
-        {#if refreshing}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin" style="vertical-align:middle;">
-            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10z" stroke-opacity="0.3"/>
-            <path d="M12 2a10 10 0 0 1 10 10"/>
-          </svg>
-        {:else}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor" class={refreshing ? 'spin' : ''} style="vertical-align:middle;">
+          <path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/>
         </svg>
-        {/if}
       </button>
-      <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
-        {#if $themeDark}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-        {:else}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
+      <div class="color-picker-wrapper">
+        <button class="button-icon" title="Choose accent color" on:click|stopPropagation={() => showColorPicker = !showColorPicker}>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor">
+            <path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-156t88-127Q256-817 330-848.5T488-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T880-518q0 115-70 176.5T640-280h-74q-9 0-12.5 5t-3.5 11q0 12 15 34.5t15 51.5q0 50-27.5 74T480-80Zm0-400Zm-177 23q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120-160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm200 0q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120 160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17ZM480-160q9 0 14.5-5t5.5-13q0-14-15-33t-15-57q0-42 29-67t71-25h70q66 0 113-38.5T800-518q0-121-92.5-201.5T488-800q-136 0-232 93t-96 227q0 133 93.5 226.5T480-160Z"/>
+          </svg>
+        </button>
+        {#if showColorPicker}
+          <div class="color-picker-popover" bind:this={colorPickerEl}>
+            <div class="color-grid">
+              {#each accentColors as color (color.name)}
+                <button
+                  class="color-swatch"
+                  class:active={$currentAccent === color.name}
+                  style="background: {color.dark.accent}"
+                  title={color.label}
+                  on:click={() => { setAccentColor(color.name); showColorPicker = false; }}
+                >
+                  {#if $currentAccent === color.name}
+                    <span class="color-label">✓</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
         {/if}
+      </div>
+      <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor">
+          <path d="M337.5-463Q311-498 289-537q-5 14-6.5 28.5T281-480q0 83 58 141t141 58q14 0 28.5-2t28.5-6q-39-22-74-48.5T396-396q-32-32-58.5-67ZM567-364.5Q630-328 702-308q-40 51-98 79.5T481-200q-117 0-198.5-81.5T201-480q0-65 28.5-123t79.5-98q20 72 56.5 135T453-452q51 51 114 87.5ZM743-380q-20-5-39.5-11T665-405q8-18 11.5-36.5T680-480q0-83-58.5-141.5T480-680q-20 0-38.5 3.5T405-665q-8-19-13.5-38T381-742q24-9 49-13.5t51-4.5q117 0 198.5 81.5T761-480q0 26-4.5 51T743-380ZM440-840v-120h80v120h-80Zm0 840v-120h80V0h-80Zm323-706-57-57 85-84 57 56-85 85ZM169-113l-57-56 85-85 57 57-85 84Zm671-327v-80h120v80H840ZM0-440v-80h120v80H0Zm791 328-85-85 57-57 84 85-56 57ZM197-706l-84-85 56-57 85 85-57 57Zm199 310Z"/>
+        </svg>
       </button>
     </div>
   </header>

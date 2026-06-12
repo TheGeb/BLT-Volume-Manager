@@ -415,8 +415,8 @@
   .tree-count { color: var(--muted); font-size: 0.85rem; }
   .tree-actions { display: flex; gap: 6px; }
   :global(.btn-icon-sm) { display: inline-flex; align-items: center; gap: 4px; }
-  .lock-toggle { border-color: color-mix(in srgb, var(--purple), rgb(255 255 255 / 10%)); color: var(--purple); }
-  .lock-toggle:hover { background: var(--purple-bg); border-color: var(--accent); }
+  .lock-toggle { border-color: color-mix(in srgb, var(--accent), rgb(255 255 255 / 10%)); color: var(--accent); }
+  .lock-toggle:hover { background: var(--accent-bg); border-color: var(--accent); }
 
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
@@ -465,33 +465,33 @@
   }
 
   :global(.tree-row[data-lock="start"]) {
-    border-color: var(--purple);
+    border-color: var(--accent);
     border-bottom: 0;
-    background: var(--purple-bg);
+    background: var(--accent-bg);
     border-radius: 8px 8px 0 0;
     overflow: hidden;
   }
 
   :global(.tree-row[data-lock="middle"]) {
-    border-left: 2px solid var(--purple);
-    border-right: 2px solid var(--purple);
+    border-left: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
     border-top: 0;
     border-bottom: 0;
-    background-color: var(--purple-bg);
+    background-color: var(--accent-bg);
     border-radius: 0;
   }
 
   :global(.tree-row[data-lock="end"]) {
-    border-color: var(--purple);
-    background: var(--purple-bg);
+    border-color: var(--accent);
+    background: var(--accent-bg);
     border-radius: 0 0 8px 8px;
     border-top: 0;
     overflow: hidden;
   }
 
   :global(.tree-row[data-lock="single"]) {
-    border-color: var(--purple);
-    background: var(--purple-bg);
+    border-color: var(--accent);
+    background: var(--accent-bg);
     border-radius: 8px;
     overflow: hidden;
   }
@@ -516,7 +516,7 @@
 
   .tree-row:not([data-lock=""]) .tree-group:hover,
   .tree-row:not([data-lock=""]) .tree-volume:hover {
-    background: color-mix(in srgb, var(--purple-bg), rgb(255 255 255 / 10%));
+    background: color-mix(in srgb, var(--accent-bg), rgb(255 255 255 / 10%));
   }
 
   .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
@@ -559,7 +559,7 @@
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 0.9rem; font-weight: 600; color: var(--muted);
   }
-  .lock-locked { color: var(--purple); }
+  .lock-locked { color: var(--accent); }
   .lock-unlocked { color: var(--muted); }
   .lock-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
