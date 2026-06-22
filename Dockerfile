@@ -21,7 +21,7 @@ COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manag
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
-FROM alpine:3.22 AS web
+FROM alpine:3.23 AS web
 COPY --from=build /src/blt-volume-manager-web /usr/local/bin/blt-volume-manager
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD wget -qO- http://localhost:8080/api/health || exit 1
