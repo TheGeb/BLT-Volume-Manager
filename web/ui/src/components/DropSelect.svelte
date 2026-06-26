@@ -3,14 +3,30 @@
 
   type Option = { value: string; label: string; disabled?: boolean };
 
-  let { options = [], value = '', onValueChange = () => {}, onOpenChange = (_open: boolean) => {} }: {
+  let {
+    options = [], value = '', onValueChange = () => {}, onOpenChange = (_open: boolean) => {},
+    multiple = false, selected = [] as string[], onSelectedChange = (_vals: string[]) => {},
+  }: {
     options: Option[];
-    value: string;
-    onValueChange: (v: string) => void;
+    value?: string;
+    onValueChange?: (v: string) => void;
     onOpenChange?: (open: boolean) => void;
+    multiple?: boolean;
+    selected?: string[];
+    onSelectedChange?: (vals: string[]) => void;
   } = $props();
 
-  let selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options.find(o => !o.disabled)?.label ?? '');
+  let selectedLabel = $derived(
+    multiple
+      ? (selected.length === 0 ? 'Any Owner' : selected.length === 1
+        ? (options.find(o => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selected`)
+      : (options.find(o => o.value === value)?.label ?? options.find(o => !o.disabled)?.label ?? '')
+  );
+
+  let maxLabelLen = $derived(Math.max(...options.map(o => o.label.length), 10));
+  let triggerStyle = $derived(`width:calc(${maxLabelLen}ch + 40px);`);
+
   let open = $state(false);
 
   $effect(() => {
@@ -18,23 +34,50 @@
   });
 </script>
 
-<Select.Root type="single" {value} {onValueChange} bind:open>
-  <Select.Trigger class="dropdown drop-select-trigger {open ? 'open' : ''}">
-    <Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
-  </Select.Trigger>
-  <Select.Portal>
-    <Select.Content class="drop-select-content">
-      {#each options as opt, i (i)}
-        <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
-          {opt.label}
-        </Select.Item>
-      {/each}
-    </Select.Content>
-  </Select.Portal>
-</Select.Root>
+{#if multiple}
+  <Select.Root type="multiple" value={selected} onValueChange={onSelectedChange} bind:open>
+    <Select.Trigger class="dropdown drop-select-trigger {open ? 'open' : ''}" style={triggerStyle}>
+      <Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </Select.Trigger>
+    <Select.Portal>
+      <Select.Content class="drop-select-content">
+        {#each options as opt, i (i)}
+          <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
+            {#if selected.includes(opt.value)}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="drop-select-checkmark">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            {:else}
+              <span style="width:14px;display:inline-block;"></span>
+            {/if}
+            {opt.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Portal>
+  </Select.Root>
+{:else}
+  <Select.Root type="single" {value} {onValueChange} bind:open>
+    <Select.Trigger class="dropdown drop-select-trigger {open ? 'open' : ''}" style={triggerStyle}>
+      <Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </Select.Trigger>
+    <Select.Portal>
+      <Select.Content class="drop-select-content">
+        {#each options as opt, i (i)}
+          <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
+            {opt.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Portal>
+  </Select.Root>
+{/if}
 
 <style>
   :global(.drop-select-trigger) {
@@ -43,7 +86,6 @@
     justify-content: space-between;
     gap: 6px;
     padding: 7px 12px;
-    min-width: 0;
     white-space: nowrap;
     font-weight: 600;
     font-size: 0.82rem;
@@ -71,7 +113,9 @@
   }
 
   :global(.drop-select-item) {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     text-align: left;
     padding: 6px 10px;
     border: none;
@@ -92,6 +136,7 @@
     color: var(--accent);
     font-weight: 600;
   }
+
 
   :global(.drop-select-item[data-disabled]) {
     opacity: 0.4;

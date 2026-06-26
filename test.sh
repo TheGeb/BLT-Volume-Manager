@@ -21,7 +21,7 @@ fi
 echo
 echo "--- Go integration tests (requires Docker) ---"
 if docker info &>/dev/null; then
-    if go test -tags=integration -count=1 -v "$@" .; then
+    if go test -tags=integration -count=1 -v "$@" ./test/; then
         echo -e "\n✓ Go integration tests passed"
     else
         echo -e "\n✗ Go integration tests failed" >&2

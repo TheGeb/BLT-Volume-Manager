@@ -12,7 +12,7 @@
   import { get } from 'svelte/store';
   import { showToast } from '$lib/stores/toast';
   import {
-    volumes, selectedVolume, volumeLockInfo, volumesLoading,
+    volumes, selectedVolume, volumeOwnerInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
     copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError,
     copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
@@ -300,7 +300,7 @@
       volumes={$filteredVolumes}
       loading={$volumesLoading}
       onSelect={onSelectVolume}
-      volumeLockInfo={$volumeLockInfo}
+      volumeOwnerInfo={$volumeOwnerInfo}
       onCreateTestVolume={handleCreateTestVolume}
       creatingTest={$creatingTest}
       testStatus={$testStatus}
@@ -319,7 +319,7 @@
 <Modal show={$deleteVolModal} onClose={() => $deleteVolModal = false}>
   <h3 style="margin:0 0 12px;color:var(--red);">Delete volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
-    This will permanently delete the volume, all its snapshots, backups, and locks from S3.
+    This will permanently delete the volume, all its snapshots, backups, and owners from S3.
   </p>
   <p style="margin:0 0 16px;color:var(--yellow);font-size:0.9rem;">
     Make sure no other hosts are still using this volume before proceeding.
@@ -412,9 +412,9 @@
   <h3 style="margin:0 0 12px;">Rename volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
     Rename <strong>{$copyRenameSource}</strong> to a new name.
-    {#if $volumeLockInfo[$copyRenameSource]?.locked}
+    {#if $volumeOwnerInfo[$copyRenameSource]?.owned}
       <span style="color:var(--red);display:block;margin-top:6px;">
-        This volume is locked and cannot be renamed. Unlock it first.
+        This volume has an owner and cannot be renamed.
       </span>
     {/if}
   </p>
@@ -429,7 +429,7 @@
   {/if}
   <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $renameVolModal = false}>Cancel</Button.Root>
-    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeLockInfo[$copyRenameSource]?.locked}
+    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeOwnerInfo[$copyRenameSource]?.owned}
       onclick={confirmRenameVolume}>
       {$copyRenameLoading ? 'Renaming...' : 'Rename'}
     </Button.Root>

@@ -13,9 +13,9 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
 
 LDFLAGS = -s -w \
-	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Version=$(VERSION)' \
-	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Commit=$(COMMIT)' \
-	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/version.Date=$(DATE)'
+	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Version=$(VERSION)' \
+	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Commit=$(COMMIT)' \
+	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Date=$(DATE)'
 
 # Default target
 all: lint build
@@ -33,7 +33,6 @@ clean:
 	go clean -cache
 	rm -rf web/ui/node_modules 2>/dev/null || true
 	rm -f web/ui/node_modules/.install-stamp
-	rm -rf web/static/*
 	rm -rf internal/web/static/*
 
 # === Lint ===
@@ -79,7 +78,6 @@ ui:
 	cd web/ui && npm install
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
-	cp -r web/static/* internal/web/static/
 
 run-web:
 	go run ./cmd/web $(ARGS)
@@ -93,7 +91,6 @@ ui-dev-build: web/ui/node_modules/.install-stamp
 	cd web/ui && npm run lint:fix
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
-	cp -r web/static/* internal/web/static/
 
 build-driver: tidy format
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver

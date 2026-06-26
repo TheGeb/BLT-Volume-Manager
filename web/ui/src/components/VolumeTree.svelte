@@ -1,7 +1,7 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import { formatExpiration } from '$lib/util';
-  import type { VolumeLockInfo } from '$lib/types';
+  import type { VolumeOwnerInfo } from '$lib/types';
   import { openCopyVolModal, openRenameVolModal } from '$lib/stores/volumes';
   import DropSelect from './DropSelect.svelte';
   import FilterInput from './FilterInput.svelte';
@@ -10,12 +10,11 @@
     volumes = [] as string[],
     loading = false,
     onSelect = (_vol: string) => {},
-    volumeLockInfo = {} as Record<string, VolumeLockInfo>,
+    volumeOwnerInfo = {} as Record<string, VolumeOwnerInfo>,
   } = $props();
 
-  let statusFilter: 'all' | 'locked' | 'unlocked' = $state('all');
-  let hostFilterVal = $state('');
-  let showLockBorders = $state(true);
+  let ownerFilter = $state<string[]>([]);
+  let showOwnerBorders = $state(true);
   let actionsReady = $state(false);
   let readyTimer: ReturnType<typeof setTimeout>;
 
@@ -33,24 +32,26 @@
     clearTimeout(readyTimer);
   }
 
-  const savedPref = typeof localStorage !== 'undefined' ? localStorage.getItem('showLockBorders') : null;
-  if (savedPref !== null) showLockBorders = JSON.parse(savedPref);
+  const savedPref = typeof localStorage !== 'undefined' ? localStorage.getItem('showOwnerBorders') : null;
+  if (savedPref !== null) showOwnerBorders = JSON.parse(savedPref);
 
-  function toggleLockBorders() {
-    showLockBorders = !showLockBorders;
-    localStorage.setItem('showLockBorders', JSON.stringify(showLockBorders));
+  function toggleOwnerBorders() {
+    showOwnerBorders = !showOwnerBorders;
+    localStorage.setItem('showOwnerBorders', JSON.stringify(showOwnerBorders));
   }
 
-  let currentVolumeLockInfo = $derived(volumeLockInfo);
+  let currentVolumeOwnerInfo = $derived(volumeOwnerInfo);
 
-  let hosts = $derived([...new Set(Object.values(currentVolumeLockInfo).map(i => i.owner).filter(Boolean))].sort());
+  let hosts = $derived([...new Set(Object.values(currentVolumeOwnerInfo).map(i => i.owner).filter(Boolean))].sort());
 
   let filtered = $derived(volumes.filter(v => {
-    const lockInfo = currentVolumeLockInfo[v];
-    if (!lockInfo) return true;
-    if (statusFilter === 'locked' && !lockInfo.locked) return false;
-    if (statusFilter === 'unlocked' && lockInfo.locked) return false;
-    if (hostFilterVal && lockInfo.owner !== hostFilterVal) return false;
+    const ownerInfo = currentVolumeOwnerInfo[v];
+    if (ownerFilter.length > 0) {
+      if (!ownerInfo) return false;
+      const matchUnclaimed = ownerFilter.includes('__unclaimed__') && !ownerInfo.owned;
+      const matchOwner = ownerInfo.owner && ownerFilter.includes(ownerInfo.owner);
+      if (!matchUnclaimed && !matchOwner) return false;
+    }
     if (searchQuery) {
       const target = searchFullPath ? v : (v.split('/').pop() || v);
       if (!target.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -121,7 +122,7 @@
   });
 
   $effect(() => {
-    if (statusFilter !== 'all' || hostFilterVal || searchQuery) {
+    if (ownerFilter.length > 0 || searchQuery) {
       expanded = allExpanded(tree);
     }
   });
@@ -168,15 +169,15 @@
     return leaves;
   }
 
-  function computeFolderLocks(nodes: TreeNode[], lockInfo: Record<string, VolumeLockInfo>): Record<string, { owner: string } | null> {
+  function computeFolderOwners(nodes: TreeNode[], ownerInfo: Record<string, VolumeOwnerInfo>): Record<string, { owner: string } | null> {
     const result: Record<string, { owner: string } | null> = {};
     function walk(ns: TreeNode[]) {
       for (const node of ns) {
         if (!node.children) continue;
         const leaves = collectLeafVolumes([node]);
-        const locks = leaves.map(l => lockInfo[l]).filter(l => l && l.locked);
-        if (locks.length > 0 && locks.length === leaves.length) {
-          const owners = [...new Set(locks.map(l => l!.owner).filter(Boolean))];
+        const ownedVolumes = leaves.map(l => ownerInfo[l]).filter(l => l && l.owned);
+        if (ownedVolumes.length > 0 && ownedVolumes.length === leaves.length) {
+          const owners = [...new Set(ownedVolumes.map(l => l!.owner).filter(Boolean))];
           result[node.path] = owners.length === 1 ? { owner: owners[0]! } : null;
         } else {
           result[node.path] = null;
@@ -188,20 +189,20 @@
     return result;
   }
 
-  let folderLocks = $derived(computeFolderLocks(tree, currentVolumeLockInfo));
+  let folderOwners = $derived(computeFolderOwners(tree, currentVolumeOwnerInfo));
 
-  let flatItemLocks = $derived(flatItems.map(item => {
+  let flatItemOwnerStatus = $derived(flatItems.map(item => {
     let owner = '';
     let status = '';
     if (item.isGroup) {
-      const fl = folderLocks[item.path];
+      const fl = folderOwners[item.path];
       if (fl) {
         owner = fl.owner;
-        status = 'locked';
+        status = 'owned';
       }
     } else {
-      const li = currentVolumeLockInfo[item.path];
-      if (li && li.locked) {
+      const li = currentVolumeOwnerInfo[item.path];
+      if (li && li.owned) {
         owner = li.owner;
         status = li.status;
       }
@@ -209,11 +210,11 @@
     return { path: item.path, owner, status };
   }));
 
-  let lockStyles = $derived(flatItemLocks.map((curr, idx) => {
+  let ownerStyles = $derived(flatItemOwnerStatus.map((curr, idx) => {
     if (!curr.owner) return null;
 
-    const prev = idx > 0 ? flatItemLocks[idx - 1] : null;
-    const next = idx < flatItemLocks.length - 1 ? flatItemLocks[idx + 1] : null;
+    const prev = idx > 0 ? flatItemOwnerStatus[idx - 1] : null;
+    const next = idx < flatItemOwnerStatus.length - 1 ? flatItemOwnerStatus[idx + 1] : null;
 
     const isSameAsPrev = prev && prev.owner === curr.owner;
     const isSameAsNext = next && next.owner === curr.owner;
@@ -226,14 +227,14 @@
 
   let labelAtIdx = $derived.by(() => {
     const map: Record<number, boolean> = {};
-    for (let i = 0; i < lockStyles.length; i++) {
-      const style = lockStyles[i];
+    for (let i = 0; i < ownerStyles.length; i++) {
+      const style = ownerStyles[i];
       if (!style) continue;
       if (style === 'single') { map[i] = true; continue; }
       if (style === 'start') {
         let len = 1;
-        for (let j = i + 1; j < lockStyles.length; j++) {
-          if (!lockStyles[j] || lockStyles[j] === 'start') break;
+        for (let j = i + 1; j < ownerStyles.length; j++) {
+          if (!ownerStyles[j] || ownerStyles[j] === 'start') break;
           len++;
         }
         const mid = i + Math.floor((len - 1) / 2);
@@ -245,13 +246,13 @@
 
   let labelOffset = $derived.by(() => {
     const map: Record<number, string> = {};
-    for (let i = 0; i < lockStyles.length; i++) {
-      const style = lockStyles[i];
+    for (let i = 0; i < ownerStyles.length; i++) {
+      const style = ownerStyles[i];
       if (!style) continue;
       if (style === 'start') {
         let len = 1;
-        for (let j = i + 1; j < lockStyles.length; j++) {
-          if (!lockStyles[j] || lockStyles[j] === 'start') break;
+        for (let j = i + 1; j < ownerStyles.length; j++) {
+          if (!ownerStyles[j] || ownerStyles[j] === 'start') break;
           len++;
         }
         if (len > 1 && len % 2 === 0) {
@@ -278,7 +279,7 @@
   }
 </script>
 
-<section class="panel volume-tree-panel" class:lock-mode={showLockBorders}>
+    <section class="panel volume-tree-panel" class:owner-mode={showOwnerBorders}>
   <div class="toolbar-row">
     <div class="toolbar-left">
       <div class="tree-actions">
@@ -290,32 +291,22 @@
           <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
           Collapse
         </button>
-        <button class="button button-secondary button-xs btn-icon-sm lock-toggle" onclick={toggleLockBorders}>
-          {showLockBorders ? 'Hide' : 'Show'} locks
+        <button class="button button-secondary button-xs btn-icon-sm owner-toggle" onclick={toggleOwnerBorders}>
+          {showOwnerBorders ? 'Hide' : 'Show'} owners
         </button>
       </div>
       <span class="tree-count">{filtered.length} of {volumes.length}</span>
     </div>
     <div class="toolbar-right">
       <DropSelect
+        multiple={true}
+        selected={ownerFilter}
+        onSelectedChange={(vals) => ownerFilter = vals}
         options={[
-          { value: 'all', label: 'All statuses' },
-          { value: 'locked', label: 'Locked' },
-          { value: 'unlocked', label: 'Unlocked' },
+          { value: '__unclaimed__', label: 'Unclaimed' },
+          ...hosts.map(h => ({ value: h, label: h })),
         ]}
-        value={statusFilter}
-        onValueChange={(v) => statusFilter = v as 'all' | 'locked' | 'unlocked'}
       />
-      {#if hosts.length > 0}
-        <DropSelect
-          options={[
-            { value: '', label: 'All hosts' },
-            ...hosts.map(h => ({ value: h, label: h })),
-          ]}
-          value={hostFilterVal}
-          onValueChange={(v) => hostFilterVal = v}
-        />
-      {/if}
       <FilterInput bind:value={searchQuery} bind:fullPath={searchFullPath} placeholder="Filter..." />
     </div>
   </div>
@@ -328,7 +319,7 @@
         </div>
       {/each}
     </div>
-  {:else if flatItems.length === 0 && statusFilter === 'all' && !hostFilterVal}
+  {:else if flatItems.length === 0 && ownerFilter.length === 0 && !searchQuery}
     <p class="empty">No volumes found</p>
   {:else if flatItems.length === 0}
     <p class="empty">No volumes match the current filters</p>
@@ -337,7 +328,7 @@
       <div class="tree">
         {#each flatItems as item, idx (item.path)}
           <div class="tree-row-wrap" transition:slide|local onoutrostart={handleOutroStart} onintroend={handleIntroEnd}>
-            <div class="tree-row" data-lock={lockStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
+            <div class="tree-row" data-owner={ownerStyles[idx] || ''} data-fading="false" style="z-index:{labelOffset[idx] ? 2 : 1}">
                 {#if item.isGroup}
                   <button class="tree-group" onclick={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
                   <div style="width:22px; display:flex; justify-content:center; align-items:center;">
@@ -383,29 +374,29 @@
                 {/if}
               </div>
               {#if item.isGroup}
-                <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
-                  {#if folderLocks[item.path]}
-                    <span class="lock-label-content" class:visible={labelAtIdx[idx]}>
-                      <span class="lock-badge lock-locked">
-                        <span class="lock-text">Locked:</span>
+                    <span class="owner-info" style="opacity:{showOwnerBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
+                  {#if folderOwners[item.path]}
+                    <span class="owner-label-content" class:visible={labelAtIdx[idx]}>
+                      <span class="owner-badge owner-owned">
+                        <span class="owner-text">Owner:</span>
                       </span>
-                      <span class="lock-owner">{folderLocks[item.path]?.owner}</span>
+                      <span class="owner-owner">{folderOwners[item.path]?.owner}</span>
                     </span>
                   {/if}
                 </span>
               {:else}
-                <span class="lock-info" style="opacity:{showLockBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
-                  {#if currentVolumeLockInfo[item.path]}
-                    {#if !lockStyles[idx] || labelAtIdx[idx]}
-                      <span class="lock-badge lock-{currentVolumeLockInfo[item.path]!.status}">
-                        <span class="lock-text">{currentVolumeLockInfo[item.path]!.status === 'locked' ? 'Locked:' : 'Unlocked'}</span>
+                <span class="owner-info" style="opacity:{showOwnerBorders ? 1 : 0};transition:opacity 0.25s ease, transform 0.25s ease, left 0.25s ease;transform:{labelOffset[idx] || ''}">
+                  {#if currentVolumeOwnerInfo[item.path]}
+                    {#if !ownerStyles[idx] || labelAtIdx[idx]}
+                      <span class="owner-badge owner-{currentVolumeOwnerInfo[item.path]!.status}">
+                        <span class="owner-text">{currentVolumeOwnerInfo[item.path]!.status === 'owned' ? 'Owner:' : 'Unclaimed'}</span>
                       </span>
-                      {#if currentVolumeLockInfo[item.path]!.owner}
-                        <span class="lock-owner">{currentVolumeLockInfo[item.path]!.owner}</span>
+                      {#if currentVolumeOwnerInfo[item.path]!.owner}
+                        <span class="owner-owner">{currentVolumeOwnerInfo[item.path]!.owner}</span>
                       {/if}
                     {/if}
-                  {:else if !loading && !lockStyles[idx]}
-                    <span class="lock-badge">—</span>
+                  {:else if !loading && !ownerStyles[idx]}
+                    <span class="owner-badge">—</span>
                   {/if}
                 </span>
               {/if}
@@ -429,8 +420,8 @@
   .tree-count { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
   .tree-actions { display: flex; gap: 6px; }
   :global(.btn-icon-sm) { display: inline-flex; align-items: center; gap: 4px; }
-  .lock-toggle { border-color: color-mix(in srgb, var(--accent), rgb(255 255 255 / 10%)); color: var(--accent); }
-  .lock-toggle:hover { background: var(--accent-bg); border-color: var(--accent); }
+  .owner-toggle { border-color: color-mix(in srgb, var(--accent), rgb(255 255 255 / 10%)); color: var(--accent); }
+  .owner-toggle:hover { background: var(--accent-bg); border-color: var(--accent); }
 
   .empty { color: var(--muted); text-align: center; padding: 40px; margin: 0; }
 
@@ -471,14 +462,14 @@
     transition: border-color 0.25s ease, background-color 0.25s ease, width 0.25s ease, border-radius 0.25s ease;
   }
 
-  :global(.lock-mode) .tree-row { width: 75%; }
+  :global(.owner-mode) .tree-row { width: 75%; }
 
-  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) {
+  .volume-tree-panel:not(:global(.owner-mode)) .tree-row[data-owner]:not([data-owner=""]) {
     border-color: var(--surface);
     background: var(--surface);
   }
 
-  :global(.tree-row[data-lock="start"]) {
+  :global(.tree-row[data-owner="start"]) {
     border-color: var(--accent);
     border-bottom: 0;
     background: var(--accent-bg);
@@ -486,7 +477,7 @@
     overflow: hidden;
   }
 
-  :global(.tree-row[data-lock="middle"]) {
+  :global(.tree-row[data-owner="middle"]) {
     border-left: 2px solid var(--accent);
     border-right: 2px solid var(--accent);
     border-top: 0;
@@ -495,7 +486,7 @@
     border-radius: 0;
   }
 
-  :global(.tree-row[data-lock="end"]) {
+  :global(.tree-row[data-owner="end"]) {
     border-color: var(--accent);
     background: var(--accent-bg);
     border-radius: 0 0 8px 8px;
@@ -503,7 +494,7 @@
     overflow: hidden;
   }
 
-  :global(.tree-row[data-lock="single"]) {
+  :global(.tree-row[data-owner="single"]) {
     border-color: var(--accent);
     background: var(--accent-bg);
     border-radius: 8px;
@@ -523,18 +514,18 @@
     transition: background 0.15s ease;
   }
 
-  .tree-row[data-lock=""] .tree-group:hover,
-  .tree-row[data-lock=""] .tree-volume:hover {
+  .tree-row[data-owner=""] .tree-group:hover,
+  .tree-row[data-owner=""] .tree-volume:hover {
     background: rgb(255 255 255 / 6%);
   }
 
-  .tree-row:not([data-lock=""]) .tree-group:hover,
-  .tree-row:not([data-lock=""]) .tree-volume:hover {
+  .tree-row:not([data-owner=""]) .tree-group:hover,
+  .tree-row:not([data-owner=""]) .tree-volume:hover {
     background: color-mix(in srgb, var(--accent-bg), rgb(255 255 255 / 10%));
   }
 
-  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-group:hover,
-  .volume-tree-panel:not(:global(.lock-mode)) .tree-row[data-lock]:not([data-lock=""]) .tree-volume:hover {
+  .volume-tree-panel:not(:global(.owner-mode)) .tree-row[data-owner]:not([data-owner=""]) .tree-group:hover,
+  .volume-tree-panel:not(:global(.owner-mode)) .tree-row[data-owner]:not([data-owner=""]) .tree-volume:hover {
     background: rgb(255 255 255 / 6%);
   }
 
@@ -542,7 +533,7 @@
   .folder-icon, .volume-icon { flex-shrink: 0; opacity: 0.7; }
   .chevron { flex-shrink: 0; transition: transform 0.15s; }
 
-  .lock-info {
+  .owner-info {
     display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 18px 0 6px;
     position: absolute; left: 100%; top: 0; height: 36px;
     z-index: 10;
@@ -551,32 +542,32 @@
     transition: opacity 0.25s ease, left 0.25s ease;
   }
 
-  :global(.lock-mode) .lock-info {
+  :global(.owner-mode) .owner-info {
     left: 75%;
     pointer-events: auto;
   }
 
-  :global(.tree-row-wrap[data-fading="true"]) .lock-info {
+  :global(.tree-row-wrap[data-fading="true"]) .owner-info {
     opacity: 0 !important;
   }
 
-  .lock-label-content {
+  .owner-label-content {
     opacity: 0;
     transition: opacity 0.25s ease;
   }
 
-  .lock-label-content.visible {
+  .owner-label-content.visible {
     opacity: 1;
   }
 
-  .lock-badge {
+  .owner-badge {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 0.9rem; font-weight: 600; color: var(--muted);
   }
-  .lock-locked { color: var(--accent); }
-  .lock-unlocked { color: var(--muted); }
-  .lock-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lock-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  .owner-owned { color: var(--accent); }
+  .owner-unclaimed { color: var(--muted); }
+  .owner-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .owner-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
   .vol-actions {
     display: flex;

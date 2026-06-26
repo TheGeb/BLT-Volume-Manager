@@ -27,9 +27,9 @@
             ldflags = [
               "-s"
               "-w"
-              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Version=0.1.0"
-              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Commit=nix"
-              "-X github.com/TheGeb/BLT-Volume-Manager/internal/version.Date=unknown"
+              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Version=0.1.0"
+              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Commit=nix"
+              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Date=unknown"
             ];
             CGO_ENABLED = 0;
 
@@ -37,7 +37,7 @@
 
             meta = with pkgs.lib; {
               inherit meta-description;
-              homepage = "https://github.com/TheGeb/BLT-Volume-Manager";
+              homepage = "https://github.com/TheGeb/docker-s3-volume-plugin";
               platforms = platforms.linux;
             };
           };

@@ -1,4 +1,4 @@
-module github.com/TheGeb/BLT-Volume-Manager
+module github.com/TheGeb/docker-s3-volume-plugin
 
 go 1.26.3
 
@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.25
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.103.3
 	github.com/docker/go-plugins-helpers v0.0.0-20240701071450-45e2431495c8
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

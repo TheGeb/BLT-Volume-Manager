@@ -10,18 +10,18 @@ export interface Snapshot {
   fallbackHash?: string;
 }
 
-export interface LockStatus {
+export interface OwnerStatus {
   volume: string;
-  locked: boolean;
+  owned: boolean;
   owner?: string;
   expires_in?: number;
 }
 
-export interface VolumeLockInfo {
-  locked: boolean;
+export interface VolumeOwnerInfo {
+  owned: boolean;
   owner: string;
   expiresIn: number;
-  status: 'locked' | 'unlocked';
+  status: 'owned' | 'unclaimed';
 }
 
 export interface RepoStatus {
@@ -52,11 +52,11 @@ export interface StatsResponse {
     unique_blob_size?: number;
     error?: string;
   };
-  locks: {
+  owners: {
     total_volumes: number;
     active: number;
     expired: number;
-    unlocked: number;
+    unclaimed: number;
     active_volumes?: string[];
     expired_volumes?: string[];
   };

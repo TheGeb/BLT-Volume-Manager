@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/applog"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/version"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/web"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
 func main() {
@@ -21,36 +19,40 @@ func main() {
 }
 
 func run() int {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	cfg.LoadEnv()
+
+	ctx, stop := app.WithShutdown()
 	defer stop()
 
 	var httpAddr string
+	var dataDir string
 	var showVersion bool
 	flag.StringVar(&httpAddr, "http-addr", ":8080", "HTTP address for the BLT Volume Manager UI")
+	flag.StringVar(&dataDir, "data-dir", "/var/lib/docker-volumes", "root directory for volumes")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(version.String())
+		fmt.Println(app.VersionString())
 		return 0
 	}
 
-	cfg, err := appconfig.FromEnv("/var/lib/docker-volumes")
+	conf, err := cfg.FromEnv(dataDir)
 	if err != nil {
-		applog.Errorf("load_config_failed", err, "error=%v", err)
+		app.Errorf("load_config_failed", err, "error=%v", err)
 		return 1
 	}
-	if cfg.ResticBase == "" {
-		applog.Error("restic_repository_required", fmt.Errorf("RESTIC_REPOSITORY must be set"))
+	if err := cfg.ValidateConfig(conf); err != nil {
+		app.Error("config_validation_failed", err)
 		return 1
 	}
-	if cfg.S3Bucket != "" {
-		applog.Info("s3_configured")
+	if conf.MetadataBackend != "" || conf.S3Bucket != "" {
+		app.Info("metadata_backend_configured")
 	}
 
 	mux := http.NewServeMux()
-	webSrv := web.NewServer(cfg)
-	webSrv.Register(mux)
+	webSrv := server.New(conf)
+	web.Register(webSrv, mux)
 
 	srv := &http.Server{
 		Addr:              httpAddr,
@@ -61,9 +63,9 @@ func run() int {
 	}
 
 	go func() {
-		applog.Infof("serving_http_ui", "address=%s", httpAddr)
+		app.Infof("serving_http_ui", "address=%s", httpAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			applog.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
+			app.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
 		}
 	}()
 

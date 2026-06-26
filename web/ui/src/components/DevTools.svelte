@@ -7,10 +7,10 @@
 
   let open = false;
   let busy = false;
-  let activeDialog: 'volume' | 'snapshot' | 'lock' | null = null;
+  let activeDialog: 'volume' | 'snapshot' | 'owner' | null = null;
   let inputName = '';
   let inputOwner = 'test-user';
-  let lockDurationMins = 0;
+  let ownerDurationMins = 0;
   let devEl: HTMLElement;
 
   function toggle() { open = !open; }
@@ -28,11 +28,11 @@
     return volume || defaultVal;
   }
 
-  function openDialog(d: 'volume' | 'snapshot' | 'lock') {
+  function openDialog(d: 'volume' | 'snapshot' | 'owner') {
     activeDialog = d;
-    inputName = d === 'volume' ? '' : d === 'lock' ? volume : defaultVolume('test/example');
+    inputName = d === 'volume' ? '' : d === 'owner' ? volume : defaultVolume('test/example');
     inputOwner = 'test-user';
-    lockDurationMins = 0;
+    ownerDurationMins = 0;
   }
 
   function closeDialog() { activeDialog = null; inputName = ''; inputOwner = ''; }
@@ -52,10 +52,10 @@
     const vol = inputName.trim();
     if (vol) void submit(() => api.createTestSnapshot(vol));
   }
-  function submitLock() {
+  function submitOwner() {
     const vol = inputName.trim();
     const owner = inputOwner.trim();
-    if (vol && owner) void submit(() => api.createLock(vol, owner, lockDurationMins));
+    if (vol && owner) void submit(() => api.createOwnerLock(vol, owner, ownerDurationMins));
   }
 </script>
 
@@ -66,7 +66,7 @@
     <div class="dev-menu" role="menu">
       <button class="button dev-menu-btn" on:click={() => openDialog('volume')} disabled={busy}>Volume</button>
       <button class="button dev-menu-btn" on:click={() => openDialog('snapshot')} disabled={busy}>Snapshot</button>
-      <button class="button dev-menu-btn" on:click={() => openDialog('lock')} disabled={busy}>Lock</button>
+      <button class="button dev-menu-btn" on:click={() => openDialog('owner')} disabled={busy}>Owner</button>
     </div>
   {/if}
   <button class="dev-fab" on:click={toggle} class:dev-fab-open={open} title="Dev tools">
@@ -80,27 +80,27 @@
       <Dialog.Overlay class="modal-overlay" />
       <Dialog.Content class="modal" style="max-width:360px;">
         <h3 style="margin:0 0 12px;">
-          {activeDialog === 'volume' ? 'Create Volume' : activeDialog === 'snapshot' ? 'Create Snapshot' : 'Create Lock'}
+          {activeDialog === 'volume' ? 'Create Volume' : activeDialog === 'snapshot' ? 'Create Snapshot' : 'Create Owner'}
         </h3>
         <input class="input modal-input" type="text"
           placeholder={activeDialog === 'snapshot' ? 'Target volume' : 'Volume'}
-          style="margin-bottom:{activeDialog === 'lock' ? '8px' : '12px'};"
+          style="margin-bottom:{activeDialog === 'owner' ? '8px' : '12px'};"
           bind:value={inputName}
-          on:keydown={(e) => e.key === 'Enter' && (activeDialog === 'volume' ? submitVolume() : activeDialog === 'snapshot' ? submitSnapshot() : submitLock())} />
-        {#if activeDialog === 'lock'}
+          on:keydown={(e) => e.key === 'Enter' && (activeDialog === 'volume' ? submitVolume() : activeDialog === 'snapshot' ? submitSnapshot() : submitOwner())} />
+        {#if activeDialog === 'owner'}
           <input class="input modal-input" type="text" placeholder="Owner"
             style="margin-bottom:8px;"
             bind:value={inputOwner}
-            on:keydown={(e) => e.key === 'Enter' && submitLock()} />
+            on:keydown={(e) => e.key === 'Enter' && submitOwner()} />
           <label style="display:flex;align-items:center;font-size:0.85rem;color:var(--muted);margin-bottom:12px;">
             Duration (min):
-            <input class="input modal-input" type="number" bind:value={lockDurationMins} min="0" placeholder="0 = none" style="width:80px;margin-left:8px;" />
+            <input class="input modal-input" type="number" bind:value={ownerDurationMins} min="0" placeholder="0 = none" style="width:80px;margin-left:8px;" />
           </label>
         {/if}
         <div class="modal-footer">
           <Button.Root class="button button-secondary" onclick={closeDialog}>Cancel</Button.Root>
-          <Button.Root class="button" onclick={activeDialog === 'volume' ? submitVolume : activeDialog === 'snapshot' ? submitSnapshot : submitLock}
-            disabled={busy || !inputName.trim() || (activeDialog === 'lock' && !inputOwner.trim())}>
+          <Button.Root class="button" onclick={activeDialog === 'volume' ? submitVolume : activeDialog === 'snapshot' ? submitSnapshot : submitOwner}
+            disabled={busy || !inputName.trim() || (activeDialog === 'owner' && !inputOwner.trim())}>
             {busy ? 'Creating...' : 'Create'}
           </Button.Root>
         </div>

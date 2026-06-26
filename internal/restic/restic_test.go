@@ -3,18 +3,15 @@ package restic
 import (
 	"testing"
 	"time"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/constants"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/volumepath"
 )
 
 func TestHasTag(t *testing.T) {
-	tags := []string{constants.BackupTagHot, constants.BackupTagCold, constants.BackupTagRestore}
+	tags := []string{BackupTagHot, BackupTagCold, "restore-point"}
 
-	if !hasTag(tags, constants.BackupTagHot) {
+	if !hasTag(tags, BackupTagHot) {
 		t.Error("expected 'hot' found")
 	}
-	if !hasTag(tags, constants.BackupTagRestore) {
+	if !hasTag(tags, "restore-point") {
 		t.Error("expected 'restore-point' found")
 	}
 	if hasTag(tags, "nonexistent") {
@@ -26,7 +23,7 @@ func TestHasTag(t *testing.T) {
 	if hasTag([]string{}, "hot") {
 		t.Error("expected false for empty tags")
 	}
-	if hasTag([]string{constants.BackupTagHot, constants.BackupTagCold}, "") {
+	if hasTag([]string{BackupTagHot, BackupTagCold}, "") {
 		t.Error("expected false for empty target")
 	}
 }
@@ -50,29 +47,6 @@ func TestCommonPathPrefix(t *testing.T) {
 		got := commonPathPrefix(tt.paths)
 		if got != tt.expected {
 			t.Errorf("commonPathPrefix(%v) = %q, want %q", tt.paths, got, tt.expected)
-		}
-	}
-}
-
-func TestVolumeNameFromPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected string
-	}{
-		{"/var/lib/docker-volumes/volumes/my-volume/data/file.txt", "my-volume"},
-		{"/volumes/my-volume/data", "my-volume"},
-		{"/volumes/group/sub/data", "group"},
-		{"/some/path/vol1-cold-snapshot", "vol1"},
-		{"/some/path/vol1-pre-restore", "vol1"},
-		{"/some/path", ""},
-		{"", ""},
-		{"/volumes/", ""},
-	}
-
-	for _, tt := range tests {
-		got := volumepath.VolumeNameFromPath(tt.path)
-		if got != tt.expected {
-			t.Errorf("VolumeNameFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
 		}
 	}
 }
@@ -110,7 +84,7 @@ func TestGenerateHash(t *testing.T) {
 		ShortID:  "abc123",
 		Time:     now,
 		Tree:     "treehash",
-		Tags:     []string{constants.BackupTagCold},
+		Tags:     []string{BackupTagCold},
 		Paths:    []string{"/volumes/vol1", "/volumes/vol2"},
 		Hostname: "host1",
 	}
@@ -175,15 +149,15 @@ func TestFindSnapshotByHashEmpty(t *testing.T) {
 func TestSnapshotSortLogic(t *testing.T) {
 	now := time.Now()
 	snaps := []Snapshot{
-		{ShortID: "s1", Time: now.Add(-2 * time.Hour), Tags: []string{constants.BackupTagRestore}, Paths: []string{"/volumes/my-vol/data"}},
-		{ShortID: "s2", Time: now.Add(-1 * time.Hour), Tags: []string{constants.BackupTagRestore}, Paths: []string{"/volumes/my-vol/data"}},
-		{ShortID: "s3", Time: now, Tags: []string{constants.BackupTagHot}, Paths: []string{"/volumes/my-vol/data"}},
+		{ShortID: "s1", Time: now.Add(-2 * time.Hour), Tags: []string{"restore-point"}, Paths: []string{"/volumes/my-vol/data"}},
+		{ShortID: "s2", Time: now.Add(-1 * time.Hour), Tags: []string{"restore-point"}, Paths: []string{"/volumes/my-vol/data"}},
+		{ShortID: "s3", Time: now, Tags: []string{BackupTagHot}, Paths: []string{"/volumes/my-vol/data"}},
 	}
 
-	if !hasTag(snaps[0].Tags, constants.BackupTagRestore) {
+	if !hasTag(snaps[0].Tags, "restore-point") {
 		t.Error("expected s1 to have restore-point tag")
 	}
-	if hasTag(snaps[2].Tags, constants.BackupTagRestore) {
+	if hasTag(snaps[2].Tags, "restore-point") {
 		t.Error("expected s3 to not have restore-point tag")
 	}
 	if !snaps[2].Time.After(snaps[1].Time) {
@@ -202,52 +176,5 @@ func TestCommonPathPrefixIdentical(t *testing.T) {
 	got := commonPathPrefix([]string{"/a/b/c", "/a/b/c", "/a/b/c"})
 	if got != "/a/b/c" {
 		t.Errorf("expected '/a/b/c', got %q", got)
-	}
-}
-
-func TestPathBelongsToVolume(t *testing.T) {
-	tests := []struct {
-		path   string
-		volume string
-		want   bool
-	}{
-		{"/var/lib/docker-volumes/volumes/my-vol/data/file.txt", "my-vol", true},
-		{"/volumes/my-vol/data", "my-vol", true},
-		{"/volumes/group/sub-vol/data", "group", true},
-		{"/volumes/group/sub-vol/data", "group/sub-vol", true},
-		{"/volumes/", "my-vol", false},
-		{"/some/path/vol1-cold-snapshot", "vol1", true},
-		{"/some/path/vol1-pre-restore", "vol1", true},
-		{"/snaps/group/sub-vol-cold-snapshot", "group/sub-vol", true},
-		{"/some/path", "vol1", false},
-		{"", "vol1", false},
-		{"/snaps/my-vol-cold-snap", "vol", false},
-		{"/volumes/other-vol", "my-vol", false},
-	}
-
-	for _, tt := range tests {
-		got := volumepath.PathBelongsToVolume(tt.path, tt.volume)
-		if got != tt.want {
-			t.Errorf("PathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
-		}
-	}
-}
-
-func TestPathBelongsToVolumeColdSnapEdgeCases(t *testing.T) {
-	tests := []struct {
-		path   string
-		volume string
-		want   bool
-	}{
-		{"/snaps/my-vol-cold-snapshot", "my-vol", true},
-		{"/snaps/group/sub-vol-cold-snapshot", "group/sub-vol", true},
-		{"/snaps/vol-cold-snapshot", "vol", true},
-		{"/snaps/other-vol-cold-snapshot", "vol", false},
-	}
-	for _, tt := range tests {
-		got := volumepath.PathBelongsToVolume(tt.path, tt.volume)
-		if got != tt.want {
-			t.Errorf("PathBelongsToVolume(%q, %q) = %v, want %v", tt.path, tt.volume, got, tt.want)
-		}
 	}
 }

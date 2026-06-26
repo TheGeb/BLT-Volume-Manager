@@ -5,7 +5,7 @@ import { versionTag } from '../util';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
-import { activeTab, loadLockStatus, loadStats, stats as repoStats, lockStatus, doSwitchTab } from './repo';
+import { activeTab, loadOwnerStatus, loadStats, stats as repoStats, ownerStatus, doSwitchTab } from './repo';
 import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, sizes, deleteSnapModal, findSnapshot, findSnapshotByVersion } from './snapshots';
 
 export const creatingTest = writable(false);
@@ -24,7 +24,7 @@ export async function loadAll(volume: string) {
   if (volume) {
     activeTab.set('snapshots');
     repoStats.set(null);
-    lockStatus.set(null);
+    ownerStatus.set(null);
   }
   syncUrl();
   if (volume) {
@@ -42,7 +42,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; tag?: 
   testStatus.set('');
   landingShown.set(false);
   repoStats.set(null);
-  lockStatus.set(null);
+  ownerStatus.set(null);
 
   const tab = (params?.tab ?? 'snapshots') as 'snapshots' | 'repo';
   activeTab.set(tab);
@@ -59,7 +59,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; tag?: 
   }
 
   if (tab === 'repo') {
-    await Promise.all([loadLockStatus(), loadStats(volume)]);
+    await Promise.all([loadOwnerStatus(), loadStats(volume)]);
   } else {
     await loadSnapshots(volume);
 
@@ -93,7 +93,7 @@ export async function handleRefresh() {
     await Promise.all(promises);
   }
   await loadVolumes();
-  if (vol && get(activeTab) === 'repo') void loadLockStatus();
+  if (vol && get(activeTab) === 'repo') void loadOwnerStatus();
 }
 
 export function onSelectVolume(vol: string) {

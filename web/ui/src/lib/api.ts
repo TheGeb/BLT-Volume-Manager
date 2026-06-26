@@ -1,4 +1,4 @@
-import type { Snapshot, LockStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
+import type { Snapshot, OwnerStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
 export interface SnapshotListParams {
   host?: string;
@@ -78,30 +78,30 @@ export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<st
 	return data;
 }
 
-export async function fetchLockStatus(volume: string): Promise<LockStatus> {
-  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`);
-  return resp.json() as Promise<LockStatus>;
+export async function fetchOwnerStatus(volume: string): Promise<OwnerStatus> {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`);
+  return resp.json() as Promise<OwnerStatus>;
 }
 
-export async function fetchAllLockStatus(): Promise<Record<string, LockStatus>> {
-  const resp = await fetch('/api/volumes/locks');
-  const data = await resp.json() as { locks?: Record<string, LockStatus> };
-  return data.locks ?? {};
+export async function fetchAllOwnerStatus(): Promise<Record<string, OwnerStatus>> {
+  const resp = await fetch('/api/volumes/owners');
+  const data = await resp.json() as { owners?: Record<string, OwnerStatus> };
+  return data.owners ?? {};
 }
 
-export async function createLock(volume: string, owner?: string, durationMinutes?: number): Promise<void> {
-  await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`, {
+export async function createOwnerLock(volume: string, owner?: string, durationMinutes?: number): Promise<void> {
+  await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner, lock_duration_mins: durationMinutes ?? 0 }),
+    body: JSON.stringify({ owner, owner_duration_mins: durationMinutes ?? 0 }),
   });
 }
 
-export async function deleteLocks(volume: string): Promise<void> {
-  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/locks`, { method: 'DELETE' });
+export async function deleteOwnerLock(volume: string): Promise<void> {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, { method: 'DELETE' });
   if (!resp.ok) {
     const body = await resp.json() as { error?: string };
-    throw new Error(body.error ?? 'Failed to delete locks');
+    throw new Error(body.error ?? 'Failed to delete owners');
   }
 }
 
@@ -205,7 +205,7 @@ export async function repairRepo(volume: string): Promise<string> {
   return d.status ?? '';
 }
 
-export async function copyVolume(source: string, target: string, preserveHistory?: boolean, snapshotIds?: string[]): Promise<{ status: string; source_locked?: boolean; source_owner?: string }> {
+export async function copyVolume(source: string, target: string, preserveHistory?: boolean, snapshotIds?: string[]): Promise<{ status: string; source_owned?: boolean; source_owner?: string }> {
   const body: Record<string, unknown> = { target };
   if (snapshotIds && snapshotIds.length > 0) {
     body.snapshot_ids = snapshotIds;

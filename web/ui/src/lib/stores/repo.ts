@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import type { StatsResponse, LockStatus } from '../types';
+import type { StatsResponse, OwnerStatus } from '../types';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume } from './volumes';
@@ -8,7 +8,7 @@ import { snapshots, loadSnapshots } from './snapshots';
 export const loading = writable(true);
 export const activeTab = writable<'snapshots' | 'repo'>('snapshots');
 export const themeDark = writable(true);
-export const lockStatus = writable<LockStatus | null>(null);
+export const ownerStatus = writable<OwnerStatus | null>(null);
 export const stats = writable<StatsResponse | null>(null);
 export const statsLoading = writable(false);
 export const checking = writable(false);
@@ -70,12 +70,12 @@ export function setAccentColor(name: string) {
   localStorage.setItem('accentColor', name);
 }
 
-export async function loadLockStatus() {
+export async function loadOwnerStatus() {
   const vol = get(selectedVolume);
-  if (!vol) { lockStatus.set(null); return; }
+  if (!vol) { ownerStatus.set(null); return; }
   try {
-    lockStatus.set(await api.fetchLockStatus(vol));
-  } catch { lockStatus.set(null); }
+    ownerStatus.set(await api.fetchOwnerStatus(vol));
+  } catch { ownerStatus.set(null); }
 }
 
 export async function loadStats(volume: string) {
@@ -114,7 +114,7 @@ export function doSwitchTab(tab: 'snapshots' | 'repo') {
   if (tab === 'repo') {
     if (vol) {
       void loadStats(vol);
-      void loadLockStatus();
+      void loadOwnerStatus();
     }
   } else if (vol && get(snapshots).length === 0) {
     void loadSnapshots(vol);

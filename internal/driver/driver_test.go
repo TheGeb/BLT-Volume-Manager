@@ -1,36 +1,14 @@
 package driver
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/appconfig"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/snapshot"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
 	"github.com/docker/go-plugins-helpers/volume"
 )
-
-func TestTypeFromString(t *testing.T) {
-	cases := []struct {
-		s        string
-		expected snapshot.Type
-	}{
-		{"btrfs", snapshot.TypeBtrfs},
-		{"zfs", snapshot.TypeZFS},
-		{"", snapshot.TypeNone},
-		{"ext4", snapshot.TypeNone},
-		{"BTRFS", snapshot.TypeNone},
-		{"ZFS", snapshot.TypeNone},
-		{"btr", snapshot.TypeNone},
-	}
-
-	for _, tc := range cases {
-		got := TypeFromString(tc.s)
-		if got != tc.expected {
-			t.Errorf("TypeFromString(%q) = %d, want %d", tc.s, got, tc.expected)
-		}
-	}
-}
 
 func TestVolumeConfigReadWrite(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
@@ -217,7 +195,7 @@ func TestResticManager(t *testing.T) {
 }
 
 func TestNewDriverDefaults(t *testing.T) {
-	d := NewDriver(appconfig.Config{DataDir: t.TempDir(), ResticBase: "/tmp/restic"})
+	d := New(cfg.Config{DataDir: t.TempDir(), ResticBase: "/tmp/restic"}, context.Background())
 	if d == nil {
 		t.Fatal("expected non-nil driver")
 	}
@@ -227,8 +205,8 @@ func TestNewDriverDefaults(t *testing.T) {
 	if d.vols == nil {
 		t.Error("expected non-nil vols map")
 	}
-	if d.locker == nil {
-		t.Error("expected non-nil locker")
+	if d.ownerClient != nil {
+		t.Error("expected nil ownerClient (no S3)")
 	}
 }
 

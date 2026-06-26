@@ -19,7 +19,7 @@
   <div style="text-align:center;padding:20px 0;">
     <h2 style="margin:0 0 8px;font-size:1.6rem;">BLT Volume Manager</h2>
     <p style="margin:0;color:var(--muted);font-size:0.95rem;">
-      Select a volume from the list above to view its snapshots, locks, and stats.
+      Select a volume from the list above to view its snapshots, owners, and stats.
     </p>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">

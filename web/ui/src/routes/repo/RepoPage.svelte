@@ -1,9 +1,9 @@
 <script lang="ts">
   import StatsGrid from '../../components/StoragePanel.svelte';
-  import LockPanel from './LockPanel.svelte';
+  import OwnerPanel from './OwnerPanel.svelte';
   import TroubleshootPanel from './ActionsPanel.svelte';
   import { onSelectVolume, switchTab } from '$lib/stores/navigation';
-  import { activeTab, lockStatus, stats, statsLoading, checking, repairing, loadLockStatus, handleCheck, handleRepair } from '$lib/stores/repo';
+  import { activeTab, ownerStatus, stats, statsLoading, checking, repairing, loadOwnerStatus, handleCheck, handleRepair } from '$lib/stores/repo';
   import { selectedVolume, openDeleteVolModal } from '$lib/stores/volumes';
 </script>
 
@@ -21,10 +21,10 @@
   <div class="tab-panel">
     <div class="repo-layout">
       <StatsGrid stats={$stats} loading={$statsLoading} />
-      <LockPanel
-        lockStatus={$lockStatus}
+      <OwnerPanel
+        ownerStatus={$ownerStatus}
         volume={$selectedVolume}
-        onLocksDeleted={() => loadLockStatus()}
+        onOwnerDeleted={() => loadOwnerStatus()}
       />
       <TroubleshootPanel
         checking={$checking}

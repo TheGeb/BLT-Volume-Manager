@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Snapshot, VolumeLockInfo } from '../types';
+import type { Snapshot, VolumeOwnerInfo } from '../types';
 import * as api from '../api';
 import { showToast } from './toast';
 
@@ -8,7 +8,7 @@ export const selectedVolume = writable('');
 export const volumeFilter = writable('');
 export const landingShown = writable(true);
 export const volumesLoading = writable(false);
-export const volumeLockInfo = writable<Record<string, VolumeLockInfo>>({});
+export const volumeOwnerInfo = writable<Record<string, VolumeOwnerInfo>>({});
 export const deleteVolModal = writable(false);
 export const deleteConfirmText = writable('');
 export const deleteVolLoading = writable(false);
@@ -38,7 +38,7 @@ export async function loadVolumes() {
   volumesLoading.set(true);
   try {
     volumes.set(await api.fetchVolumes());
-    void fetchAllVolumeLockInfo();
+    void fetchAllVolumeOwnerInfo();
   } catch {
     showToast('Cannot reach server', true);
   } finally {
@@ -46,25 +46,25 @@ export async function loadVolumes() {
   }
 }
 
-async function fetchAllVolumeLockInfo() {
+async function fetchAllVolumeOwnerInfo() {
   const vols = get(volumes);
   if (vols.length === 0) return;
-  const allLocks = await api.fetchAllLockStatus();
-  const info: Record<string, VolumeLockInfo> = {};
+  const allOwners = await api.fetchAllOwnerStatus();
+  const info: Record<string, VolumeOwnerInfo> = {};
   for (const vol of vols) {
-    const r = allLocks[vol];
+    const r = allOwners[vol];
     if (r) {
       info[vol] = {
-        locked: r.locked,
+        owned: r.owned,
         owner: r.owner ?? '',
         expiresIn: r.expires_in ?? 0,
-        status: r.locked ? 'locked' : 'unlocked',
+        status: r.owned ? 'owned' : 'unclaimed',
       };
     } else {
-      info[vol] = { locked: false, owner: '', expiresIn: 0, status: 'unlocked' };
+      info[vol] = { owned: false, owner: '', expiresIn: 0, status: 'unclaimed' };
     }
   }
-  volumeLockInfo.set(info);
+  volumeOwnerInfo.set(info);
 }
 
 export function onFilterChange(f: string) { volumeFilter.set(f); }
