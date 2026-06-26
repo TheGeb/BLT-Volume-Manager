@@ -10,7 +10,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleSnapshotAction(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot/") {
 		http.NotFound(w, r)
 		return
@@ -18,7 +18,7 @@ func HandleSnapshotAction(s *server.Server, w http.ResponseWriter, r *http.Reque
 
 	trimmed := strings.TrimPrefix(r.URL.Path, "/api/snapshot/")
 	if trimmed == "sizes" {
-		HandleSnapshotSizes(s, w, r)
+		SnapshotSizes(s, w, r)
 		return
 	}
 
@@ -34,7 +34,7 @@ func HandleSnapshotAction(s *server.Server, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	rm := s.VolumeManager(volName)
-	store, _ := s.GetOrCreateMetadataStore()
+	store, _ := s.MetadataStore()
 
 	if parts[1] == "delete" {
 		if !server.RequireMethod(w, r, http.MethodDelete) {
@@ -120,7 +120,7 @@ func HandleSnapshotAction(s *server.Server, w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func HandleSnapshotView(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
 		http.NotFound(w, r)
 		return
@@ -243,7 +243,7 @@ func HandleSnapshotView(s *server.Server, w http.ResponseWriter, r *http.Request
 	}
 }
 
-func HandleSnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -273,7 +273,7 @@ func HandleSnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Reques
 	server.RespondJSON(w, result)
 }
 
-func HandleSnapshotBatchDelete(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}

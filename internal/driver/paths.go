@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 )
 
 const (
@@ -32,7 +32,7 @@ func VolumeNameFromPath(path string) string {
 		return ""
 	}
 	last := parts[len(parts)-1]
-	for _, suffix := range []string{snapshot.ColdSnapSuffix, snapshot.PreRestoreSuffix} {
+	for _, suffix := range []string{snapshot.ColdSuffix, snapshot.PreRestoreSuffix} {
 		if strings.HasSuffix(last, suffix) {
 			return strings.TrimSuffix(last, suffix)
 		}
@@ -48,7 +48,7 @@ func PathBelongsToVolume(snapPath, volume string) bool {
 			return true
 		}
 	}
-	for _, suffix := range []string{snapshot.ColdSnapSuffix, snapshot.PreRestoreSuffix} {
+	for _, suffix := range []string{snapshot.ColdSuffix, snapshot.PreRestoreSuffix} {
 		if strings.HasSuffix(snapPath, "/"+volume+suffix) {
 			return true
 		}

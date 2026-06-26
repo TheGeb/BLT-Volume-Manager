@@ -14,12 +14,12 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleDevMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func DevMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	enabled := os.Getenv("BLT_TEST_MODE") != ""
 	server.RespondJSON(w, map[string]bool{"enabled": enabled})
 }
 
-func HandleDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -72,7 +72,7 @@ func HandleDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if ms, err := s.GetOrCreateMetadataStore(); err == nil && ms != nil {
+	if ms, err := s.MetadataStore(); err == nil && ms != nil {
 		if err := ms.WriteVolumeMarker(req.Name); err != nil {
 			log.Error("write_volume_marker_failed", err)
 		}
@@ -84,7 +84,7 @@ func HandleDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func HandleDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

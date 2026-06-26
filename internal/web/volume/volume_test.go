@@ -34,7 +34,7 @@ func volumeObjects(names ...string) []metadata.Object {
 	return objs
 }
 
-func TestHandleVolumes(t *testing.T) {
+func TestListVolumes(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
@@ -44,7 +44,7 @@ func TestHandleVolumes(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumes(s, rec, req)
+	ListVolumes(s, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -71,7 +71,7 @@ func TestHandleVolumes(t *testing.T) {
 	}
 }
 
-func TestHandleVolumesEmpty(t *testing.T) {
+func TestListVolumesEmpty(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
@@ -81,7 +81,7 @@ func TestHandleVolumesEmpty(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumes(s, rec, req)
+	ListVolumes(s, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -101,7 +101,7 @@ func TestHandleVolumesEmpty(t *testing.T) {
 	}
 }
 
-func TestHandleVolumesMethodNotAllowed(t *testing.T) {
+func TestListVolumesMethodNotAllowed(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
@@ -111,19 +111,19 @@ func TestHandleVolumesMethodNotAllowed(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumes(s, rec, req)
+	ListVolumes(s, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
 	}
 }
 
-func TestHandleVolumesNoS3(t *testing.T) {
+func TestListVolumesNoS3(t *testing.T) {
 	s := &server.Server{}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumes(s, rec, req)
+	ListVolumes(s, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)

@@ -8,12 +8,11 @@ import (
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleVolumeAction(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/volume/") {
 		http.NotFound(w, r)
 		return
@@ -31,7 +30,7 @@ func HandleVolumeAction(s *server.Server, w http.ResponseWriter, r *http.Request
 			http.NotFound(w, r)
 			return
 		}
-		HandleCopyVolume(s, w, r, volumeName)
+		CopyVolume(s, w, r, volumeName)
 		return
 	}
 
@@ -41,7 +40,7 @@ func HandleVolumeAction(s *server.Server, w http.ResponseWriter, r *http.Request
 			http.NotFound(w, r)
 			return
 		}
-		HandleRenameVolume(s, w, r, volumeName)
+		RenameVolume(s, w, r, volumeName)
 		return
 	}
 
@@ -51,18 +50,18 @@ func HandleVolumeAction(s *server.Server, w http.ResponseWriter, r *http.Request
 			http.NotFound(w, r)
 			return
 		}
-		owner.HandleOwnerAction(s, w, r, volumeName)
+		owner.OwnerRouter(s, w, r, volumeName)
 		return
 	}
 
 	if r.Method == http.MethodDelete {
-		HandleDeleteVolume(s, w, r, path)
+		DeleteVolume(s, w, r, path)
 	} else {
 		http.NotFound(w, r)
 	}
 }
 
-func HandleDeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if !server.ValidVolumeName(volumeName) || strings.Contains(volumeName, "/") {
 		http.Error(w, "invalid volume name", http.StatusBadRequest)
 		return
@@ -72,7 +71,7 @@ func HandleDeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request
 	server.RespondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
-func HandleCopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
 		return
@@ -144,7 +143,7 @@ func HandleCopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, 
 		}
 	}
 
-	ms, err := s.GetOrCreateMetadataStoreWithPrefix(metadata.VolumesPrefix)
+	ms, err := s.MetadataStore()
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
 		return
@@ -169,7 +168,7 @@ func HandleCopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, 
 	server.RespondJSON(w, resp)
 }
 
-func HandleRenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
 		return
@@ -226,7 +225,7 @@ func HandleRenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	vs, err := s.GetOrCreateMetadataStoreWithPrefix(metadata.VolumesPrefix)
+	vs, err := s.MetadataStore()
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
 		return

@@ -9,7 +9,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func ListVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		server.RespondError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
 		return
@@ -22,7 +22,7 @@ func HandleVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s3Store, err := s.GetOrCreateMetadataStore()
+	s3Store, err := s.MetadataStore()
 	if err != nil || s3Store == nil {
 		server.RespondJSON(w, map[string]any{"owners": owners})
 		return
@@ -34,7 +34,7 @@ func HandleVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	kept := metadata.FilterStaleOwnerObjects(s3Store, objects, metadata.DefaultOwnerTTL)
+	kept := metadata.RemoveStaleObjects(s3Store, objects, metadata.DefaultOwnerTTL)
 
 	grouped := make(map[string][]metadata.Object)
 	for _, obj := range kept {
@@ -50,7 +50,7 @@ func HandleVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request
 
 	for vol, objs := range grouped {
 		metadata.SortOwnerObjects(objs)
-		key, ownerName, expiry := metadata.FilterValidOwnersByKey(s3Store, objs)
+		key, ownerName, expiry := metadata.FindOwner(s3Store, objs)
 		if key != "" {
 			result := map[string]any{
 				"volume": vol,

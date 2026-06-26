@@ -210,18 +210,18 @@ func SnapshotListResponse(s *server.Server, volName string, opts *restic.ListSna
 		snaps = snaps[offset:]
 	}
 
-	store, _ := s.GetOrCreateMetadataStore()
+	store, _ := s.MetadataStore()
 
 	restorePointID := ""
 	if id, err := metadata.FindRestorePointByName(store, volName); err == nil {
 		restorePointID = id
 	}
 
-	result := make([]SnapshotWithVolume, 0, len(snaps))
+	result := make([]WithVolume, 0, len(snaps))
 	for _, snap := range snaps {
 		fullHash := rm.GenerateHash(snap)
 		snap.FallbackHash = fullHash[:len(snap.ShortID)]
-		result = append(result, SnapshotWithVolume{Snapshot: snap, Volume: volName})
+		result = append(result, WithVolume{Snapshot: snap, Volume: volName})
 	}
 
 	return map[string]any{
@@ -231,7 +231,7 @@ func SnapshotListResponse(s *server.Server, volName string, opts *restic.ListSna
 	}, nil
 }
 
-func HandleSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func ListSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -249,7 +249,7 @@ func HandleSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, resp)
 }
 
-func HandleSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func ListSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -266,7 +266,7 @@ func HandleSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	hosts, err := rm.ListSnapshotsGroupedByHost(latest)
+	hosts, err := rm.SnapshotHosts(latest)
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return

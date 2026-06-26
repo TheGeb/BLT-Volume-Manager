@@ -35,7 +35,7 @@ func (m *Manager) Init() error {
 }
 
 func (m *Manager) Stats() (*RepoStats, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", "--json", "--mode", "raw-data")
@@ -57,7 +57,7 @@ func (m *Manager) Stats() (*RepoStats, error) {
 }
 
 func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", snapshotID, "--json")
@@ -77,7 +77,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 }
 
 func (m *Manager) repositoryExists() (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json")
@@ -99,7 +99,7 @@ func (m *Manager) initRepository() error {
 }
 
 func (m *Manager) Check(noLock bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutMedium)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
 	defer cancel()
 	args := []string{"check"}
 	if noLock {
@@ -112,13 +112,13 @@ func (m *Manager) Repair() error {
 	if err := m.Unlock(); err != nil {
 		log.Warnf("repair_unlock_failed_continuing", "error=%v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutLong)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
 	return m.runSimple(ctx, "repair", "index")
 }
 
 func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutLong)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
 
 	args := []string{"--from-repo", m.repo, "-r", destRepo, "copy"}

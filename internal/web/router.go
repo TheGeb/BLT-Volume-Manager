@@ -26,62 +26,62 @@ func Register(s *server.Server, mux *http.ServeMux) {
 	})
 
 	inner.HandleFunc("/api/repo/init", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleRepoInit(s, w, r)
+		repo.InitRepo(s, w, r)
 	})
 	inner.HandleFunc("/api/repo/status", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleRepoStatus(s, w, r)
+		repo.RepoStatus(s, w, r)
 	})
 
 	inner.HandleFunc("/api/snapshots", func(w http.ResponseWriter, r *http.Request) {
-		snapshot.HandleSnapshots(s, w, r)
+		snapshot.ListSnapshots(s, w, r)
 	})
 	inner.HandleFunc("/api/snapshot/", func(w http.ResponseWriter, r *http.Request) {
-		snapshot.HandleSnapshotAction(s, w, r)
+		snapshot.SnapshotRouter(s, w, r)
 	})
 	inner.HandleFunc("/api/snapshot-view/", func(w http.ResponseWriter, r *http.Request) {
-		snapshot.HandleSnapshotView(s, w, r)
+		snapshot.SnapshotFileRouter(s, w, r)
 	})
 	inner.HandleFunc("/api/snapshots/delete-batch", func(w http.ResponseWriter, r *http.Request) {
-		snapshot.HandleSnapshotBatchDelete(s, w, r)
+		snapshot.BatchDeleteSnapshots(s, w, r)
 	})
 	inner.HandleFunc("/api/snapshots/hosts", func(w http.ResponseWriter, r *http.Request) {
-		snapshot.HandleSnapshotHosts(s, w, r)
+		snapshot.ListSnapshotHosts(s, w, r)
 	})
 
 	inner.HandleFunc("/api/volume/", func(w http.ResponseWriter, r *http.Request) {
-		volume.HandleVolumeAction(s, w, r)
+		volume.VolumeRouter(s, w, r)
 	})
 
 	inner.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleStats(s, w, r)
+		repo.Stats(s, w, r)
 	})
 	inner.HandleFunc("/api/stats/refresh", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleStatsRefresh(s, w, r)
+		repo.RefreshStats(s, w, r)
 	})
 
 	inner.HandleFunc("/api/volumes", func(w http.ResponseWriter, r *http.Request) {
-		volume.HandleVolumes(s, w, r)
+		volume.ListVolumes(s, w, r)
 	})
 	inner.HandleFunc("/api/volumes/owners", func(w http.ResponseWriter, r *http.Request) {
-		owner.HandleVolumeOwners(s, w, r)
+		owner.ListVolumeOwners(s, w, r)
 	})
 
 	inner.HandleFunc("/api/repo/check", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleCheck(s, w, r)
+		repo.CheckRepo(s, w, r)
 	})
 	inner.HandleFunc("/api/repo/repair", func(w http.ResponseWriter, r *http.Request) {
-		repo.HandleRepair(s, w, r)
+		repo.RepairRepo(s, w, r)
 	})
 
 	inner.HandleFunc("/api/dev-mode", func(w http.ResponseWriter, r *http.Request) {
-		HandleDevMode(s, w, r)
+		DevMode(s, w, r)
 	})
 	if os.Getenv("BLT_TEST_MODE") != "" {
 		inner.HandleFunc("/api/dummy-volume", func(w http.ResponseWriter, r *http.Request) {
-			HandleDummyVolume(s, w, r)
+			CreateDummyVolume(s, w, r)
 		})
 		inner.HandleFunc("/api/dummy-snapshot", func(w http.ResponseWriter, r *http.Request) {
-			HandleDummySnapshot(s, w, r)
+			CreateDummySnapshot(s, w, r)
 		})
 	}
 

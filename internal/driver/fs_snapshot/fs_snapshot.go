@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	ColdSnapSuffix   = "-cold-snapshot"
+	ColdSuffix   = "-cold-snapshot"
 	PreRestoreSuffix = "-pre-restore"
 )
 
@@ -35,7 +35,7 @@ func (t Type) String() string {
 	return ""
 }
 
-type SnapInfo struct {
+type Info struct {
 	VolName    string
 	SnapDir    string
 	AccessPath string
@@ -43,11 +43,11 @@ type SnapInfo struct {
 	ZfsSnap    string
 }
 
-type Snapshotter interface {
+type Provider interface {
 	Type() Type
 	MatchFSType(fsType string) bool
-	CreateSnapshot(volPath, accessPath, volName string, info *SnapInfo) error
-	RemoveSnapshot(info *SnapInfo) error
+	CreateSnapshot(volPath, accessPath, volName string, info *Info) error
+	RemoveSnapshot(info *Info) error
 	Init(path string, opts map[string]string) error
 	Destroy(path string) error
 }
@@ -68,7 +68,7 @@ func RootDataset() string {
 }
 
 var (
-	snapshotters = map[Type]Snapshotter{}
+	providers = map[Type]Provider{}
 	typeOrder    []Type
 )
 
@@ -76,9 +76,9 @@ func RegisteredTypes() []Type {
 	return typeOrder
 }
 
-func Register(s Snapshotter) {
+func Register(s Provider) {
 	t := s.Type()
-	snapshotters[t] = s
+	providers[t] = s
 	typeOrder = append(typeOrder, t)
 }
 
@@ -91,27 +91,27 @@ func Detect(path string) Type {
 	}
 	fsType := strings.TrimSpace(string(out))
 	for _, t := range typeOrder {
-		if s := snapshotters[t]; s != nil && s.MatchFSType(fsType) {
+		if s := providers[t]; s != nil && s.MatchFSType(fsType) {
 			return t
 		}
 	}
 	return TypeNone
 }
 
-func Create(volPath, snapDir, volName string) (*SnapInfo, error) {
+func Create(volPath, snapDir, volName string) (*Info, error) {
 	t := Detect(volPath)
 	if t == TypeNone {
 		return nil, fmt.Errorf("no supported snapshot filesystem at %s", volPath)
 	}
-	accessPath := filepath.Join(snapDir, volName+ColdSnapSuffix)
-	info := &SnapInfo{
+	accessPath := filepath.Join(snapDir, volName+ColdSuffix)
+	info := &Info{
 		VolName:    volName,
 		SnapDir:    snapDir,
 		AccessPath: accessPath,
 		Subtype:    t,
 	}
 
-	s, ok := snapshotters[t]
+	s, ok := providers[t]
 	if !ok {
 		return nil, fmt.Errorf("unsupported filesystem type for %s", volPath)
 	}
@@ -121,18 +121,18 @@ func Create(volPath, snapDir, volName string) (*SnapInfo, error) {
 	return info, nil
 }
 
-func Remove(info *SnapInfo) error {
+func Remove(info *Info) error {
 	if info.Subtype == TypeNone {
 		return nil
 	}
-	s, ok := snapshotters[info.Subtype]
+	s, ok := providers[info.Subtype]
 	if !ok {
 		return nil
 	}
 	return s.RemoveSnapshot(info)
 }
 
-func ListOrphaned(snapDir string) ([]*SnapInfo, error) {
+func ListOrphaned(snapDir string) ([]*Info, error) {
 	entries, err := os.ReadDir(snapDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -140,14 +140,14 @@ func ListOrphaned(snapDir string) ([]*SnapInfo, error) {
 		}
 		return nil, err
 	}
-	var out []*SnapInfo
+	var out []*Info
 	for _, e := range entries {
 		name := e.Name()
-		if !strings.HasSuffix(name, ColdSnapSuffix) {
+		if !strings.HasSuffix(name, ColdSuffix) {
 			continue
 		}
-		volName := strings.TrimSuffix(name, ColdSnapSuffix)
-		out = append(out, &SnapInfo{
+		volName := strings.TrimSuffix(name, ColdSuffix)
+		out = append(out, &Info{
 			VolName:    volName,
 			SnapDir:    snapDir,
 			AccessPath: filepath.Join(snapDir, name),
@@ -156,7 +156,7 @@ func ListOrphaned(snapDir string) ([]*SnapInfo, error) {
 	return out, nil
 }
 
-func TypeFromString(s string) Type {
+func FromString(s string) Type {
 	switch s {
 	case "btrfs":
 		return TypeBtrfs
@@ -166,7 +166,7 @@ func TypeFromString(s string) Type {
 	return TypeNone
 }
 
-func ResolveType(info *SnapInfo) error {
+func ResolveType(info *Info) error {
 	t := Detect(info.AccessPath)
 	if t == TypeNone {
 		return fmt.Errorf("unsupported filesystem type at %s", info.AccessPath)
@@ -193,7 +193,7 @@ func ZFSDataset(path string) (string, error) {
 }
 
 func InitFs(volPath string, t Type, opts map[string]string) error {
-	s, ok := snapshotters[t]
+	s, ok := providers[t]
 	if !ok {
 		return fmt.Errorf("unsupported snapshot filesystem type: %s", t)
 	}
@@ -201,7 +201,7 @@ func InitFs(volPath string, t Type, opts map[string]string) error {
 }
 
 func DestroyVolume(volPath string, t Type) error {
-	s, ok := snapshotters[t]
+	s, ok := providers[t]
 	if !ok {
 		return fmt.Errorf("unsupported snapshot filesystem type: %s", t)
 	}

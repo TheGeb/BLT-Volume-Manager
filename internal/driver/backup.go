@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 )
 

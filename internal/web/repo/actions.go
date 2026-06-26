@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleRepoInit(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func InitRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -25,7 +25,7 @@ func HandleRepoInit(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, map[string]string{"status": "repository initialized"})
 }
 
-func HandleRepoStatus(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func RepoStatus(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

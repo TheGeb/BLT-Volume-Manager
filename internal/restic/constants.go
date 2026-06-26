@@ -6,9 +6,9 @@ const (
 	BackupTagHot  = "hot"
 	BackupTagCold = "cold"
 
-	ResticDir = "restic"
+	Dir = "restic"
 
-	ResticTimeoutShort  = 2 * time.Minute
-	ResticTimeoutMedium = 10 * time.Minute
-	ResticTimeoutLong   = 30 * time.Minute
+	TimeoutShort  = 2 * time.Minute
+	TimeoutMedium = 10 * time.Minute
+	TimeoutLong   = 30 * time.Minute
 )

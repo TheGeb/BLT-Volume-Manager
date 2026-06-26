@@ -45,7 +45,7 @@ func (s *Server) HasBackend() bool {
 	return s.Config.MetadataBackend != "" || s.Config.S3Bucket != ""
 }
 
-func (s *Server) GetOrCreateMetadataStore() (*metadata.Store, error) {
+func (s *Server) MetadataStore() (*metadata.Store, error) {
 	if !s.HasBackend() {
 		return nil, fmt.Errorf("metadata backend not configured")
 	}
@@ -62,9 +62,7 @@ func (s *Server) GetOrCreateMetadataStore() (*metadata.Store, error) {
 	return s.metadataStore, nil
 }
 
-func (s *Server) GetOrCreateMetadataStoreWithPrefix(_ string) (*metadata.Store, error) {
-	return s.GetOrCreateMetadataStore()
-}
+
 
 func (s *Server) IsS3Backend() bool {
 	return strings.HasPrefix(s.ResticBase, "s3:")
@@ -75,7 +73,7 @@ func (s *Server) VolumeManager(volName string) *restic.Manager {
 }
 
 func (s *Server) StoreForVolume(_ string) (*metadata.Store, error) {
-	return s.GetOrCreateMetadataStore()
+	return s.MetadataStore()
 }
 
 func (s *Server) StoreForResticData() (metadata.ObjectStore, error) {
@@ -96,7 +94,7 @@ func (s *Server) StoreForResticData() (metadata.ObjectStore, error) {
 }
 
 func (s *Server) NextVersionTags(volName string, major bool) []string {
-	ms, err := s.GetOrCreateMetadataStore()
+	ms, err := s.MetadataStore()
 	if err != nil || ms == nil {
 		return nil
 	}
@@ -108,7 +106,7 @@ func (s *Server) NextVersionTags(volName string, major bool) []string {
 }
 
 func (s *Server) VolumeNames() []string {
-	ms, err := s.GetOrCreateMetadataStore()
+	ms, err := s.MetadataStore()
 	if err != nil || ms == nil {
 		return nil
 	}

@@ -10,45 +10,45 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func TestHandleOwnerAction_GetNoBackend(t *testing.T) {
+func TestOwnerRouter_GetNoBackend(t *testing.T) {
 	s := &server.Server{}
 	req := httptest.NewRequest(http.MethodGet, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
-	HandleOwnerAction(s, rec, req, "test")
+	OwnerRouter(s, rec, req, "test")
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rec.Code)
 	}
 }
 
-func TestHandleOwnerAction_DeleteNoBackend(t *testing.T) {
+func TestOwnerRouter_DeleteNoBackend(t *testing.T) {
 	s := &server.Server{}
 	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
-	HandleOwnerAction(s, rec, req, "test")
+	OwnerRouter(s, rec, req, "test")
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rec.Code)
 	}
 }
 
-func TestHandleOwnerAction_MethodNotAllowed(t *testing.T) {
+func TestOwnerRouter_MethodNotAllowed(t *testing.T) {
 	s := &server.Server{}
 	req := httptest.NewRequest(http.MethodPut, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
-	HandleOwnerAction(s, rec, req, "test")
+	OwnerRouter(s, rec, req, "test")
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
 	}
 }
 
-func TestHandleOwnerAction_PostInvalidJSON(t *testing.T) {
+func TestOwnerRouter_PostInvalidJSON(t *testing.T) {
 	s := &server.Server{}
 	body := strings.NewReader(`not json`)
 	req := httptest.NewRequest(http.MethodPost, "/api/volume/test/owner", body)
 	rec := httptest.NewRecorder()
-	HandleOwnerAction(s, rec, req, "test")
+	OwnerRouter(s, rec, req, "test")
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -63,11 +63,11 @@ func TestHandleOwnerAction_PostInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestHandleVolumeOwners_NoBackend(t *testing.T) {
+func TestListVolumeOwners_NoBackend(t *testing.T) {
 	s := &server.Server{}
 	req := httptest.NewRequest(http.MethodGet, "/api/owners", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumeOwners(s, rec, req)
+	ListVolumeOwners(s, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -87,11 +87,11 @@ func TestHandleVolumeOwners_NoBackend(t *testing.T) {
 	}
 }
 
-func TestHandleVolumeOwners_MethodNotAllowed(t *testing.T) {
+func TestListVolumeOwners_MethodNotAllowed(t *testing.T) {
 	s := &server.Server{}
 	req := httptest.NewRequest(http.MethodPost, "/api/owners", nil)
 	rec := httptest.NewRecorder()
-	HandleVolumeOwners(s, rec, req)
+	ListVolumeOwners(s, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)

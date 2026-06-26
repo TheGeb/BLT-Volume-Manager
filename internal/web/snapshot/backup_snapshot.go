@@ -6,7 +6,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 )
 
-type SnapshotWithVolume struct {
+type WithVolume struct {
 	restic.Snapshot
 	Volume string `json:"volume"`
 }

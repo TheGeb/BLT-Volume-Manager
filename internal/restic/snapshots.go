@@ -25,7 +25,7 @@ func (m *Manager) ListSnapshots() ([]Snapshot, error) {
 }
 
 func (m *Manager) ListSnapshotsWithOpts(opts *ListSnapshotsOpts) ([]Snapshot, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	args := []string{"snapshots", "--no-lock", "--json"}
@@ -69,8 +69,8 @@ type HostSnapshots struct {
 	Snapshots []Snapshot `json:"snapshots"`
 }
 
-func (m *Manager) ListSnapshotsGroupedByHost(latest int) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+func (m *Manager) SnapshotHosts(latest int) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	args := []string{"snapshots", "--no-lock", "--json", "--group-by", "host", "--latest", "1"}
@@ -133,7 +133,7 @@ func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 }
 
 func (m *Manager) RestoreIfExists(path, preferred string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	args := []string{"snapshots", "--no-lock", "--last", "1", "--json"}
@@ -205,7 +205,7 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 }
 
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutMedium)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
 	defer cancel()
 	return m.runSimple(ctx, "restore", snapshotID, "--target", target)
 }
@@ -231,7 +231,7 @@ type DiffChange struct {
 }
 
 func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	args := []string{"ls", "--no-lock", snapshotID}
@@ -330,7 +330,7 @@ func commonPathPrefix(paths []string) string {
 }
 
 func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	cmd, err := m.resticCommand(ctx, "dump", "--no-lock", snapshotID, path)
@@ -345,7 +345,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 }
 
 func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutShort)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
 	cmd, err := m.resticCommand(ctx, "diff", "--no-lock", "--json", snapID1, snapID2)

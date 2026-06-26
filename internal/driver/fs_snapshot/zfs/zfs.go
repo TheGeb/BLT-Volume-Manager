@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 )
 
-type zfsSnapshotter struct{}
+type zfsProvider struct{}
 
 func init() {
-	snapshot.Register(&zfsSnapshotter{})
+	snapshot.Register(&zfsProvider{})
 }
 
-func (z *zfsSnapshotter) Type() snapshot.Type { return snapshot.TypeZFS }
+func (z *zfsProvider) Type() snapshot.Type { return snapshot.TypeZFS }
 
-func (z *zfsSnapshotter) MatchFSType(fsType string) bool {
+func (z *zfsProvider) MatchFSType(fsType string) bool {
 	return fsType == "zfs"
 }
 
-func (z *zfsSnapshotter) Init(path string, opts map[string]string) error {
+func (z *zfsProvider) Init(path string, opts map[string]string) error {
 	parentDataset := snapshot.RootDataset()
 	if p, ok := opts["zfs-pool"]; ok && p != "" {
 		parentDataset = p
@@ -46,7 +46,7 @@ func (z *zfsSnapshotter) Init(path string, opts map[string]string) error {
 	return nil
 }
 
-func (z *zfsSnapshotter) Destroy(path string) error {
+func (z *zfsProvider) Destroy(path string) error {
 	dataset, err := snapshot.ZFSDataset(path)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (z *zfsSnapshotter) Destroy(path string) error {
 	return nil
 }
 
-func (z *zfsSnapshotter) CreateSnapshot(volPath, accessPath, volName string, info *snapshot.SnapInfo) error {
+func (z *zfsProvider) CreateSnapshot(volPath, accessPath, volName string, info *snapshot.Info) error {
 	dataset, err := snapshot.ZFSDataset(volPath)
 	if err != nil {
 		return fmt.Errorf("resolve zfs dataset: %w", err)
@@ -73,7 +73,7 @@ func (z *zfsSnapshotter) CreateSnapshot(volPath, accessPath, volName string, inf
 	return nil
 }
 
-func (z *zfsSnapshotter) RemoveSnapshot(info *snapshot.SnapInfo) error {
+func (z *zfsProvider) RemoveSnapshot(info *snapshot.Info) error {
 	return zfsRemoveSnapshot(info.ZfsSnap, info.AccessPath)
 }
 

@@ -64,7 +64,7 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 	return volume, owner, expiry, nil
 }
 
-func FilterValidOwnersByKey(store ObjectStore, objects []Object) (firstKey string, firstOwner string, firstExpiry int64) {
+func FindOwner(store ObjectStore, objects []Object) (firstKey string, firstOwner string, firstExpiry int64) {
 	now := time.Now().Unix()
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -82,7 +82,6 @@ func FilterValidOwnersByKey(store ObjectStore, objects []Object) (firstKey strin
 					continue
 				}
 				if o.ExpiryTime > 0 && o.RemainingSeconds() <= 0 {
-					_ = store.DeleteObject(*obj.Key)
 					continue
 				}
 				return *obj.Key, o.Name, o.ExpiryTime
@@ -97,7 +96,7 @@ func FilterValidOwnersByKey(store ObjectStore, objects []Object) (firstKey strin
 	return "", "", 0
 }
 
-func FilterStaleOwnerObjects(store ObjectStore, objects []Object, ttl time.Duration) []Object {
+func RemoveStaleObjects(store ObjectStore, objects []Object, ttl time.Duration) []Object {
 	kept := make([]Object, 0, len(objects))
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -155,7 +154,7 @@ func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (my
 	}
 	SortOwnerObjects(objects)
 
-	key, _, _ := FilterValidOwnersByKey(store, objects)
+	key, _, _ := FindOwner(store, objects)
 	if key != myKey {
 		return "", fmt.Errorf("another owner proposal was earlier")
 	}

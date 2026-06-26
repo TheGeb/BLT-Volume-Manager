@@ -10,7 +10,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func GetVolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
+func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
 	if !s.HasBackend() {
 		return nil, errors.New("metadata backend not configured: set META_BACKEND, METADATA_S3_BUCKET, or S3_ENDPOINT")
 	}
@@ -27,14 +27,14 @@ func GetVolumeOwner(s *server.Server, volumeName string) (map[string]any, error)
 	}
 
 	metadata.SortOwnerObjects(objects)
-	objects = metadata.FilterStaleOwnerObjects(ms, objects, metadata.DefaultOwnerTTL)
+	objects = metadata.RemoveStaleObjects(ms, objects, metadata.DefaultOwnerTTL)
 
 	result := map[string]any{
 		"volume": volumeName,
 		"owned":  false,
 	}
 
-	key, owner, expiry := metadata.FilterValidOwnersByKey(ms, objects)
+	key, owner, expiry := metadata.FindOwner(ms, objects)
 	if key != "" {
 		result["owned"] = true
 		result["owner"] = owner
@@ -51,7 +51,7 @@ func GetVolumeOwner(s *server.Server, volumeName string) (map[string]any, error)
 }
 
 func IsVolumeOwned(s *server.Server, volumeName string) (bool, string, error) {
-	status, err := GetVolumeOwner(s, volumeName)
+	status, err := VolumeOwner(s, volumeName)
 	if err != nil {
 		return false, "", err
 	}

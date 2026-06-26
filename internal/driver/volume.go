@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/docker/go-plugins-helpers/volume"
 )
@@ -102,7 +102,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 		log.Errorf("final_backup_failed", err, "volume=%s", name)
 	}
 	if fsType != "" {
-		if err := snapshot.DestroyVolume(volPath, snapshot.TypeFromString(fsType)); err != nil {
+		if err := snapshot.DestroyVolume(volPath, snapshot.FromString(fsType)); err != nil {
 			log.Errorf("destroy_volume_failed", err, "path=%s fs=%s", volPath, fsType)
 		}
 	} else {

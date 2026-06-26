@@ -8,10 +8,10 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleOwnerAction(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func OwnerRouter(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	switch r.Method {
 	case http.MethodGet:
-		status, err := GetVolumeOwner(s, volumeName)
+		status, err := VolumeOwner(s, volumeName)
 		if err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return

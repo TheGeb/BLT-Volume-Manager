@@ -25,7 +25,7 @@ func TestTypeString(t *testing.T) {
 	}
 }
 
-func TestTypeFromString(t *testing.T) {
+func TestFromString(t *testing.T) {
 	cases := []struct {
 		s        string
 		expected Type
@@ -40,9 +40,9 @@ func TestTypeFromString(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := TypeFromString(tc.s)
+		got := FromString(tc.s)
 		if got != tc.expected {
-			t.Errorf("TypeFromString(%q) = %d, want %d", tc.s, got, tc.expected)
+			t.Errorf("FromString(%q) = %d, want %d", tc.s, got, tc.expected)
 		}
 	}
 }
@@ -70,10 +70,10 @@ func TestListOrphaned_EmptyDir(t *testing.T) {
 func TestListOrphaned_FindsColdSnaps(t *testing.T) {
 	snapDir := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(snapDir, "vol1"+ColdSnapSuffix), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "vol1"+ColdSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(snapDir, "vol2"+ColdSnapSuffix), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "vol2"+ColdSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(snapDir, "regular-dir"), 0o755); err != nil {
@@ -105,7 +105,7 @@ func TestListOrphaned_FindsColdSnaps(t *testing.T) {
 
 func TestListOrphaned_AccessPath(t *testing.T) {
 	snapDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(snapDir, "test-vol"+ColdSnapSuffix), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapDir, "test-vol"+ColdSuffix), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,7 +114,7 @@ func TestListOrphaned_AccessPath(t *testing.T) {
 		t.Fatalf("ListOrphaned: %v", err)
 	}
 
-	want := filepath.Join(snapDir, "test-vol"+ColdSnapSuffix)
+	want := filepath.Join(snapDir, "test-vol"+ColdSuffix)
 	if snaps[0].AccessPath != want {
 		t.Errorf("AccessPath = %q, want %q", snaps[0].AccessPath, want)
 	}
@@ -124,22 +124,22 @@ func TestListOrphaned_AccessPath(t *testing.T) {
 }
 
 func TestResolveType_DetectNonExistent(t *testing.T) {
-	info := &SnapInfo{AccessPath: filepath.Join(t.TempDir(), "nonexistent")}
+	info := &Info{AccessPath: filepath.Join(t.TempDir(), "nonexistent")}
 	err := ResolveType(info)
 	if err == nil {
 		t.Error("expected error for nonexistent path")
 	}
 }
 
-func TestSnapInfoZeroValue(t *testing.T) {
-	info := &SnapInfo{}
+func TestInfoZeroValue(t *testing.T) {
+	info := &Info{}
 	if info.Subtype != TypeNone {
 		t.Errorf("expected TypeNone, got %d", info.Subtype)
 	}
 }
 
 func TestRemove_NoneType(t *testing.T) {
-	err := Remove(&SnapInfo{Subtype: TypeNone})
+	err := Remove(&Info{Subtype: TypeNone})
 	if err != nil {
 		t.Errorf("expected no error for TypeNone, got %v", err)
 	}

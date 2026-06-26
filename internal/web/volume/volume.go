@@ -30,20 +30,20 @@ func CleanupVolumeData(s *server.Server, volumeName string) {
 		}
 		if s.IsS3Backend() {
 			if dataStore, err := s.StoreForResticData(); err == nil && dataStore != nil {
-				if err := dataStore.DeleteObjectsWithPrefix(restic.ResticDir + "/" + volumeName + "/"); err != nil {
+				if err := dataStore.DeleteObjectsWithPrefix(restic.Dir + "/" + volumeName + "/"); err != nil {
 					log.Error("delete_restic_data_failed", err)
 				}
 			}
 		}
 	}
 	if !s.IsS3Backend() {
-		repoPath := filepath.Join(s.ResticBase, restic.ResticDir, volumeName)
+		repoPath := filepath.Join(s.ResticBase, restic.Dir, volumeName)
 		absPath, err := filepath.Abs(repoPath)
 		if err != nil {
 			log.Error("resolve_repo_path_failed", err)
 			return
 		}
-		basePath, err := filepath.Abs(filepath.Join(s.ResticBase, restic.ResticDir))
+		basePath, err := filepath.Abs(filepath.Join(s.ResticBase, restic.Dir))
 		if err != nil {
 			log.Error("resolve_base_path_failed", err)
 			return

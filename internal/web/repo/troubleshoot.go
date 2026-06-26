@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func HandleCheck(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func CheckRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -28,7 +28,7 @@ func HandleCheck(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, map[string]string{"status": "Check completed, repository is healthy."})
 }
 
-func HandleRepair(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func RepairRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

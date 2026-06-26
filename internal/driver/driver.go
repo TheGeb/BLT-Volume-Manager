@@ -6,11 +6,10 @@ import (
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	appcfg "github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 
-	// register btrfs/zfs snapshotters via init()
-	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot/btrfs"
-	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot/zfs"
+	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot/btrfs"
+	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot/zfs"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 )

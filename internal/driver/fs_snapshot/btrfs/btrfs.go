@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
+	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 )
 
-type btrfsSnapshotter struct{}
+type btrfsProvider struct{}
 
 func init() {
-	snapshot.Register(&btrfsSnapshotter{})
+	snapshot.Register(&btrfsProvider{})
 }
 
-func (b *btrfsSnapshotter) Type() snapshot.Type { return snapshot.TypeBtrfs }
+func (b *btrfsProvider) Type() snapshot.Type { return snapshot.TypeBtrfs }
 
-func (b *btrfsSnapshotter) MatchFSType(fsType string) bool {
+func (b *btrfsProvider) MatchFSType(fsType string) bool {
 	return fsType == "btrfs"
 }
 
-func (b *btrfsSnapshotter) Init(path string, _ map[string]string) error {
+func (b *btrfsProvider) Init(path string, _ map[string]string) error {
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("remove path: %w", err)
 	}
@@ -41,11 +41,11 @@ func btrfsCreateSubvolume(path string) error {
 	return nil
 }
 
-func (b *btrfsSnapshotter) Destroy(path string) error {
+func (b *btrfsProvider) Destroy(path string) error {
 	return btrfsRemove(path)
 }
 
-func (b *btrfsSnapshotter) CreateSnapshot(volPath, accessPath, volName string, info *snapshot.SnapInfo) error {
+func (b *btrfsProvider) CreateSnapshot(volPath, accessPath, volName string, info *snapshot.Info) error {
 	if !isSubvolume(volPath) {
 		return fmt.Errorf("%s is not a btrfs subvolume; init with btrfs first", volPath)
 	}
@@ -55,7 +55,7 @@ func (b *btrfsSnapshotter) CreateSnapshot(volPath, accessPath, volName string, i
 	return btrfsCreate(volPath, accessPath)
 }
 
-func (b *btrfsSnapshotter) RemoveSnapshot(info *snapshot.SnapInfo) error {
+func (b *btrfsProvider) RemoveSnapshot(info *snapshot.Info) error {
 	return btrfsRemove(info.AccessPath)
 }
 
