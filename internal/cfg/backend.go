@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/etcd"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/s3"
@@ -30,7 +30,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 			S3Endpoint:     cfg.S3Endpoint,
 			Region:         cfg.S3Region,
 			ForcePathStyle: &cfg.S3ForcePathStyle,
-			Logger:         app.S3Call,
+			Logger:         log.S3Call,
 		})
 	case metadata.BackendEtcd:
 		if len(cfg.EtcdEndpoints) == 0 {

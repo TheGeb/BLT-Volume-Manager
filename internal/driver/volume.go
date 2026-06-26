@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/docker/go-plugins-helpers/volume"
@@ -38,14 +38,14 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 			return err
 		}
 		if rerr := ownerLock.Release(); rerr != nil {
-			app.Errorf("release_owner_failed", rerr, "volume=%s", name)
+			log.Errorf("release_owner_failed", rerr, "volume=%s", name)
 		}
 	}
 
 	// Cold backup on create — marks the volume's initial state (v0, v0.0)
 	rm := d.ResticManager(name)
 	if err := rm.Backup(volPath, "cold", "v0", "v0.0"); err != nil {
-		app.Errorf("create_cold_backup_failed", err, "volume=%s", name)
+		log.Errorf("create_cold_backup_failed", err, "volume=%s", name)
 	}
 
 	return nil
@@ -67,14 +67,14 @@ func (d *Driver) initFsType(opts map[string]string, name, volPath string) string
 		}
 		parent := filepath.Dir(volPath)
 		if snapshot.Detect(parent) != t {
-			app.Warnf("volume_fs_mismatch", "volume=%s fs=%s parent=%s", name, candidate, parent)
+			log.Warnf("volume_fs_mismatch", "volume=%s fs=%s parent=%s", name, candidate, parent)
 			return ""
 		}
 		if err := snapshot.InitFs(volPath, t, opts); err != nil {
-			app.Errorf("fs_init_failed", err, "volume=%s fs=%s", name, candidate)
+			log.Errorf("fs_init_failed", err, "volume=%s fs=%s", name, candidate)
 			return ""
 		}
-		app.Infof("fs_initialized", "volume=%s fs=%s", name, candidate)
+		log.Infof("fs_initialized", "volume=%s fs=%s", name, candidate)
 		return candidate
 	}
 	return ""
@@ -99,20 +99,20 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 
 	rm := d.ResticManager(name)
 	if err := d.coldBackup(name, volPath, fsType, rm); err != nil {
-		app.Errorf("final_backup_failed", err, "volume=%s", name)
+		log.Errorf("final_backup_failed", err, "volume=%s", name)
 	}
 	if fsType != "" {
 		if err := snapshot.DestroyVolume(volPath, snapshot.TypeFromString(fsType)); err != nil {
-			app.Errorf("destroy_volume_failed", err, "path=%s fs=%s", volPath, fsType)
+			log.Errorf("destroy_volume_failed", err, "path=%s fs=%s", volPath, fsType)
 		}
 	} else {
 		if err := os.RemoveAll(volPath); err != nil {
-			app.Errorf("remove_volume_dir_failed", err, "path=%s", volPath)
+			log.Errorf("remove_volume_dir_failed", err, "path=%s", volPath)
 		}
 	}
 	if ownerLock != nil {
 		if err := ownerLock.Release(); err != nil {
-			app.Errorf("release_owner_failed", err, "volume=%s", name)
+			log.Errorf("release_owner_failed", err, "volume=%s", name)
 		}
 	}
 	return nil
@@ -144,7 +144,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	ctx := context.Background()
 	ownerLock, err := d.ownerClient.Lock(ctx, name)
 	if err != nil {
-		app.Errorf("mount_owner_lock_failed", err, "volume=%s", name)
+		log.Errorf("mount_owner_lock_failed", err, "volume=%s", name)
 	} else {
 		vi.OwnerLock = ownerLock
 
@@ -152,40 +152,40 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 		if vt := d.nextVersionTags(name, true); vt != nil {
 			tags := append([]string{"cold"}, vt...)
 			if err := rm.Backup(volPath, tags...); err != nil {
-				app.Errorf("mount_cold_backup_failed", err, "volume=%s", name)
+				log.Errorf("mount_cold_backup_failed", err, "volume=%s", name)
 			}
 		}
 
 		if vi.FsType != "" {
 			snapID, err := metadata.FindRestorePointByName(d.metadataStore, name)
 			if err != nil {
-				app.Errorf("check_restore_point_failed", err, "volume=%s", name)
+				log.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
 				valid, verr := vi.OwnerLock.IsValid()
 				switch {
 				case verr != nil:
-					app.Errorf("owner_check_failed", verr, "volume=%s", name)
+					log.Errorf("owner_check_failed", verr, "volume=%s", name)
 				case !valid:
-					app.Warnf("owner_expired_skipping_restore", "volume=%s", name)
+					log.Warnf("owner_expired_skipping_restore", "volume=%s", name)
 				default:
-					app.Infof("restore_point_found", "volume=%s snapshot=%s", name, snapID)
+					log.Infof("restore_point_found", "volume=%s snapshot=%s", name, snapID)
 
 					snapDir := filepath.Join(d.root, SnapshotsDir)
 					preSnap, snapErr := snapshot.Create(volPath, snapDir, name+snapshot.PreRestoreSuffix)
 					if snapErr != nil {
-						app.Errorf("pre_restore_snapshot_failed", snapErr, "volume=%s", name)
+						log.Errorf("pre_restore_snapshot_failed", snapErr, "volume=%s", name)
 					}
 					if err := rm.RestoreSnapshot(snapID, volPath); err != nil {
-						app.Errorf("restore_failed", err, "volume=%s snapshot=%s", name, snapID)
+						log.Errorf("restore_failed", err, "volume=%s snapshot=%s", name, snapID)
 					} else {
-						app.Infof("restore_complete_removing_point", "volume=%s", name)
+						log.Infof("restore_complete_removing_point", "volume=%s", name)
 						if err := metadata.DeleteRestorePoint(d.metadataStore, name); err != nil {
-							app.Errorf("remove_restore_point_failed", err, "volume=%s", name)
+							log.Errorf("remove_restore_point_failed", err, "volume=%s", name)
 						}
 					}
 					if preSnap != nil {
 						if err := snapshot.Remove(preSnap); err != nil {
-							app.Errorf("cleanup_pre_restore_snapshot_failed", err, "volume=%s", name)
+							log.Errorf("cleanup_pre_restore_snapshot_failed", err, "volume=%s", name)
 						}
 					}
 				}
@@ -211,7 +211,7 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) error {
 		if vi.attached <= 0 {
 			rm := d.ResticManager(name)
 			if err := d.coldBackup(name, vi.Path, vi.FsType, rm); err != nil {
-				app.Errorf("unmount_cold_backup_failed", err, "volume=%s", name)
+				log.Errorf("unmount_cold_backup_failed", err, "volume=%s", name)
 			}
 			if vi.cancel != nil {
 				vi.cancel()
@@ -315,12 +315,12 @@ func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		app.Errorf("read_volume_config_failed", err, "path=%s", volPath)
+		log.Errorf("read_volume_config_failed", err, "path=%s", volPath)
 		return nil
 	}
 	var cfg volumeConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		app.Errorf("parse_volume_config_failed", err, "path=%s", volPath)
+		log.Errorf("parse_volume_config_failed", err, "path=%s", volPath)
 		return nil
 	}
 	return &cfg

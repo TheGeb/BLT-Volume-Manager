@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
 )
 
@@ -29,7 +29,7 @@ func (b *btrfsSnapshotter) Init(path string, _ map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create parent: %w", err)
 	}
-	app.Debugf("btrfs_create_subvolume", "path=%s", path)
+	log.Debugf("btrfs_create_subvolume", "path=%s", path)
 	return btrfsCreateSubvolume(path)
 }
 
@@ -60,13 +60,13 @@ func (b *btrfsSnapshotter) RemoveSnapshot(info *snapshot.SnapInfo) error {
 }
 
 func isSubvolume(path string) bool {
-	app.Debugf("btrfs_check_subvolume", "path=%s", path)
+	log.Debugf("btrfs_check_subvolume", "path=%s", path)
 	cmd := exec.Command("btrfs", "subvolume", "show", path)
 	return cmd.Run() == nil
 }
 
 func btrfsCreate(source, dest string) error {
-	app.Debugf("btrfs_snapshot_create", "source=%s dest=%s", source, dest)
+	log.Debugf("btrfs_snapshot_create", "source=%s dest=%s", source, dest)
 	cmd := exec.Command("btrfs", "subvolume", "snapshot", "-r", source, dest)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("btrfs subvolume snapshot: %w\n%s", err, string(out))
@@ -75,7 +75,7 @@ func btrfsCreate(source, dest string) error {
 }
 
 func btrfsRemove(path string) error {
-	app.Debugf("btrfs_snapshot_delete", "path=%s", path)
+	log.Debugf("btrfs_snapshot_delete", "path=%s", path)
 	cmd := exec.Command("btrfs", "subvolume", "delete", path)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("btrfs subvolume delete: %w\n%s", err, string(out))

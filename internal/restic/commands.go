@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 func (m *Manager) runSimple(ctx context.Context, args ...string) error {
@@ -26,12 +26,12 @@ func (m *Manager) runCommand(cmd *exec.Cmd) error {
 
 func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	global := []string{"-r", m.repo}
-	if v := app.Verbosity(); v > 0 {
+	if v := log.Verbosity(); v > 0 {
 		global = append(global, fmt.Sprintf("--verbose=%d", v))
 	}
 
 	global = append(global, args...)
-	app.Debugf("restic_command", "args=%s", strings.Join(global, " "))
+	log.Debugf("restic_command", "args=%s", strings.Join(global, " "))
 	//nolint:gosec // args constructed from env vars and hardcoded strings only
 	cmd := exec.CommandContext(ctx, "restic", global...)
 	cmd.Env = os.Environ()

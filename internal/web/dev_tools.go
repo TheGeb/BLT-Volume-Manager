@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
@@ -74,7 +74,7 @@ func HandleDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 
 	if ms, err := s.GetOrCreateMetadataStore(); err == nil && ms != nil {
 		if err := ms.WriteVolumeMarker(req.Name); err != nil {
-			app.Error("write_volume_marker_failed", err)
+			log.Error("write_volume_marker_failed", err)
 		}
 	}
 
@@ -130,11 +130,11 @@ func HandleDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Reques
 func writeDummyFiles(dir string) int {
 	dummyContent := map[string]string{
 		"readme.txt":       "This is a test volume created at " + time.Now().Format(time.RFC3339),
-		"config/app.json":  `{"version": "1.0", "debug": true, "name": "test-app"}`,
+		"config/log.json":  `{"version": "1.0", "debug": true, "name": "test-app"}`,
 		"config/db.yaml":   "host: localhost\nport: 5432\ndatabase: testdb",
 		"data/users.csv":   "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n3,Charlie,charlie@example.com",
 		"data/orders.csv":  "id,user_id,total\n1,1,99.99\n2,2,149.50\n3,3,75.00\n4,1,200.00",
-		"logs/app.log":     "2024-01-01 10:00:00 INFO  Starting application\n2024-01-01 10:00:01 INFO  Connected to database\n2024-01-01 10:00:02 INFO  Server listening on port 8080",
+		"logs/log.log":     "2024-01-01 10:00:00 INFO  Starting application\n2024-01-01 10:00:01 INFO  Connected to database\n2024-01-01 10:00:02 INFO  Server listening on port 8080",
 		"scripts/setup.sh": "#!/bin/bash\necho \"Setting up...\"\nmkdir -p /data\necho \"Done.\"",
 	}
 	for path, content := range dummyContent {

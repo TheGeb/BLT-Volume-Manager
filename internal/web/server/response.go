@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -30,16 +30,16 @@ func RespondError(w http.ResponseWriter, err error, status int) {
 	msg := "unknown error"
 	if err != nil {
 		msg = err.Error()
-		app.Error("request_error", err)
+		log.Error("request_error", err)
 	}
 	if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": msg}); encodeErr != nil {
-		app.Error("encode_error_response_failed", encodeErr)
+		log.Error("encode_error_response_failed", encodeErr)
 	}
 }
 
 func RespondJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		app.Error("encode_response_failed", err)
+		log.Error("encode_response_failed", err)
 	}
 }

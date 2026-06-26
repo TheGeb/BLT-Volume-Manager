@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
@@ -61,9 +61,9 @@ func HandleSnapshotAction(s *server.Server, w http.ResponseWriter, r *http.Reque
 		go func() {
 			defer s.DoneWork()
 			if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
-				app.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
+				log.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
 			} else {
-				app.Info("restore_ok")
+				log.Info("restore_ok")
 			}
 		}()
 		server.RespondJSON(w, map[string]string{"status": "restore started – see server logs for results"})

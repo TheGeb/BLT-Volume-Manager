@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 type Type int
@@ -83,7 +83,7 @@ func Register(s Snapshotter) {
 }
 
 func Detect(path string) Type {
-	app.Debugf("detect_fs", "path=%s", path)
+	log.Debugf("detect_fs", "path=%s", path)
 	cmd := exec.Command("stat", "-f", "-c", "%T", path)
 	out, err := cmd.Output()
 	if err != nil {
@@ -176,7 +176,7 @@ func ResolveType(info *SnapInfo) error {
 }
 
 func ZFSDataset(path string) (string, error) {
-	app.Debugf("findmnt_lookup", "path=%s", path)
+	log.Debugf("findmnt_lookup", "path=%s", path)
 	cmd := exec.Command("findmnt", "-T", path, "-o", "SOURCE", "-n")
 	out, err := cmd.Output()
 	if err != nil {

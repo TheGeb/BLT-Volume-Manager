@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 type RepoStats struct {
@@ -44,13 +44,13 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		app.Errorf("restic_stats_failed", err, "stderr=%s", string(out))
+		log.Errorf("restic_stats_failed", err, "stderr=%s", string(out))
 		return nil, fmt.Errorf("restic stats: %w", err)
 	}
 
 	var stats RepoStats
 	if err := json.Unmarshal(out, &stats); err != nil {
-		app.Errorf("parse_restic_stats_failed", err, "raw=%s", string(out))
+		log.Errorf("parse_restic_stats_failed", err, "raw=%s", string(out))
 		return nil, fmt.Errorf("parse restic stats: %w", err)
 	}
 	return &stats, nil
@@ -110,7 +110,7 @@ func (m *Manager) Check(noLock bool) error {
 
 func (m *Manager) Repair() error {
 	if err := m.Unlock(); err != nil {
-		app.Warnf("repair_unlock_failed_continuing", "error=%v", err)
+		log.Warnf("repair_unlock_failed_continuing", "error=%v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ResticTimeoutLong)
 	defer cancel()
@@ -143,11 +143,11 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 		args = append(args, "--from-password-file", tmpName, "--password-file", tmpName)
 	}
 
-	if v := app.Verbosity(); v > 0 {
+	if v := log.Verbosity(); v > 0 {
 		args = append(args, fmt.Sprintf("--verbose=%d", v))
 	}
 
-	app.Debugf("restic_command", "args=%s", strings.Join(args, " "))
+	log.Debugf("restic_command", "args=%s", strings.Join(args, " "))
 	//nolint:gosec // args constructed from env vars and hardcoded strings only
 	cmd := exec.CommandContext(ctx, "restic", args...)
 	cmd.Env = os.Environ()

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 )
@@ -28,13 +28,13 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 				hotTicker.Stop()
 				return
 			case <-hotTicker.C:
-				app.Infof("hot_backup_start", "volume=%s", name)
+				log.Infof("hot_backup_start", "volume=%s", name)
 				tags := []string{restic.BackupTagHot}
 				if vt := d.nextVersionTags(name, false); vt != nil {
 					tags = append(tags, vt...)
 				}
 				if err := rm.Backup(volPath, tags...); err != nil {
-					app.Errorf("hot_backup_failed", err, "volume=%s", name)
+					log.Errorf("hot_backup_failed", err, "volume=%s", name)
 				}
 			}
 		}
@@ -55,7 +55,7 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 	snapDir := filepath.Join(d.root, SnapshotsDir)
 	info, err := snapshot.Create(volPath, snapDir, name)
 	if err != nil {
-		app.Errorf("snapshot_create_failed", err, "volume=%s falling back to direct backup", name)
+		log.Errorf("snapshot_create_failed", err, "volume=%s falling back to direct backup", name)
 		tags := []string{restic.BackupTagCold}
 		if versionTags != nil {
 			tags = append(tags, versionTags...)
@@ -76,7 +76,7 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 		return fmt.Errorf("cold backup: %w", err)
 	}
 	if err := snapshot.Remove(info); err != nil {
-		app.Errorf("remove_snapshot_failed", err, "volume=%s fs=%s", name, fsType)
+		log.Errorf("remove_snapshot_failed", err, "volume=%s fs=%s", name, fsType)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func (d *Driver) retryOrphanedSnapshots() {
 	snapDir := filepath.Join(d.root, SnapshotsDir)
 	snaps, err := snapshot.ListOrphaned(snapDir)
 	if err != nil {
-		app.Errorf("list_orphaned_snapshots_failed", err, "error=%v", err)
+		log.Errorf("list_orphaned_snapshots_failed", err, "error=%v", err)
 		return
 	}
 	for _, info := range snaps {
@@ -110,10 +110,10 @@ func (d *Driver) retryOrphanedSnapshots() {
 			continue
 		}
 		if err := snapshot.ResolveType(info); err != nil {
-			app.Errorf("resolve_snapshot_type_failed", err, "path=%s", info.AccessPath)
+			log.Errorf("resolve_snapshot_type_failed", err, "path=%s", info.AccessPath)
 			continue
 		}
-		app.Infof("retry_orphaned_cold_backup", "volume=%s path=%s", info.VolName, info.AccessPath)
+		log.Infof("retry_orphaned_cold_backup", "volume=%s path=%s", info.VolName, info.AccessPath)
 		rm := d.ResticManager(info.VolName)
 		versionTags := d.nextVersionTags(info.VolName, false)
 		tags := []string{restic.BackupTagCold}
@@ -121,11 +121,11 @@ func (d *Driver) retryOrphanedSnapshots() {
 			tags = append(tags, versionTags...)
 		}
 		if err := rm.BackupAt(info.AccessPath, tags, fi.ModTime()); err != nil {
-			app.Errorf("orphaned_cold_backup_failed", err, "volume=%s", info.VolName)
+			log.Errorf("orphaned_cold_backup_failed", err, "volume=%s", info.VolName)
 			continue
 		}
 		if err := snapshot.Remove(info); err != nil {
-			app.Errorf("cleanup_snapshot_failed", err, "path=%s", info.AccessPath)
+			log.Errorf("cleanup_snapshot_failed", err, "path=%s", info.AccessPath)
 		}
 	}
 }

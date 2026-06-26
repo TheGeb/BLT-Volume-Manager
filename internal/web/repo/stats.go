@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
@@ -29,7 +29,7 @@ func HandleStats(s *server.Server, w http.ResponseWriter, r *http.Request) {
 
 	rst, err := rm.Stats()
 	if err != nil {
-		app.Error("stats_failed", err)
+		log.Error("stats_failed", err)
 		repoStats["error"] = err.Error()
 	} else if rst != nil {
 		repoStats = map[string]any{

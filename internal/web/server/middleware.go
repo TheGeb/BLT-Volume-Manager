@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 const gzipMinSize = 1024
@@ -21,11 +21,11 @@ func Logging(next http.Handler) http.Handler {
 		lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(lw, r)
 		dur := time.Since(start)
-		level := app.LevelDebug
+		level := log.LevelDebug
 		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, ".js") {
-			level = app.LevelTrace
+			level = log.LevelTrace
 		}
-		app.LogEvent(level, app.Event{
+		log.LogEvent(level, log.Event{
 			Event:      "http_request",
 			Method:     r.Method,
 			Path:       r.URL.Path,

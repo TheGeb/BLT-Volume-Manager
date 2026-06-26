@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
@@ -39,15 +40,15 @@ func run() int {
 
 	conf, err := cfg.FromEnv(dataDir)
 	if err != nil {
-		app.Errorf("load_config_failed", err, "error=%v", err)
+		log.Errorf("load_config_failed", err, "error=%v", err)
 		return 1
 	}
 	if err := cfg.ValidateConfig(conf); err != nil {
-		app.Error("config_validation_failed", err)
+		log.Error("config_validation_failed", err)
 		return 1
 	}
 	if conf.MetadataBackend != "" || conf.S3Bucket != "" {
-		app.Info("metadata_backend_configured")
+		log.Info("metadata_backend_configured")
 	}
 
 	mux := http.NewServeMux()
@@ -63,9 +64,9 @@ func run() int {
 	}
 
 	go func() {
-		app.Infof("serving_http_ui", "address=%s", httpAddr)
+		log.Infof("serving_http_ui", "address=%s", httpAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			app.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
+			log.Errorf("http_server_failed", err, "address=%s error=%v", httpAddr, err)
 		}
 	}()
 

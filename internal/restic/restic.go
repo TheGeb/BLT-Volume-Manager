@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
 type Manager struct {
@@ -39,7 +39,7 @@ func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	for _, s := range snapshots {
 		fullHash := m.GenerateHash(s)
 		shortHash := fullHash[:len(s.ShortID)]
-		app.Debugf("comparing_hash", "hash=%x snapshot=%s", hash, s.ID)
+		log.Debugf("comparing_hash", "hash=%x snapshot=%s", hash, s.ID)
 		if shortHash == hash {
 			return &s, nil
 		}

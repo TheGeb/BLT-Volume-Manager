@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	appcfg "github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver/snapshot"
 
@@ -45,7 +45,7 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 		var err error
 		objectStore, err = appcfg.OpenMetadataBackend(c)
 		if err != nil {
-			app.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
+			log.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
 		}
 	}
 
@@ -81,7 +81,7 @@ func (d *Driver) nextVersionTags(name string, major bool) []string {
 	}
 	tags, err := d.metadataStore.NextVersionTags(name, major)
 	if err != nil {
-		app.Errorf("version_counter_failed", err, "volume=%s", name)
+		log.Errorf("version_counter_failed", err, "volume=%s", name)
 		return nil
 	}
 	return tags

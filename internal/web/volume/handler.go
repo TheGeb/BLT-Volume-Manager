@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
@@ -221,7 +221,7 @@ func HandleRenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request
 	if err == nil {
 		for _, snap := range snapshots {
 			if err := sourceManager.ForgetSnapshot(snap.ID); err != nil {
-				app.Error("forget_snapshot_failed", err)
+				log.Error("forget_snapshot_failed", err)
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
 	"github.com/docker/go-plugins-helpers/volume"
@@ -35,27 +36,27 @@ func run() int {
 	}
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		app.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)
+		log.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)
 		return 1
 	}
 
 	conf, err := cfg.FromEnv(dataDir)
 	if err != nil {
-		app.Errorf("load_config_failed", err, "error=%v", err)
+		log.Errorf("load_config_failed", err, "error=%v", err)
 		return 1
 	}
 	if err := cfg.ValidateConfig(conf); err != nil {
-		app.Error("config_validation_failed", err)
+		log.Error("config_validation_failed", err)
 		return 1
 	}
 	if conf.MetadataBackend != "" || conf.S3Bucket != "" {
-		app.Info("metadata_backend_configured")
+		log.Info("metadata_backend_configured")
 	}
 
 	drv := driver.New(conf, ctx)
 	h := volume.NewHandler(drv)
 
-	app.Infof("starting_plugin", "socket=%s data_dir=%s", socketPath, conf.DataDir)
+	log.Infof("starting_plugin", "socket=%s data_dir=%s", socketPath, conf.DataDir)
 	socketErr := make(chan error, 1)
 	go func() {
 		socketErr <- h.ServeUnix(socketPath, 0)
@@ -64,15 +65,15 @@ func run() int {
 	select {
 	case err := <-socketErr:
 		if err != nil {
-			app.Errorf("serve_unix_failed", err, "error=%v", err)
+			log.Errorf("serve_unix_failed", err, "error=%v", err)
 			return 1
 		}
 	case <-ctx.Done():
-		app.Info("shutting_down")
+		log.Info("shutting_down")
 	}
 
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-		app.Warnf("socket_cleanup_failed", "path=%s", socketPath)
+		log.Warnf("socket_cleanup_failed", "path=%s", socketPath)
 	}
 	return 0
 }
