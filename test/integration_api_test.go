@@ -22,13 +22,6 @@ func setupAPITest(t *testing.T) (*httptest.Server, *GarageServer) {
 
 	garage := StartGarage(t)
 
-	t.Setenv("AWS_ACCESS_KEY_ID", garage.AccessKey)
-	t.Setenv("AWS_SECRET_ACCESS_KEY", garage.SecretKey)
-	t.Setenv("RESTIC_PASSWORD", "test-password")
-	t.Setenv("S3_FORCE_PATH_STYLE", "true")
-
-	t.Setenv("BLT_TEST_MODE", "1")
-
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
 	mux := http.NewServeMux()
@@ -60,6 +53,7 @@ func apiErr(t *testing.T, ts *httptest.Server, method, path string, body any, wa
 }
 
 func TestAPI_Volumes(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	m := apiOK(t, ts, "GET", "/api/volumes", nil)
@@ -70,6 +64,7 @@ func TestAPI_Volumes(t *testing.T) {
 }
 
 func TestAPI_RepoInitAndStatus(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	m := apiOK(t, ts, "GET", "/api/repo/status?volume=test-vol", nil)
@@ -89,6 +84,7 @@ func TestAPI_RepoInitAndStatus(t *testing.T) {
 }
 
 func TestAPI_Snapshots(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	body := map[string]string{"name": "test-group/snap-vol"}
@@ -105,6 +101,7 @@ func TestAPI_Snapshots(t *testing.T) {
 }
 
 func TestAPI_Stats(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	m := apiOK(t, ts, "GET", "/api/stats?volume=nonexistent", nil)
@@ -126,6 +123,7 @@ func TestAPI_Stats(t *testing.T) {
 }
 
 func TestAPI_Owners(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	m := apiOK(t, ts, "POST", "/api/volume/test-vol/owners", nil)
@@ -150,6 +148,7 @@ func TestAPI_Owners(t *testing.T) {
 }
 
 func TestAPI_DeleteVolume(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/del-vol"})
@@ -161,6 +160,7 @@ func TestAPI_DeleteVolume(t *testing.T) {
 }
 
 func TestAPI_EdgeCases(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	apiErr(t, ts, "GET", "/api/nonexistent", nil, http.StatusNotFound)
@@ -183,6 +183,7 @@ func TestAPI_EdgeCases(t *testing.T) {
 }
 
 func TestAPI_S3StoreThroughGarage(t *testing.T) {
+	t.Parallel()
 	ts, garage := setupAPITest(t)
 
 	apiOK(t, ts, "POST", "/api/volume/persist-vol/owners", nil)
@@ -206,6 +207,7 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 }
 
 func TestAPI_SnapshotViewFallbackHash(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	volName := "test-group/fallback-vol"
@@ -253,6 +255,7 @@ func TestAPI_SnapshotViewFallbackHash(t *testing.T) {
 }
 
 func TestAPI_SnapshotViewDiffFallbackHash(t *testing.T) {
+	t.Parallel()
 	ts, _ := setupAPITest(t)
 
 	volName := "test-group/diff-fallback-vol"

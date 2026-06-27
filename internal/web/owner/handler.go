@@ -3,6 +3,7 @@ package owner
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
@@ -24,7 +25,7 @@ func OwnerRouter(s *server.Server, w http.ResponseWriter, r *http.Request, volum
 			OwnerDurationMins int    `json:"owner_duration_mins"`
 		}
 		if r.Body != nil {
-			if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil && err != io.EOF {
 				server.RespondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
 				return
 			}

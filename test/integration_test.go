@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,15 +15,10 @@ import (
 )
 
 func TestResticBackupRestoreWithGarage(t *testing.T) {
+	t.Parallel()
 	garage := StartGarage(t)
 
 	repoURL := "s3:" + garage.Endpoint + "/" + garage.BucketName
-	t.Setenv("RESTIC_REPOSITORY", repoURL)
-	t.Setenv("AWS_ACCESS_KEY_ID", garage.AccessKey)
-	t.Setenv("AWS_SECRET_ACCESS_KEY", garage.SecretKey)
-	t.Setenv("RESTIC_PASSWORD", "test-password")
-	t.Setenv("S3_FORCE_PATH_STYLE", "true")
-
 	rm := restic.NewManager(repoURL)
 
 	s3Client, err := s3.NewClient(s3.Config{
@@ -113,11 +109,8 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 }
 
 func TestS3OwnersWithGarage(t *testing.T) {
+	t.Parallel()
 	garage := StartGarage(t)
-
-	t.Setenv("AWS_ACCESS_KEY_ID", garage.AccessKey)
-	t.Setenv("AWS_SECRET_ACCESS_KEY", garage.SecretKey)
-	t.Setenv("S3_FORCE_PATH_STYLE", "true")
 
 	s3Store, err := s3.NewClient(s3.Config{
 		S3Bucket:   garage.BucketName,
@@ -154,7 +147,7 @@ func TestS3OwnersWithGarage(t *testing.T) {
 		t.Fatalf("delete lock object: %v", err)
 	}
 	got, err = s3Store.ReadObject(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, metadata.ErrKeyNotFound) {
 		t.Fatalf("read after delete: %v", err)
 	}
 	if got != nil {

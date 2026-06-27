@@ -23,11 +23,6 @@ func setupPluginTest(t *testing.T) (string, *GarageServer) {
 
 	garage := StartGarage(t)
 
-	t.Setenv("AWS_ACCESS_KEY_ID", garage.AccessKey)
-	t.Setenv("AWS_SECRET_ACCESS_KEY", garage.SecretKey)
-	t.Setenv("RESTIC_PASSWORD", "test-password")
-	t.Setenv("S3_FORCE_PATH_STYLE", "true")
-
 	dataDir := t.TempDir()
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
@@ -37,7 +32,7 @@ func setupPluginTest(t *testing.T) (string, *GarageServer) {
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		S3Region:   "us-east-1",
-	})
+	}, context.Background())
 	h := volume.NewHandler(drv)
 
 	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
@@ -115,6 +110,7 @@ func pluginOK(t *testing.T, socketPath, endpoint string, req any) map[string]any
 }
 
 func TestPlugin_CreateVolume(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "test-vol"})
 	if err, ok := m["Err"].(string); ok && err != "" {
@@ -123,6 +119,7 @@ func TestPlugin_CreateVolume(t *testing.T) {
 }
 
 func TestPlugin_CreateDuplicate(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
@@ -132,6 +129,7 @@ func TestPlugin_CreateDuplicate(t *testing.T) {
 }
 
 func TestPlugin_ListVolumes(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
 	vols, _ := m["Volumes"].([]any)
@@ -148,6 +146,7 @@ func TestPlugin_ListVolumes(t *testing.T) {
 }
 
 func TestPlugin_GetVolume(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "get-vol"})
 
@@ -166,6 +165,7 @@ func TestPlugin_GetVolume(t *testing.T) {
 }
 
 func TestPlugin_PathVolume(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "path-vol"})
 
@@ -176,6 +176,7 @@ func TestPlugin_PathVolume(t *testing.T) {
 }
 
 func TestPlugin_MountUnmount(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "mount-vol"})
 
@@ -189,6 +190,7 @@ func TestPlugin_MountUnmount(t *testing.T) {
 }
 
 func TestPlugin_RemoveVolume(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "remove-vol"})
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "remove-vol"})
@@ -203,6 +205,7 @@ func TestPlugin_RemoveVolume(t *testing.T) {
 }
 
 func TestPlugin_FullLifecycle(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "lifecycle-vol"})
@@ -229,6 +232,7 @@ func TestPlugin_FullLifecycle(t *testing.T) {
 }
 
 func TestPlugin_Capabilities(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 	m := pluginOK(t, socket, "VolumeDriver.Capabilities", nil)
 	caps, ok := m["Capabilities"].(map[string]any)
@@ -241,6 +245,7 @@ func TestPlugin_Capabilities(t *testing.T) {
 }
 
 func TestPlugin_EdgeCases(t *testing.T) {
+	t.Parallel()
 	socket, _ := setupPluginTest(t)
 
 	m := pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})

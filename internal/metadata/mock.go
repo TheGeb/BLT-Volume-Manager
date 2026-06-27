@@ -7,7 +7,7 @@ type MockObjectStore struct {
 }
 
 func (m *MockObjectStore) PutObject(string, []byte) error    { return nil }
-func (m *MockObjectStore) ReadObject(string) ([]byte, error) { return nil, nil }
+func (m *MockObjectStore) ReadObject(string) ([]byte, error) { return nil, ErrKeyNotFound }
 func (m *MockObjectStore) DeleteObject(string) error         { return nil }
 func (m *MockObjectStore) ListObjects(prefix string) ([]Object, error) {
 	if m.ListFunc != nil {

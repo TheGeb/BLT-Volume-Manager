@@ -1,17 +1,17 @@
+//go:build integration
+
 package integration
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
-	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const (
@@ -29,120 +29,80 @@ type GarageServer struct {
 func StartGarage(t *testing.T) *GarageServer {
 	t.Helper()
 
-	accessKey := randomHex(20)
-	secretKey := randomHex(40)
 	bucketName := "test-bucket-" + randomString(8)
 
-	buildDir := ".docker-build-" + randomString(8)
-	if err := os.MkdirAll(buildDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(buildDir) })
-	rpcSecret := randomHex(64)
-	config := fmt.Sprintf(`
-metadata_dir = "/tmp/garage/meta"
-data_dir = "/tmp/garage/data"
-db_engine = "sqlite"
-rpc_bind_addr = "[::]:3901"
-rpc_secret = "%s"
-replication_factor = 1
-
-[s3_api]
-s3_region = "us-east-1"
-api_bind_addr = "0.0.0.0:3900"
-root_domain = ".s3.garage.localhost"
-
-[s3_web]
-bind_addr = "0.0.0.0:3902"
-root_domain = ".web.garage.localhost"
-
-[admin]
-api_bind_addr = "0.0.0.0:3903"
-`, rpcSecret)
-
-	if err := os.WriteFile(filepath.Join(buildDir, "config.toml"), []byte(config), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	dockerfile := "FROM " + garageImage + "\nCOPY config.toml /etc/garage.toml\n"
-	if err := os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if out, err := exec.Command("docker", "build", "-t", garageBuiltID, buildDir).CombinedOutput(); err != nil {
-		t.Fatalf("build garage image: %v\n%s", err, out)
-	}
-
-	cmd := exec.Command("docker", "run", "-d",
-		"-p", "3900",
-		"-e", "GARAGE_DEFAULT_ACCESS_KEY="+accessKey,
-		"-e", "GARAGE_DEFAULT_SECRET_KEY="+secretKey,
-		"-e", "GARAGE_DEFAULT_BUCKET="+bucketName,
-		garageBuiltID,
-		"/garage", "server", "--single-node", "--default-bucket",
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("start garage container: %v\n%s", err, out)
-	}
-	containerID := strings.TrimSpace(string(out))
+	createBucket(t, bucketName)
 
 	t.Cleanup(func() {
-		_ = exec.Command("docker", "rm", "-f", containerID).Run()
+		deleteBucket(t, bucketName)
 	})
 
-	var hostPort string
-	for i := 0; i < 30; i++ {
-		portOut, err := exec.Command("docker", "port", containerID, "3900").CombinedOutput()
-		if err == nil {
-			hostPort = strings.TrimSpace(string(portOut))
-			if hostPort != "" {
-				break
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	if hostPort == "" {
-		logs, _ := exec.Command("docker", "logs", containerID).CombinedOutput()
-		_ = exec.Command("docker", "rm", "-f", containerID).Run()
-		t.Fatalf("garage container did not publish port 3900\nlogs:\n%s", logs)
-	}
-
-	parts := strings.Split(hostPort, ":")
-	endpoint := fmt.Sprintf("http://localhost:%s", parts[len(parts)-1])
-
-	gs := &GarageServer{
-		AccessKey:  accessKey,
-		SecretKey:  secretKey,
+	return &GarageServer{
+		AccessKey:  sharedAccessKey,
+		SecretKey:  sharedSecretKey,
 		BucketName: bucketName,
-		Endpoint:   endpoint,
+		Endpoint:   sharedEndpoint,
 	}
-
-	gs.waitReady(t)
-	return gs
 }
 
-func (g *GarageServer) waitReady(t *testing.T) {
+func createBucket(t *testing.T, bucket string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
-	checkURL := g.Endpoint + "/"
-	for {
-		select {
-		case <-ctx.Done():
-			t.Fatalf("garage at %s did not become ready within 30s", g.Endpoint)
-		default:
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
-			if err != nil {
-				t.Fatalf("create request: %v", err)
-			}
-			resp, err := http.DefaultClient.Do(req) //nolint:gosec // Test helper checking known Garage endpoint
-			if err == nil {
-				_ = resp.Body.Close()
-				return
-			}
-			time.Sleep(200 * time.Millisecond)
+	creds := credentials.NewStaticCredentialsProvider(sharedAccessKey, sharedSecretKey, "")
+	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion("us-east-1"),
+		config.WithCredentialsProvider(creds),
+	)
+	if err != nil {
+		t.Fatalf("load aws config: %v", err)
+	}
+
+	client := s3sdk.NewFromConfig(awsCfg, func(o *s3sdk.Options) {
+		o.BaseEndpoint = aws.String(sharedEndpoint)
+		o.UsePathStyle = true
+	})
+
+	_, err = client.CreateBucket(context.Background(), &s3sdk.CreateBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		t.Fatalf("create bucket %s: %v", bucket, err)
+	}
+}
+
+func deleteBucket(t *testing.T, bucket string) {
+	creds := credentials.NewStaticCredentialsProvider(sharedAccessKey, sharedSecretKey, "")
+	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion("us-east-1"),
+		config.WithCredentialsProvider(creds),
+	)
+	if err != nil {
+		t.Logf("load aws config for bucket cleanup: %v", err)
+		return
+	}
+
+	client := s3sdk.NewFromConfig(awsCfg, func(o *s3sdk.Options) {
+		o.BaseEndpoint = aws.String(sharedEndpoint)
+		o.UsePathStyle = true
+	})
+
+	listResp, err := client.ListObjectsV2(context.Background(), &s3sdk.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+	})
+	if err == nil {
+		for _, obj := range listResp.Contents {
+			_, _ = client.DeleteObject(context.Background(), &s3sdk.DeleteObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    obj.Key,
+			})
 		}
+	}
+
+	_, err = client.DeleteBucket(context.Background(), &s3sdk.DeleteBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		t.Logf("delete bucket %s: %v", bucket, err)
 	}
 }
 

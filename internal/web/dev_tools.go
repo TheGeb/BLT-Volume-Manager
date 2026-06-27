@@ -37,8 +37,8 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 		return
 	}
 	rm := s.VolumeManager(req.Name)
-	volPath := filepath.Join(os.TempDir(), "blt-dummy-data")
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
+	volPath, err := os.MkdirTemp("", "blt-dummy-volume-")
+	if err != nil {
 		server.RespondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -100,8 +100,8 @@ func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Reques
 	}
 
 	rm := s.VolumeManager(req.Volume)
-	volPath := filepath.Join(os.TempDir(), "blt-dummy-data")
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
+	volPath, err := os.MkdirTemp("", "blt-dummy-snapshot-")
+	if err != nil {
 		server.RespondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
 		return
 	}
