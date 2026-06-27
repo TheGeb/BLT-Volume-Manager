@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
@@ -14,20 +15,17 @@ import (
 )
 
 func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, "/api/volume/") {
+	escapedPath := r.URL.EscapedPath()
+	if !strings.HasPrefix(escapedPath, "/api/volume/") {
 		http.NotFound(w, r)
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/volume/")
-	if !server.ValidVolumeName(path) {
-		http.NotFound(w, r)
-		return
-	}
+	rawPath := strings.TrimPrefix(escapedPath, "/api/volume/")
 
-	if strings.HasSuffix(path, "/copy") {
-		volumeName := strings.TrimSuffix(path, "/copy")
-		if !server.ValidVolumeName(volumeName) {
+	if strings.HasSuffix(rawPath, "/copy") {
+		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/copy"))
+		if err != nil || !server.ValidVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -35,9 +33,9 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.HasSuffix(path, "/rename") {
-		volumeName := strings.TrimSuffix(path, "/rename")
-		if !server.ValidVolumeName(volumeName) {
+	if strings.HasSuffix(rawPath, "/rename") {
+		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/rename"))
+		if err != nil || !server.ValidVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -45,13 +43,19 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.HasSuffix(path, "/"+driver.OwnersDir) {
-		volumeName := strings.TrimSuffix(path, "/"+driver.OwnersDir)
-		if !server.ValidVolumeName(volumeName) {
+	if strings.HasSuffix(rawPath, "/"+driver.OwnersDir) {
+		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/"+driver.OwnersDir))
+		if err != nil || !server.ValidVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
 		owner.OwnerRouter(s, w, r, volumeName)
+		return
+	}
+
+	path, err := url.PathUnescape(rawPath)
+	if err != nil || !server.ValidVolumeName(path) {
+		http.NotFound(w, r)
 		return
 	}
 
@@ -63,7 +67,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
-	if !server.ValidVolumeName(volumeName) || strings.Contains(volumeName, "/") {
+	if !server.ValidVolumeName(volumeName) {
 		http.Error(w, "invalid volume name", http.StatusBadRequest)
 		return
 	}
