@@ -12,6 +12,8 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
 
+STATICCHECK ?= $(shell command -v staticcheck >/dev/null 2>&1 && echo staticcheck || echo 'GOTOOLCHAIN=go1.26.3 go run honnef.co/go/tools/cmd/staticcheck@latest')
+
 LDFLAGS = -s -w \
 	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Version=$(VERSION)' \
 	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Commit=$(COMMIT)' \
@@ -37,12 +39,18 @@ clean:
 
 # === Lint ===
 
-lint-go:
+staticcheck:
+	$(STATICCHECK) ./...
+
+golangci-lint-check:
 	golangci-lint fmt ./...
 	golangci-lint run ./...
 
+lint-go: format
+	@$(MAKE) -j2 golangci-lint-check staticcheck
+
 lint: format
-	golangci-lint run ./...
+	@$(MAKE) -j2 golangci-lint-check staticcheck
 	cd web/ui && npm run lint
 
 hadolint:
@@ -68,6 +76,7 @@ test-ui:
 
 coverage:
 	golangci-lint fmt ./...
+	$(MAKE) staticcheck
 	go test ./... -coverprofile=coverage.out -short
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"

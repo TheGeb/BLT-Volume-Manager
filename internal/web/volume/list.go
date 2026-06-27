@@ -8,7 +8,7 @@ import (
 
 func ListVolumes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 	volumes := s.VolumeNames()

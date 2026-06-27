@@ -11,19 +11,9 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-type mockObjectStore struct {
-	objects    []metadata.Object
-	objectsErr error
+func mockStore(objects []metadata.Object, objectsErr error) *metadata.Store {
+	return metadata.New(&metadata.MockObjectStore{Objects: objects, ObjectsErr: objectsErr})
 }
-
-func (m *mockObjectStore) PutObject(string, []byte) error    { return nil }
-func (m *mockObjectStore) ReadObject(string) ([]byte, error) { return nil, nil }
-func (m *mockObjectStore) DeleteObject(string) error         { return nil }
-func (m *mockObjectStore) ListObjects(string) ([]metadata.Object, error) {
-	return m.objects, m.objectsErr
-}
-func (m *mockObjectStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
-func (m *mockObjectStore) DeleteObjectsWithPrefix(string) error                { return nil }
 
 func volumeObjects(names ...string) []metadata.Object {
 	var objs []metadata.Object
@@ -38,9 +28,7 @@ func TestListVolumes(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(metadata.New(&mockObjectStore{
-		objects: volumeObjects("vol-a", "vol-b", "group/nested"),
-	}))
+	s.SetMetadataStore(mockStore(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -75,9 +63,7 @@ func TestListVolumesEmpty(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(metadata.New(&mockObjectStore{
-		objects: nil,
-	}))
+	s.SetMetadataStore(mockStore(nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -105,9 +91,7 @@ func TestListVolumesMethodNotAllowed(t *testing.T) {
 	s := &server.Server{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(metadata.New(&mockObjectStore{
-		objects: volumeObjects("vol-a"),
-	}))
+	s.SetMetadataStore(mockStore(volumeObjects("vol-a"), nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/volumes", nil)
 	rec := httptest.NewRecorder()

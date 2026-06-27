@@ -38,7 +38,9 @@ func setupAPITest(t *testing.T) (*httptest.Server, *GarageServer) {
 		S3Endpoint: garage.Endpoint,
 		S3Region:   "us-east-1",
 	})
-	web.Register(srv, mux)
+	if err := web.Register(srv, mux); err != nil {
+		t.Fatalf("register web routes failed: %v", err)
+	}
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 

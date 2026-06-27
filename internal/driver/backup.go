@@ -29,11 +29,8 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 				return
 			case <-hotTicker.C:
 				log.Infof("hot_backup_start", "volume=%s", name)
-				tags := []string{restic.BackupTagHot}
-				if vt := d.nextVersionTags(name, false); vt != nil {
-					tags = append(tags, vt...)
-				}
-				if err := rm.Backup(volPath, tags...); err != nil {
+				vt := d.nextVersionTags(name, false)
+				if err := rm.Backup(volPath, restic.WithTags(restic.BackupTagHot, vt...)...); err != nil {
 					log.Errorf("hot_backup_failed", err, "volume=%s", name)
 				}
 			}
@@ -45,22 +42,14 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 	versionTags := d.nextVersionTags(name, false)
 
 	if fsType == "" {
-		tags := []string{restic.BackupTagCold}
-		if versionTags != nil {
-			tags = append(tags, versionTags...)
-		}
-		return rm.Backup(volPath, tags...)
+		return rm.Backup(volPath, restic.WithTags(restic.BackupTagCold, versionTags...)...)
 	}
 
 	snapDir := filepath.Join(d.root, SnapshotsDir)
 	info, err := snapshot.Create(volPath, snapDir, name)
 	if err != nil {
 		log.Errorf("snapshot_create_failed", err, "volume=%s falling back to direct backup", name)
-		tags := []string{restic.BackupTagCold}
-		if versionTags != nil {
-			tags = append(tags, versionTags...)
-		}
-		return rm.Backup(volPath, tags...)
+		return rm.Backup(volPath, restic.WithTags(restic.BackupTagCold, versionTags...)...)
 	}
 
 	snapTime := time.Now()
@@ -68,11 +57,7 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 		snapTime = fi.ModTime()
 	}
 
-	tags := []string{restic.BackupTagCold}
-	if versionTags != nil {
-		tags = append(tags, versionTags...)
-	}
-	if err := rm.BackupAt(info.AccessPath, tags, snapTime); err != nil {
+	if err := rm.BackupAt(info.AccessPath, restic.WithTags(restic.BackupTagCold, versionTags...), snapTime); err != nil {
 		return fmt.Errorf("cold backup: %w", err)
 	}
 	if err := snapshot.Remove(info); err != nil {
@@ -116,11 +101,7 @@ func (d *Driver) retryOrphanedSnapshots() {
 		log.Infof("retry_orphaned_cold_backup", "volume=%s path=%s", info.VolName, info.AccessPath)
 		rm := d.ResticManager(info.VolName)
 		versionTags := d.nextVersionTags(info.VolName, false)
-		tags := []string{restic.BackupTagCold}
-		if versionTags != nil {
-			tags = append(tags, versionTags...)
-		}
-		if err := rm.BackupAt(info.AccessPath, tags, fi.ModTime()); err != nil {
+		if err := rm.BackupAt(info.AccessPath, restic.WithTags(restic.BackupTagCold, versionTags...), fi.ModTime()); err != nil {
 			log.Errorf("orphaned_cold_backup_failed", err, "volume=%s", info.VolName)
 			continue
 		}

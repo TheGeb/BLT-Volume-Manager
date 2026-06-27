@@ -8,13 +8,11 @@ import (
 )
 
 func InitRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
-	volName := r.URL.Query().Get("volume")
-	if volName == "" {
-		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+	volName, ok := server.RequireVolumeParam(w, r)
+	if !ok {
 		return
 	}
 	rm := s.VolumeManager(volName)
@@ -26,13 +24,11 @@ func InitRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 }
 
 func RepoStatus(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
-	volName := r.URL.Query().Get("volume")
-	if volName == "" {
-		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+	volName, ok := server.RequireVolumeParam(w, r)
+	if !ok {
 		return
 	}
 	rm := s.VolumeManager(volName)

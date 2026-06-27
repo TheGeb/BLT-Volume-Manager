@@ -17,7 +17,7 @@ func CleanupVolumeData(s *server.Server, volumeName string) {
 		return
 	}
 	if s.HasBackend() {
-		if volStore, err := s.StoreForVolume(volumeName); err == nil {
+		if volStore, err := s.StoreForVolume(); err == nil {
 			if err := volStore.DeleteObjectsWithPrefix(metadata.OwnerFolder(volumeName)); err != nil {
 				log.Error("delete_owner_objects_failed", err)
 			}

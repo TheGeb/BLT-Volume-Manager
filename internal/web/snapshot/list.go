@@ -105,22 +105,25 @@ func ApplySnapshotFilter(snaps []restic.Snapshot, f *SnapshotFilter) []restic.Sn
 	return out
 }
 
-func ParseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *SnapshotFilter, int, int) {
-	hosts := r.URL.Query()["host"]
-	tags := r.URL.Query()["tag"]
-
-	offset := 0
+func parsePagination(r *http.Request) (offset, limit int) {
 	if o := r.URL.Query().Get("offset"); o != "" {
 		if n, err := strconv.Atoi(o); err == nil && n >= 0 {
 			offset = n
 		}
 	}
-	limit := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n
 		}
 	}
+	return
+}
+
+func ParseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *SnapshotFilter, int, int) {
+	hosts := r.URL.Query()["host"]
+	tags := r.URL.Query()["tag"]
+
+	offset, limit := parsePagination(r)
 
 	var filter *SnapshotFilter
 	ensureFilter := func() {

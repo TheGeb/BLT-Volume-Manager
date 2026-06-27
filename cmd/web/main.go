@@ -40,7 +40,7 @@ func run() int {
 
 	conf, err := cfg.FromEnv(dataDir)
 	if err != nil {
-		log.Errorf("load_config_failed", err, "error=%v", err)
+		log.Errorf("load_config_failed", err, "data_dir=%s", dataDir)
 		return 1
 	}
 	if err := cfg.ValidateConfig(conf); err != nil {
@@ -53,7 +53,10 @@ func run() int {
 
 	mux := http.NewServeMux()
 	webSrv := server.New(conf)
-	web.Register(webSrv, mux)
+	if err := web.Register(webSrv, mux); err != nil {
+		log.Errorf("register_web_routes_failed", err, "http_addr=%s", httpAddr)
+		return 1
+	}
 
 	srv := &http.Server{
 		Addr:              httpAddr,

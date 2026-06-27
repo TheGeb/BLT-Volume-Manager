@@ -49,30 +49,10 @@ func (s *Server) MetadataStore() (*metadata.Store, error) {
 	if !s.HasBackend() {
 		return nil, fmt.Errorf("metadata backend not configured")
 	}
-	s.metadataMu.Lock()
-	defer s.metadataMu.Unlock()
-	if s.metadataStore != nil {
-		return s.metadataStore, nil
-	}
-	raw, err := cfg.OpenMetadataBackend(s.Config)
-	if err != nil {
-		return nil, err
-	}
-	s.metadataStore = metadata.New(raw)
-	return s.metadataStore, nil
+	return s.initMetadataStore()
 }
 
-
-
-func (s *Server) IsS3Backend() bool {
-	return strings.HasPrefix(s.ResticBase, "s3:")
-}
-
-func (s *Server) VolumeManager(volName string) *restic.Manager {
-	return restic.NewManager(s.ResticBase + "/restic/" + volName)
-}
-
-func (s *Server) StoreForVolume(_ string) (*metadata.Store, error) {
+func (s *Server) StoreForVolume() (*metadata.Store, error) {
 	return s.MetadataStore()
 }
 
@@ -80,6 +60,10 @@ func (s *Server) StoreForResticData() (metadata.ObjectStore, error) {
 	if s.Config.S3Bucket == "" {
 		return nil, fmt.Errorf("S3 bucket not configured")
 	}
+	return s.initMetadataStore()
+}
+
+func (s *Server) initMetadataStore() (*metadata.Store, error) {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
 	if s.metadataStore != nil {
@@ -91,6 +75,14 @@ func (s *Server) StoreForResticData() (metadata.ObjectStore, error) {
 	}
 	s.metadataStore = metadata.New(raw)
 	return s.metadataStore, nil
+}
+
+func (s *Server) IsS3Backend() bool {
+	return strings.HasPrefix(s.ResticBase, "s3:")
+}
+
+func (s *Server) VolumeManager(volName string) *restic.Manager {
+	return restic.NewManager(s.ResticBase + "/restic/" + volName)
 }
 
 func (s *Server) NextVersionTags(volName string, major bool) []string {

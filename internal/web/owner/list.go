@@ -11,7 +11,7 @@ import (
 
 func ListVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		server.RespondError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 

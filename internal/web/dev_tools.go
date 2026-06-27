@@ -21,7 +21,7 @@ func DevMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
 
 func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -63,11 +63,8 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	tags := []string{restic.BackupTagCold}
-	if vt := s.NextVersionTags(req.Name, true); vt != nil {
-		tags = append(tags, vt...)
-	}
-	if err := rm.BackupInDir(".", tags, volPath); err != nil {
+	vt := s.NextVersionTags(req.Name, true)
+	if err := rm.BackupInDir(".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
 		server.RespondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -86,7 +83,7 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 
 func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -112,11 +109,8 @@ func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Reques
 
 	count := writeDummyFiles(volPath)
 
-	tags := []string{restic.BackupTagCold}
-	if vt := s.NextVersionTags(req.Volume, false); vt != nil {
-		tags = append(tags, vt...)
-	}
-	if err := rm.BackupInDir(".", tags, volPath); err != nil {
+	vt := s.NextVersionTags(req.Volume, false)
+	if err := rm.BackupInDir(".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
 		server.RespondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}

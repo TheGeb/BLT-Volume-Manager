@@ -44,6 +44,6 @@ func OwnerRouter(s *server.Server, w http.ResponseWriter, r *http.Request, volum
 		server.RespondJSON(w, map[string]string{"status": "owners deleted"})
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 	}
 }

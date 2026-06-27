@@ -28,6 +28,10 @@ type Snapshot struct {
 
 func NewManager(repo string) *Manager { return &Manager{repo: repo} }
 
+func WithTags(base string, extra ...string) []string {
+	return append([]string{base}, extra...)
+}
+
 func (m *Manager) Repo() string { return m.repo }
 
 func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -121,7 +120,7 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
 
-	args := []string{"--from-repo", m.repo, "-r", destRepo, "copy"}
+	args := []string{fmt.Sprintf("--from-repo=%s", m.repo), "copy"}
 	args = append(args, snapshotIDs...)
 
 	if pwFile := os.Getenv("RESTIC_PASSWORD_FILE"); pwFile != "" {
@@ -147,10 +146,10 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 		args = append(args, fmt.Sprintf("--verbose=%d", v))
 	}
 
-	log.Debugf("restic_command", "args=%s", strings.Join(args, " "))
-	//nolint:gosec // args constructed from env vars and hardcoded strings only
-	cmd := exec.CommandContext(ctx, "restic", args...)
-	cmd.Env = os.Environ()
+	cmd, err := m.resticCommandForRepo(ctx, destRepo, args...)
+	if err != nil {
+		return err
+	}
 	return m.runCommand(cmd)
 }
 

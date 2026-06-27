@@ -2,14 +2,20 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
+var (
+	ErrMethodNotAllowed = errors.New("method not allowed")
+	ErrMissingVolume    = errors.New("missing volume query parameter")
+)
+
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method != method {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return false
 	}
 	return true
@@ -18,7 +24,7 @@ func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 func RequireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	vol := r.URL.Query().Get("volume")
 	if vol == "" {
-		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		http.Error(w, ErrMissingVolume.Error(), http.StatusBadRequest)
 		return "", false
 	}
 	return vol, true

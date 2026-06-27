@@ -11,6 +11,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
@@ -148,10 +149,8 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	} else {
 		vi.OwnerLock = ownerLock
 
-		// Cold backup at mount — marks session boundary with new major version
 		if vt := d.nextVersionTags(name, true); vt != nil {
-			tags := append([]string{"cold"}, vt...)
-			if err := rm.Backup(volPath, tags...); err != nil {
+			if err := rm.Backup(volPath, restic.WithTags("cold", vt...)...); err != nil {
 				log.Errorf("mount_cold_backup_failed", err, "volume=%s", name)
 			}
 		}

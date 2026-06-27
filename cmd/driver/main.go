@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
@@ -42,7 +43,7 @@ func run() int {
 
 	conf, err := cfg.FromEnv(dataDir)
 	if err != nil {
-		log.Errorf("load_config_failed", err, "error=%v", err)
+		log.Errorf("load_config_failed", err, "data_dir=%s", dataDir)
 		return 1
 	}
 	if err := cfg.ValidateConfig(conf); err != nil {
@@ -57,6 +58,13 @@ func run() int {
 	h := volume.NewHandler(drv)
 
 	log.Infof("starting_plugin", "socket=%s data_dir=%s", socketPath, conf.DataDir)
+	if err := cleanupSocket(socketPath); err != nil {
+		if !os.IsNotExist(err) {
+			log.Errorf("socket_cleanup_before_start_failed", err, "path=%s", socketPath)
+			return 1
+		}
+	}
+
 	socketErr := make(chan error, 1)
 	go func() {
 		socketErr <- h.ServeUnix(socketPath, 0)
@@ -65,7 +73,7 @@ func run() int {
 	select {
 	case err := <-socketErr:
 		if err != nil {
-			log.Errorf("serve_unix_failed", err, "error=%v", err)
+			log.Errorf("serve_unix_failed", err, "socket=%s", socketPath)
 			return 1
 		}
 	case <-ctx.Done():
@@ -76,4 +84,22 @@ func run() int {
 		log.Warnf("socket_cleanup_failed", "path=%s", socketPath)
 	}
 	return 0
+}
+
+func cleanupSocket(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return err
+	}
+
+	conn, err := net.Dial("unix", path)
+	if err == nil {
+		_ = conn.Close()
+		return fmt.Errorf("socket already in use: %s", path)
+	}
+
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	log.Info("removed_stale_socket")
+	return nil
 }

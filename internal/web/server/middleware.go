@@ -56,15 +56,21 @@ func Gzip(next http.Handler) http.Handler {
 		next.ServeHTTP(buf, r)
 		if buf.code >= 300 || buf.buf.Len() < gzipMinSize {
 			w.WriteHeader(buf.code)
-			_, _ = w.Write(buf.buf.Bytes())
+			if _, err := w.Write(buf.buf.Bytes()); err != nil {
+				log.Error("write_gzip_passthrough_failed", err)
+			}
 			return
 		}
 		w.Header().Del("Content-Length")
 		w.Header().Set("Content-Encoding", "gzip")
 		w.WriteHeader(buf.code)
 		gz := gzip.NewWriter(w)
-		_, _ = gz.Write(buf.buf.Bytes())
-		_ = gz.Close()
+		if _, err := gz.Write(buf.buf.Bytes()); err != nil {
+			log.Error("write_gzip_failed", err)
+		}
+		if err := gz.Close(); err != nil {
+			log.Error("close_gzip_writer_failed", err)
+		}
 	})
 }
 

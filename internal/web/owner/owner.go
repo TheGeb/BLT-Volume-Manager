@@ -15,7 +15,7 @@ func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
 		return nil, errors.New("metadata backend not configured: set META_BACKEND, METADATA_S3_BUCKET, or S3_ENDPOINT")
 	}
 
-	ms, err := s.StoreForVolume(volumeName)
+	ms, err := s.StoreForVolume()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func CreateVolumeOwner(s *server.Server, volumeName, ownerName string, ownerDura
 		return nil, errors.New("metadata backend not configured: set META_BACKEND, METADATA_S3_BUCKET, or S3_ENDPOINT")
 	}
 
-	ms, err := s.StoreForVolume(volumeName)
+	ms, err := s.StoreForVolume()
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func DeleteVolumeOwners(s *server.Server, volumeName string) error {
 		return errors.New("metadata backend not configured")
 	}
 
-	ms, err := s.StoreForVolume(volumeName)
+	ms, err := s.StoreForVolume()
 	if err != nil {
 		return fmt.Errorf("initialize metadata store: %w", err)
 	}

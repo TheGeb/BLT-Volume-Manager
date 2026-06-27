@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -160,17 +159,10 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		return fmt.Errorf("parse snapshot list: %w", err)
 	}
 	if len(snaps) == 0 {
-		rargs := []string{"restore", "latest", "--target", path}
 		if preferred == BackupTagHot || preferred == BackupTagCold {
-			rargs = append(rargs, "--tag", preferred)
+			return m.runRestore(ctx, "latest", path, preferred)
 		}
-		r, err := m.resticCommand(ctx, rargs...)
-		if err != nil {
-			return err
-		}
-		r.Stdout = os.Stdout
-		r.Stderr = os.Stderr
-		return r.Run()
+		return m.runRestore(ctx, "latest", path)
 	}
 	id := ""
 	if v, ok := snaps[0]["short_id"]; ok {
@@ -186,22 +178,10 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		}
 	}
 	if id == "" {
-		r, err := m.resticCommand(ctx, "restore", "latest", "--target", path)
-		if err != nil {
-			return err
-		}
-		r.Stdout = os.Stdout
-		r.Stderr = os.Stderr
-		return r.Run()
+		return m.runRestore(ctx, "latest", path)
 	}
 
-	r, err := m.resticCommand(ctx, "restore", id, "--target", path)
-	if err != nil {
-		return err
-	}
-	r.Stdout = os.Stdout
-	r.Stderr = os.Stderr
-	return r.Run()
+	return m.runRestore(ctx, id, path)
 }
 
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
@@ -273,31 +253,13 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 
 	common := commonPathPrefix(rawPaths)
 
-	var nodes []FileNode
-	for _, p := range rawPaths {
-		if p == common {
-			continue
-		}
-		rel := strings.TrimPrefix(p, common)
-		rel = strings.TrimPrefix(rel, "/")
-		if rel == "" || rel == "." {
-			continue
-		}
-		nodes = append(nodes, FileNode{
-			Name:     filepath.Base(rel),
-			Type:     map[bool]string{true: "dir", false: "file"}[dirSet[p]],
-			Path:     "/" + rel,
-			FullPath: p,
-		})
-	}
-
-	if len(nodes) == 0 {
-		common = filepath.Dir(common)
+	buildNodes := func(prefix string) []FileNode {
+		var nodes []FileNode
 		for _, p := range rawPaths {
-			if p == common {
+			if p == prefix {
 				continue
 			}
-			rel := strings.TrimPrefix(p, common)
+			rel := strings.TrimPrefix(p, prefix)
 			rel = strings.TrimPrefix(rel, "/")
 			if rel == "" || rel == "." {
 				continue
@@ -309,6 +271,12 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 				FullPath: p,
 			})
 		}
+		return nodes
+	}
+
+	nodes := buildNodes(common)
+	if len(nodes) == 0 {
+		nodes = buildNodes(filepath.Dir(common))
 	}
 	return nodes, nil
 }

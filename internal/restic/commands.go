@@ -24,15 +24,31 @@ func (m *Manager) runCommand(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
+func (m *Manager) runRestore(ctx context.Context, snapshotID, target string, tags ...string) error {
+	args := []string{"restore", snapshotID, "--target", target}
+	for _, t := range tags {
+		args = append(args, "--tag", t)
+	}
+	cmd, err := m.resticCommand(ctx, args...)
+	if err != nil {
+		return err
+	}
+	return m.runCommand(cmd)
+}
+
 func (m *Manager) resticCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
-	global := []string{"-r", m.repo}
+	return m.resticCommandForRepo(ctx, m.repo, args...)
+}
+
+func (m *Manager) resticCommandForRepo(ctx context.Context, repo string, args ...string) (*exec.Cmd, error) {
+	global := []string{fmt.Sprintf("--repo=%s", repo)}
 	if v := log.Verbosity(); v > 0 {
 		global = append(global, fmt.Sprintf("--verbose=%d", v))
 	}
 
 	global = append(global, args...)
 	log.Debugf("restic_command", "args=%s", strings.Join(global, " "))
-	//nolint:gosec // args constructed from env vars and hardcoded strings only
+	//nolint:gosec // all variable args are --flag=value pairs, repo is passed as --repo=<value>
 	cmd := exec.CommandContext(ctx, "restic", global...)
 	cmd.Env = os.Environ()
 	return cmd, nil

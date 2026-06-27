@@ -8,6 +8,7 @@ import (
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
@@ -71,9 +72,43 @@ func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 	server.RespondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
+func checkedTargetManager(s *server.Server, w http.ResponseWriter, target string) *restic.Manager {
+	if !server.ValidVolumeName(target) {
+		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
+		return nil
+	}
+	for _, v := range s.VolumeNames() {
+		if v == target {
+			server.RespondError(w, fmt.Errorf("target volume %q already exists", target), http.StatusConflict)
+			return nil
+		}
+	}
+	tm := s.VolumeManager(target)
+	if err := tm.Init(); err != nil {
+		server.RespondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
+		return nil
+	}
+	return tm
+}
+
+func writeVolumeMarker(s *server.Server, w http.ResponseWriter, target string) bool {
+	ms, err := s.MetadataStore()
+	if err != nil {
+		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
+		return false
+	}
+	if ms != nil {
+		if err := ms.WriteVolumeMarker(target); err != nil {
+			server.RespondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
+			return false
+		}
+	}
+	return true
+}
+
 func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
-		server.RespondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -86,28 +121,15 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 		server.RespondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
 		return
 	}
-	if !server.ValidVolumeName(req.Target) {
-		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
+
+	targetManager := checkedTargetManager(s, w, req.Target)
+	if targetManager == nil {
 		return
 	}
 
 	owned, ownerName, err := owner.IsVolumeOwned(s, volumeName)
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("check owner: %w", err), http.StatusInternalServerError)
-		return
-	}
-
-	existing := s.VolumeNames()
-	for _, v := range existing {
-		if v == req.Target {
-			server.RespondError(w, fmt.Errorf("target volume %q already exists", req.Target), http.StatusConflict)
-			return
-		}
-	}
-
-	targetManager := s.VolumeManager(req.Target)
-	if err := targetManager.Init(); err != nil {
-		server.RespondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -143,16 +165,8 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 		}
 	}
 
-	ms, err := s.MetadataStore()
-	if err != nil {
-		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
+	if !writeVolumeMarker(s, w, req.Target) {
 		return
-	}
-	if ms != nil {
-		if err := ms.WriteVolumeMarker(req.Target); err != nil {
-			server.RespondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	s.RefreshStats()
@@ -170,7 +184,7 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 
 func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
-		server.RespondError(w, fmt.Errorf("method not allowed"), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -181,8 +195,9 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 		server.RespondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
 		return
 	}
-	if !server.ValidVolumeName(req.Target) {
-		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
+
+	targetManager := checkedTargetManager(s, w, req.Target)
+	if targetManager == nil {
 		return
 	}
 
@@ -193,20 +208,6 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 	}
 	if owned {
 		server.RespondError(w, fmt.Errorf("cannot rename owned volume %q (owned by %q)", volumeName, ownerName), http.StatusConflict)
-		return
-	}
-
-	existing := s.VolumeNames()
-	for _, v := range existing {
-		if v == req.Target {
-			server.RespondError(w, fmt.Errorf("target volume %q already exists", req.Target), http.StatusConflict)
-			return
-		}
-	}
-
-	targetManager := s.VolumeManager(req.Target)
-	if err := targetManager.Init(); err != nil {
-		server.RespondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -225,16 +226,8 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 		}
 	}
 
-	vs, err := s.MetadataStore()
-	if err != nil {
-		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
+	if !writeVolumeMarker(s, w, req.Target) {
 		return
-	}
-	if vs != nil {
-		if err := vs.WriteVolumeMarker(req.Target); err != nil {
-			server.RespondError(w, fmt.Errorf("write volume marker: %w", err), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	CleanupVolumeData(s, volumeName)

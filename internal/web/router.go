@@ -1,12 +1,14 @@
 package web
 
 import (
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/repo"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
@@ -14,7 +16,7 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/volume"
 )
 
-func Register(s *server.Server, mux *http.ServeMux) {
+func Register(s *server.Server, mux *http.ServeMux) error {
 	inner := http.NewServeMux()
 
 	inner.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -86,18 +88,23 @@ func Register(s *server.Server, mux *http.ServeMux) {
 	}
 
 	var verifyOnce sync.Once
-	verifyStaticFiles := func() {
+	verifyStaticFiles := func() error {
+		var err error
 		verifyOnce.Do(func() {
-			if _, err := StaticFiles.ReadDir("static"); err != nil {
-				panic("web assets not found. Run: make ui")
-			}
+			_, err = StaticFiles.ReadDir("static")
 		})
+		if err != nil {
+			return fmt.Errorf("web assets not found. Run: make ui: %w", err)
+		}
+		return nil
 	}
-	verifyStaticFiles()
+	if err := verifyStaticFiles(); err != nil {
+		return err
+	}
 
 	uiFS, err := fs.Sub(StaticFiles, "static")
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to initialize web static files: %w", err)
 	}
 	rootFileServer := http.FileServer(http.FS(uiFS))
 	uiHandler := http.StripPrefix("/ui", rootFileServer)
@@ -127,11 +134,14 @@ func Register(s *server.Server, mux *http.ServeMux) {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			log.Error("write_ui_index_failed", err)
+		}
 	})
 	inner.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)
 	})
 
 	mux.Handle("/", server.NoSniff(server.Gzip(server.Logging(inner))))
+	return nil
 }

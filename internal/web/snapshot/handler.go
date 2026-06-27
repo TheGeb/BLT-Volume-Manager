@@ -7,6 +7,7 @@ import (
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
@@ -37,36 +38,12 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	store, _ := s.MetadataStore()
 
 	if parts[1] == "delete" {
-		if !server.RequireMethod(w, r, http.MethodDelete) {
-			return
-		}
-		if err := rm.ForgetSnapshot(snapshotID); err != nil {
-			server.RespondError(w, err, http.StatusInternalServerError)
-			return
-		}
-		server.RespondJSON(w, map[string]string{"status": "snapshot deleted"})
+		handleDeleteSnapshot(s, w, r, rm, snapshotID)
 		return
 	}
 
 	if parts[1] == "restore" {
-		if !server.RequireMethod(w, r, http.MethodPost) {
-			return
-		}
-		target := r.URL.Query().Get("path")
-		if target == "" {
-			http.Error(w, "missing path query parameter", http.StatusBadRequest)
-			return
-		}
-		s.AddWork()
-		go func() {
-			defer s.DoneWork()
-			if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
-				log.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
-			} else {
-				log.Info("restore_ok")
-			}
-		}()
-		server.RespondJSON(w, map[string]string{"status": "restore started – see server logs for results"})
+		handleRestoreSnapshot(s, w, r, rm, snapshotID)
 		return
 	}
 
@@ -116,7 +93,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		resp["status"] = "tag removed"
 		server.RespondJSON(w, resp)
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -135,7 +112,7 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 
 	volName := r.URL.Query().Get("volume")
 	if volName == "" {
-		http.Error(w, "missing volume query parameter", http.StatusBadRequest)
+		http.Error(w, server.ErrMissingVolume.Error(), http.StatusBadRequest)
 		return
 	}
 	rm := s.VolumeManager(volName)
@@ -158,94 +135,127 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 
 	switch action {
 	case "ls":
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		path := r.URL.Query().Get("path")
-		nodes, err := rm.ListSnapshotFiles(rawID, path)
-		if err != nil && fallbackHash != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-				nodes, err = rm.ListSnapshotFiles(snap.ID, path)
-			}
-		}
-		if err != nil {
-			server.RespondError(w, err, http.StatusInternalServerError)
-			return
-		}
-		server.RespondJSON(w, nodes)
-
+		handleListSnapshotFiles(s, w, r, rm, rawID, fallbackHash)
 	case "dump":
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		path := r.URL.Query().Get("path")
-		if path == "" {
-			http.Error(w, "missing path", http.StatusBadRequest)
-			return
-		}
-		data, err := rm.DumpFile(rawID, path)
-		if err != nil && fallbackHash != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-				data, err = rm.DumpFile(snap.ID, path)
-			}
-		}
-		if err != nil {
-			server.RespondError(w, err, http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		//nolint:gosec // Intentional dump of restic file contents as text/plain with
-		// X-Content-Type-Options: nosniff
-		_, _ = w.Write(data)
-
+		handleDumpSnapshotFile(s, w, r, rm, rawID, fallbackHash)
 	case "diff":
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if len(parts) < 3 || parts[2] == "" {
-			http.Error(w, "missing second snapshot id", http.StatusBadRequest)
-			return
-		}
-
 		secondID := parts[2]
 		diffVersion := r.URL.Query().Get("diffTag")
 		diffFallback := r.URL.Query().Get("diffFallbackHash")
-
 		secondID = resolve(secondID, diffVersion, diffFallback)
-
-		result, err := rm.DiffSnapshots(rawID, secondID)
-		if err != nil {
-			resolvedFirst, resolvedSecond := rawID, secondID
-			if fallbackHash != "" {
-				if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-					resolvedFirst = snap.ID
-				}
-			}
-			if diffFallback != "" {
-				if snap, lookupErr := rm.FindSnapshotByHash(diffFallback); lookupErr == nil {
-					resolvedSecond = snap.ID
-				}
-			}
-			result, err = rm.DiffSnapshots(resolvedFirst, resolvedSecond)
-		}
-		if err != nil {
-			server.RespondError(w, err, http.StatusNotFound)
-			return
-		}
-		server.RespondJSON(w, result)
-
+		handleDiffSnapshots(s, w, r, rm, rawID, secondID, fallbackHash, diffFallback)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
+func handleListSnapshotFiles(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	nodes, err := rm.ListSnapshotFiles(rawID, path)
+	if err != nil && fallbackHash != "" {
+		if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+			nodes, err = rm.ListSnapshotFiles(snap.ID, path)
+		}
+	}
+	if err != nil {
+		server.RespondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	server.RespondJSON(w, nodes)
+}
+
+func handleDumpSnapshotFile(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "missing path", http.StatusBadRequest)
+		return
+	}
+	data, err := rm.DumpFile(rawID, path)
+	if err != nil && fallbackHash != "" {
+		if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+			data, err = rm.DumpFile(snap.ID, path)
+		}
+	}
+	if err != nil {
+		server.RespondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	//nolint:gosec // Intentional dump of restic file contents as text/plain with X-Content-Type-Options: nosniff
+	_, _ = w.Write(data)
+}
+
+func handleDiffSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, secondID, fallbackHash, diffFallback string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+	result, err := rm.DiffSnapshots(rawID, secondID)
+	if err != nil {
+		resolvedFirst, resolvedSecond := rawID, secondID
+		if fallbackHash != "" {
+			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+				resolvedFirst = snap.ID
+			}
+		}
+		if diffFallback != "" {
+			if snap, lookupErr := rm.FindSnapshotByHash(diffFallback); lookupErr == nil {
+				resolvedSecond = snap.ID
+			}
+		}
+		result, err = rm.DiffSnapshots(resolvedFirst, resolvedSecond)
+	}
+	if err != nil {
+		server.RespondError(w, err, http.StatusNotFound)
+		return
+	}
+	server.RespondJSON(w, result)
+}
+
+func handleDeleteSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+	if !server.RequireMethod(w, r, http.MethodDelete) {
+		return
+	}
+	if err := rm.ForgetSnapshot(snapshotID); err != nil {
+		server.RespondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	server.RespondJSON(w, map[string]string{"status": "snapshot deleted"})
+}
+
+func handleRestoreSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+	if !server.RequireMethod(w, r, http.MethodPost) {
+		return
+	}
+	target := r.URL.Query().Get("path")
+	if target == "" {
+		http.Error(w, "missing path query parameter", http.StatusBadRequest)
+		return
+	}
+	s.AddWork()
+	go func() {
+		defer s.DoneWork()
+		if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
+			log.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
+		} else {
+			log.Info("restore_ok")
+		}
+	}()
+	server.RespondJSON(w, map[string]string{"status": "restore started – see server logs for results"})
+}
+
 func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {

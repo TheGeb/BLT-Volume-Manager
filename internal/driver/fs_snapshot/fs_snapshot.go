@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	ColdSuffix   = "-cold-snapshot"
+	ColdSuffix       = "-cold-snapshot"
 	PreRestoreSuffix = "-pre-restore"
 )
 
@@ -69,7 +69,7 @@ func RootDataset() string {
 
 var (
 	providers = map[Type]Provider{}
-	typeOrder    []Type
+	typeOrder []Type
 )
 
 func RegisteredTypes() []Type {

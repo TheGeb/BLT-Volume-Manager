@@ -4,20 +4,9 @@ import "testing"
 
 func sPtr(s string) *string { return &s }
 
-type mockObjectStore struct {
-	listFunc func(prefix string) ([]Object, error)
-}
-
-func (m *mockObjectStore) PutObject(string, []byte) error                      { return nil }
-func (m *mockObjectStore) ReadObject(string) ([]byte, error)                   { return nil, nil }
-func (m *mockObjectStore) DeleteObject(string) error                           { return nil }
-func (m *mockObjectStore) ListObjects(prefix string) ([]Object, error)         { return m.listFunc(prefix) }
-func (m *mockObjectStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
-func (m *mockObjectStore) DeleteObjectsWithPrefix(string) error                { return nil }
-
 func TestListVolumeMarkers(t *testing.T) {
-	st := New(&mockObjectStore{
-		listFunc: func(prefix string) ([]Object, error) {
+	st := New(&MockObjectStore{
+		ListFunc: func(prefix string) ([]Object, error) {
 			return nil, nil
 		},
 	})
@@ -31,8 +20,8 @@ func TestListVolumeMarkers(t *testing.T) {
 }
 
 func TestListVolumeMarkersWithVolumes(t *testing.T) {
-	st := New(&mockObjectStore{
-		listFunc: func(prefix string) ([]Object, error) {
+	st := New(&MockObjectStore{
+		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
 				{Key: sPtr("prefix/vol-a.json")},
 				{Key: sPtr("prefix/vol-b.json")},
@@ -56,8 +45,8 @@ func TestListVolumeMarkersWithVolumes(t *testing.T) {
 }
 
 func TestListVolumeMarkersSkipsNilKey(t *testing.T) {
-	st := New(&mockObjectStore{
-		listFunc: func(prefix string) ([]Object, error) {
+	st := New(&MockObjectStore{
+		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
 				{Key: nil},
 				{Key: sPtr("prefix/valid.json")},
@@ -74,8 +63,8 @@ func TestListVolumeMarkersSkipsNilKey(t *testing.T) {
 }
 
 func TestListVolumeMarkersSkipsEmptyName(t *testing.T) {
-	st := New(&mockObjectStore{
-		listFunc: func(prefix string) ([]Object, error) {
+	st := New(&MockObjectStore{
+		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
 				{Key: sPtr("prefix/.json")},
 			}, nil
