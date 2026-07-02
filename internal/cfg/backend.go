@@ -16,6 +16,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 		if cfg.S3Bucket != "" {
 			backend = metadata.BackendS3
 		} else {
+			//TODO: Finalize env and log
 			return nil, fmt.Errorf("no metadata backend configured: set BLT_METADATA_BACKEND, S3_BUCKET, or METADATA_S3_BUCKET")
 		}
 	}
@@ -29,7 +30,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 			S3Bucket:       cfg.S3Bucket,
 			S3Endpoint:     cfg.S3Endpoint,
 			Region:         cfg.S3Region,
-			ForcePathStyle: &cfg.S3ForcePathStyle,
+			ForcePathStyle: &cfg.S3ForcePathStyle, //TODO: make this more clear
 			Logger:         log.S3Call,
 		})
 	case metadata.BackendEtcd:
