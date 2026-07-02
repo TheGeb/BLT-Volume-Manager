@@ -20,7 +20,7 @@ type Config struct {
 	OwnerMaxMins     int
 }
 
-func FromEnv(dataDir string) (Config, error) {
+func FromEnv(dataDir string) (Config, error) { //FIXME: shouldn't this consider dotenv? And finalize env vars
 	abs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return Config{}, err
