@@ -22,7 +22,6 @@ const levelTrace = slog.LevelDebug - 4
 var levelNames = map[string]slog.Level{
 	"error":   slog.LevelError,
 	"warn":    slog.LevelWarn,
-	"warning": slog.LevelWarn,
 	"info":    slog.LevelInfo,
 	"debug":   slog.LevelDebug,
 	"trace":   levelTrace,
@@ -115,6 +114,7 @@ func logLevel() slog.Level {
 	return levelVar.Level()
 }
 
+// Derives restic CLI verbosity from app log level
 func Verbosity() int {
 	switch l := levelVar.Level(); {
 	case l <= levelTrace:
