@@ -1,5 +1,7 @@
 package metadata
 
+//TODO: Should this be a _test file?
+
 type MockObjectStore struct {
 	Objects    []Object
 	ObjectsErr error

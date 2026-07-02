@@ -2,6 +2,7 @@ package metadata
 
 import "strings"
 
+// FIXME: Why pass in the prefix? Just use it within this method. Double check all other metadata types
 func (s *Store) ListVolumeMarkers(prefix string) ([]string, error) {
 	objects, err := s.store.ListObjects(prefix)
 	if err != nil {

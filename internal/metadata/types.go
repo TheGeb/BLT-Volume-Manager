@@ -62,7 +62,7 @@ type RestorePoint struct {
 	FallbackHash string `json:"fallbackHash"`
 }
 
-type RestorePointStore interface {
+type RestorePointStore interface { //FIXME: Shouldn't this just use objectStore?
 	WriteRestorePoint(vol string, rp RestorePoint) error
 	ReadRestorePoint(vol string) (*RestorePoint, error)
 	DeleteRestorePoint(vol string) error

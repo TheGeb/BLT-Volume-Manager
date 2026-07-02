@@ -7,6 +7,7 @@ const (
 	BackendEtcd = "etcd"
 )
 
+// TODO: Are these only used for S3? perhaps move them to that package
 const (
 	OwnerPrefix        = "blt-volume-manager/owners/"
 	VolumesPrefix      = "blt-volume-manager/registered-volumes/"

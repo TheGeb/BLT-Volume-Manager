@@ -15,6 +15,8 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
 )
 
+//TODO: Integrate/wrap official etcd client, go.etcd.io/etcd/client/v3
+
 // Config configures an etcd backend client.
 type Config struct {
 	Endpoints   []string

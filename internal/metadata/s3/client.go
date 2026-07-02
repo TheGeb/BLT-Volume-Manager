@@ -75,7 +75,7 @@ func NewClient(cfg Config) (metadata.ObjectStore, error) {
 			o.UsePathStyle = true
 		})
 	}
-	forcePathStyle := cfg.ForcePathStyle
+	forcePathStyle := cfg.ForcePathStyle 
 	if forcePathStyle != nil && *forcePathStyle {
 		clientOpts = append(clientOpts, func(o *s3sdk.Options) {
 			o.UsePathStyle = true

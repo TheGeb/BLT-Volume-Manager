@@ -10,16 +10,66 @@ import (
 	"time"
 )
 
+func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (myKey string, err error) {
+	//TODO: Thoroughly examine every call in this method
+	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
+	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
+	data, err := json.Marshal(proposal)
+	if err != nil {
+		return "", fmt.Errorf("marshal proposal: %w", err)
+	}
+
+	if err := store.PutObject(myKey, data); err != nil {
+		return "", fmt.Errorf("create proposal: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = store.DeleteObject(myKey)
+		}
+	}()
+
+	objects, err := store.ListObjects(folder)
+	if err != nil {
+		return "", fmt.Errorf("list proposals: %w", err)
+	}
+
+	SortOwnerObjects(objects)
+
+	for _, obj := range objects {
+		if obj.Key == nil {
+			continue
+		}
+		k := *obj.Key
+		if k == myKey || !strings.Contains(k, owner) {
+			continue
+		}
+		_ = store.DeleteObject(k)
+	}
+
+	objects, err = store.ListObjects(folder)
+	if err != nil {
+		return "", fmt.Errorf("re-list proposals: %w", err)
+	}
+	SortOwnerObjects(objects)
+
+	key, _, _ := FindOwner(store, objects)
+	if key != myKey {
+		return "", fmt.Errorf("another owner proposal was earlier")
+	}
+
+	return myKey, nil
+}
+
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
-		return 1<<62 - 1
+		return 1<<62 - 1 //FIXME: This seems like an ugly way of handling no expiration
 	}
 	return o.ExpiryTime - time.Now().Unix()
 }
 
 func (e *OwnerLockError) Error() string { return e.Msg }
 
-func OwnerFolder(volumeName string) string {
+func OwnerFolder(volumeName string) string { //FIXME: Rename. Folder is misleading, but Prefix has other meaning? maybe Base or similar?
 	return OwnerPrefix + volumeName + "/"
 }
 
@@ -58,7 +108,7 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 	if err != nil {
 		return "", "", 0, fmt.Errorf("parse expiry from owner key: %w", err)
 	}
-	if expiry > 1e15 {
+	if expiry > 1e15 { //FIXME: Ugly no-expiration handling, seems like it can be completely removed
 		return volume, owner, 0, ErrOldOwnerKeyFormat
 	}
 	return volume, owner, expiry, nil
@@ -111,55 +161,6 @@ func RemoveStaleObjects(store ObjectStore, objects []Object, ttl time.Duration) 
 		kept = append(kept, obj)
 	}
 	return kept
-}
-
-func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (myKey string, err error) {
-	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
-	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
-	data, err := json.Marshal(proposal)
-	if err != nil {
-		return "", fmt.Errorf("marshal proposal: %w", err)
-	}
-
-	if err := store.PutObject(myKey, data); err != nil {
-		return "", fmt.Errorf("create proposal: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = store.DeleteObject(myKey)
-		}
-	}()
-
-	objects, err := store.ListObjects(folder)
-	if err != nil {
-		return "", fmt.Errorf("list proposals: %w", err)
-	}
-
-	SortOwnerObjects(objects)
-
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		k := *obj.Key
-		if k == myKey || !strings.Contains(k, owner) {
-			continue
-		}
-		_ = store.DeleteObject(k)
-	}
-
-	objects, err = store.ListObjects(folder)
-	if err != nil {
-		return "", fmt.Errorf("re-list proposals: %w", err)
-	}
-	SortOwnerObjects(objects)
-
-	key, _, _ := FindOwner(store, objects)
-	if key != myKey {
-		return "", fmt.Errorf("another owner proposal was earlier")
-	}
-
-	return myKey, nil
 }
 
 func (s *Store) DeleteOwnerObjects(ownerFolder string) error {

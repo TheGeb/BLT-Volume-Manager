@@ -30,7 +30,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 			S3Bucket:       cfg.S3Bucket,
 			S3Endpoint:     cfg.S3Endpoint,
 			Region:         cfg.S3Region,
-			ForcePathStyle: &cfg.S3ForcePathStyle, //TODO: make this more clear
+			ForcePathStyle: &cfg.S3ForcePathStyle, //TODO: document the meaning of this, see S3 API
 			Logger:         log.S3Call,
 		})
 	case metadata.BackendEtcd:
