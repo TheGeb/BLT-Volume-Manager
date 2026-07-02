@@ -34,6 +34,7 @@ func WithTags(base string, extra ...string) []string {
 
 func (m *Manager) Repo() string { return m.repo }
 
+// TODO: Consider moving to another file
 func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	snapshots, err := m.ListSnapshots()
 	if err != nil {

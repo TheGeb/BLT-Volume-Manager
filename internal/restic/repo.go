@@ -126,6 +126,7 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 	if pwFile := os.Getenv("RESTIC_PASSWORD_FILE"); pwFile != "" {
 		args = append(args, "--from-password-file", pwFile, "--password-file", pwFile)
 	} else if pw := os.Getenv("RESTIC_PASSWORD"); pw != "" {
+		//TODO: Verify whether to always write a temp password file?
 		tmpFile, err := os.CreateTemp("", "restic-pw-*")
 		if err != nil {
 			return fmt.Errorf("create temp password file: %w", err)

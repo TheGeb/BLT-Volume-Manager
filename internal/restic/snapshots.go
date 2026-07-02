@@ -13,6 +13,9 @@ import (
 	"strings"
 )
 
+//TODO: Break this file up. Maybe singular (tagging, restore, forget), plural (list, hosts?), and view/diff?
+// or one file for each main action?
+
 type ListSnapshotsOpts struct {
 	Hosts  []string
 	Latest int
@@ -130,6 +133,7 @@ func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 	}
 	return m.runSimple(context.Background(), "tag", "--remove", tag, snapshotID)
 }
+
 
 func (m *Manager) RestoreIfExists(path, preferred string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)

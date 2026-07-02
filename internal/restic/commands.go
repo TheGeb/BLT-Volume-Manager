@@ -10,6 +10,8 @@ import (
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 )
 
+//TODO: Do not have other files use raw strings to specify commands, create a method for each
+
 func (m *Manager) runSimple(ctx context.Context, args ...string) error {
 	cmd, err := m.resticCommand(ctx, args...)
 	if err != nil {
