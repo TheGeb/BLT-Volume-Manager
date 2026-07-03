@@ -45,7 +45,7 @@ func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
 				hot++
 			case restic.BackupTagCold:
 				cold++
-			case "excluded":
+			case "excluded": //FIXME: Is this tag still valid? If so, add constant, otherwise remove
 				excluded++
 			}
 		}
@@ -104,7 +104,7 @@ func Stats(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	rm := s.VolumeManager(volName)
 
 	resp := map[string]any{
-		"snapshots": buildSnapshotStats(rm, volName),
+		"snapshots": buildSnapshotStats(rm, volName), //FIXME: Is this even used on the UI anymore? Might be able to completely remove
 		"repo":      buildRepoStats(rm),
 		"volume":    volName,
 	}

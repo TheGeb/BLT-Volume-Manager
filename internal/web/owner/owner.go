@@ -11,7 +11,7 @@ import (
 )
 
 func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
-	if !s.HasBackend() {
+	if !s.HasBackend() { //FIXME: can all these "has backend" checks be done on startup instead of all over the app?
 		return nil, errors.New("metadata backend not configured: set META_BACKEND, METADATA_S3_BUCKET, or S3_ENDPOINT")
 	}
 
@@ -21,13 +21,13 @@ func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
 	}
 
 	folder := metadata.OwnerFolder(volumeName)
-	objects, err := ms.ListObjects(folder)
+	objects, err := ms.ListObjects(folder) //FIXME: more generic store methods which should use domain based methods
 	if err != nil {
 		return nil, fmt.Errorf("list owner objects: %w", err)
 	}
 
 	metadata.SortOwnerObjects(objects)
-	objects = metadata.RemoveStaleObjects(ms, objects, metadata.DefaultOwnerTTL)
+	objects = metadata.RemoveStaleObjects(ms, objects, metadata.DefaultOwnerTTL) //FIXME: do async?
 
 	result := map[string]any{
 		"volume": volumeName,
@@ -35,7 +35,7 @@ func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
 	}
 
 	key, owner, expiry := metadata.FindOwner(ms, objects)
-	if key != "" {
+	if key != "" { //FIXME: similar issue to above, owned is redundant and use expiry instead of "expires in" which is stale and can be misleading
 		result["owned"] = true
 		result["owner"] = owner
 		if expiry > 0 {
@@ -50,7 +50,7 @@ func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
 	return result, nil
 }
 
-func IsVolumeOwned(s *server.Server, volumeName string) (bool, string, error) {
+func IsVolumeOwned(s *server.Server, volumeName string) (bool, string, error) { //FIXME: consider rename like "ForVolume"?
 	status, err := VolumeOwner(s, volumeName)
 	if err != nil {
 		return false, "", err
@@ -76,7 +76,7 @@ func CreateVolumeOwner(s *server.Server, volumeName, ownerName string, ownerDura
 	}
 
 	if ownerName == "" {
-		ownerName = fmt.Sprintf("webadmin-%s-%d", metadata.Hostname(), os.Getpid())
+		ownerName = fmt.Sprintf("webadmin-%s-%d", metadata.Hostname(), os.Getpid()) //FIXME: remove default, perhaps return error instead
 	}
 	var expiry int64
 	if ownerDurationMins > 0 {

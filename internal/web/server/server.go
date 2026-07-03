@@ -52,11 +52,11 @@ func (s *Server) MetadataStore() (*metadata.Store, error) {
 	return s.initMetadataStore()
 }
 
-func (s *Server) StoreForVolume() (*metadata.Store, error) {
+func (s *Server) StoreForVolume() (*metadata.Store, error) { //FIXME: This naming is awkward
 	return s.MetadataStore()
 }
 
-func (s *Server) StoreForResticData() (metadata.ObjectStore, error) {
+func (s *Server) StoreForResticData() (metadata.ObjectStore, error) { //FIXME: name is a bit too verbose, and awkwardly returns metadata store
 	if s.Config.S3Bucket == "" {
 		return nil, fmt.Errorf("S3 bucket not configured")
 	}
@@ -77,6 +77,7 @@ func (s *Server) initMetadataStore() (*metadata.Store, error) {
 	return s.metadataStore, nil
 }
 
+// FIXME: update name to specify that this is for backup data, not metadata. Also avoid S3 naming and return backend type?
 func (s *Server) IsS3Backend() bool {
 	return strings.HasPrefix(s.ResticBase, "s3:")
 }

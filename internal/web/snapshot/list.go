@@ -25,7 +25,7 @@ type SnapshotFilter struct {
 
 func ParseVersionParam(s string) (major, minor int, ok bool) {
 	parts := strings.SplitN(s, ".", 2)
-	if len(parts) != 2 {
+	if len(parts) != 2 { //TODO: Should major version alone be supported?
 		return 0, 0, false
 	}
 	maj, err1 := strconv.Atoi(parts[0])
@@ -132,7 +132,7 @@ func ParseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 		}
 	}
 
-	if tf := r.URL.Query().Get("timeFrom"); tf != "" {
+	if tf := r.URL.Query().Get("timeFrom"); tf != "" { //TODO: consider rename to distinguish from timeOfDay params
 		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
 			t := time.UnixMilli(n)
 			ensureFilter()
@@ -252,6 +252,7 @@ func ListSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, resp)
 }
 
+//FIXME: hosts might deserve its own file
 func ListSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return

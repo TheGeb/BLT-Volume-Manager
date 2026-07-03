@@ -41,7 +41,7 @@ type OwnerLockError struct {
 	Msg  string
 }
 
-var ErrOldOwnerKeyFormat = errors.New("old owner key format, GET needed")
+var ErrOldOwnerKeyFormat = errors.New("old owner key format, GET needed") //FIXME: Get rid of this error type, no need to worry about old format
 
 type OwnerClient interface {
 	Lock(ctx context.Context, name string) (OwnerLock, error)

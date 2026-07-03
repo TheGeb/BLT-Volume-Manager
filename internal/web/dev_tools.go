@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver" //FIXME: Web should not depend on driver
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
 )
 
-func DevMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func DevMode(s *server.Server, w http.ResponseWriter, r *http.Request) { //FIXME: sync name with test mode var
 	enabled := os.Getenv("BLT_TEST_MODE") != ""
 	server.RespondJSON(w, map[string]bool{"enabled": enabled})
 }
@@ -44,7 +44,7 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 	}
 	defer func() { _ = os.RemoveAll(volPath) }()
 
-	if err := os.WriteFile(filepath.Join(volPath, driver.VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(volPath, driver.VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil { //TODO: get rid of magic number across app
 		server.RespondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -133,7 +133,7 @@ func writeDummyFiles(dir string) int {
 	}
 	for path, content := range dummyContent {
 		fullPath := filepath.Join(dir, path)
-		_ = os.MkdirAll(filepath.Dir(fullPath), 0o755)
+		_ = os.MkdirAll(filepath.Dir(fullPath), 0o755) //TODO: get rid of magic number across app
 		_ = os.WriteFile(fullPath, []byte(content), 0o644)
 	}
 	return len(dummyContent)

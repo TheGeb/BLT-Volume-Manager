@@ -73,7 +73,7 @@ func OwnerFolder(volumeName string) string { //FIXME: Rename. Folder is misleadi
 	return OwnerPrefix + volumeName + "/"
 }
 
-func SortOwnerObjects(objects []Object) {
+func SortOwnerObjects(objects []Object) { //TODO: Update name to specify that sort is chronological
 	sort.Slice(objects, func(i, j int) bool {
 		ti, tj := objects[i].LastModified, objects[j].LastModified
 		if ti != nil && tj != nil && !ti.Equal(*tj) {

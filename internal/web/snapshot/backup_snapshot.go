@@ -24,7 +24,7 @@ func FindSnapshotByVersion(rm *restic.Manager, version string) (string, error) {
 		return "", &snapshotNotFoundError{version: version}
 	}
 	newest := snapshots[0]
-	for _, s := range snapshots[1:] {
+	for _, s := range snapshots[1:] { //TODO: warn if there are multiple matches?
 		if s.Time.After(newest.Time) {
 			newest = s
 		}

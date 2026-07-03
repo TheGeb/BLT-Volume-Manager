@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver" //FIXME: Web should not depend on driver
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
@@ -67,7 +67,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
-	if !server.ValidVolumeName(volumeName) {
+	if !server.ValidVolumeName(volumeName) { //TODO: Need to ensure that volume groups are handled properly
 		http.Error(w, "invalid volume name", http.StatusBadRequest)
 		return
 	}
@@ -76,6 +76,7 @@ func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 	server.RespondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
+//FIXME: awkward naming
 func checkedTargetManager(s *server.Server, w http.ResponseWriter, target string) *restic.Manager {
 	if !server.ValidVolumeName(target) {
 		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
@@ -154,6 +155,8 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 			return
 		}
 	default:
+		//FIXME: will this default ever be hit? User should be forced to multiselect or take all
+		// Maybe if they try to multiselect but choose nothing??
 		snaps, err := sourceManager.ListSnapshots()
 		if err != nil {
 			server.RespondError(w, fmt.Errorf("list snapshots: %w", err), http.StatusInternalServerError)
@@ -223,7 +226,7 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 
 	snapshots, err := sourceManager.ListSnapshots()
 	if err == nil {
-		for _, snap := range snapshots {
+		for _, snap := range snapshots { //FIXME: is there a way to do this in bulk? Could take a while for lots of snapshots
 			if err := sourceManager.ForgetSnapshot(snap.ID); err != nil {
 				log.Error("forget_snapshot_failed", err)
 			}

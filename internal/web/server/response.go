@@ -21,6 +21,8 @@ func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	return true
 }
 
+// FIXME: Should this belong in volume package?
+// Also this check is duplicated in a bunch of places, maybe centralize it more
 func RequireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	vol := r.URL.Query().Get("volume")
 	if vol == "" {

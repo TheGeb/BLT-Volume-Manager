@@ -36,7 +36,7 @@ func CleanupVolumeData(s *server.Server, volumeName string) {
 			}
 		}
 	}
-	if !s.IsS3Backend() {
+	if !s.IsS3Backend() { //FIXME: hardcoding paths based on backend should be avoided and abstracted away
 		repoPath := filepath.Join(s.ResticBase, restic.Dir, volumeName)
 		absPath, err := filepath.Abs(repoPath)
 		if err != nil {

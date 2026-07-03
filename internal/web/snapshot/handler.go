@@ -24,7 +24,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(trimmed, "/")
-	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore" && parts[1] != "delete") {
+	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore" && parts[1] != "delete") { //FIXME: extract these to constants
 		http.NotFound(w, r)
 		return
 	}
@@ -53,7 +53,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch r.Method {
+	switch r.Method { //FIXME: organization is a bit awkward, maybe split by path first then method?
 	case http.MethodPost:
 		if tag == "restore-point" {
 			if err := metadata.SetRestorePoint(store, volName, snapshotID); err != nil {

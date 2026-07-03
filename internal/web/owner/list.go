@@ -17,29 +17,30 @@ func ListVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) 
 
 	owners := make(map[string]map[string]any)
 
-	if !s.HasBackend() {
+	if !s.HasBackend() { //FIXME: No backend should return error
 		server.RespondJSON(w, map[string]any{"owners": owners})
 		return
 	}
 
-	s3Store, err := s.MetadataStore()
+	s3Store, err := s.MetadataStore() //FIXME: Remove S3 naming for generic metadata store objects
 	if err != nil || s3Store == nil {
 		server.RespondJSON(w, map[string]any{"owners": owners})
 		return
 	}
 
-	objects, listErr := s3Store.ListObjects(metadata.OwnerPrefix)
+	objects, listErr := s3Store.ListObjects(metadata.OwnerPrefix) //FIXME: Move to owner file and do not have consumers pass the prefix
 	if listErr != nil {
 		server.RespondJSON(w, map[string]any{"owners": owners})
 		return
 	}
-
+	
+	//TODO: refactor to group by active/stale, then remove all stale ones async and proceed acting on active ones?
 	kept := metadata.RemoveStaleObjects(s3Store, objects, metadata.DefaultOwnerTTL)
 
 	grouped := make(map[string][]metadata.Object)
 	for _, obj := range kept {
 		vol, _, _, err := metadata.ParseOwnerKey(*obj.Key)
-		if err != nil && !errors.Is(err, metadata.ErrOldOwnerKeyFormat) {
+		if err != nil && !errors.Is(err, metadata.ErrOldOwnerKeyFormat) { //FIXME: remove "old format" checks
 			continue
 		}
 		if vol == "" {
@@ -54,7 +55,7 @@ func ListVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) 
 		if key != "" {
 			result := map[string]any{
 				"volume": vol,
-				"owned":  true,
+				"owned":  true, //FIXME: owned is redundant when owner is already present
 				"owner":  ownerName,
 			}
 			if expiry > 0 {
@@ -62,7 +63,7 @@ func ListVolumeOwners(s *server.Server, w http.ResponseWriter, r *http.Request) 
 				if remaining < 0 {
 					remaining = 0
 				}
-				result["expires_in"] = remaining
+				result["expires_in"] = remaining //FIXME: Returning expiry is preferred instead of stale "expires in"
 			}
 			owners[vol] = result
 		}

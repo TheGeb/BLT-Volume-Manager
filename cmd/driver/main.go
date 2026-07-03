@@ -6,7 +6,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
+	"github.com/TheGeb/docker-s3-volume-plugin/internal/app" //FIXME: naming should be for BLT, not S3
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
 	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"

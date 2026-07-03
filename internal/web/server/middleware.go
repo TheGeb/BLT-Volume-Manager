@@ -48,7 +48,7 @@ func Gzip(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/") {
+		if !strings.HasPrefix(r.URL.Path, "/api/") { //TODO: should gzip be limited to API?
 			next.ServeHTTP(w, r)
 			return
 		}
