@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
 type RepoStats struct {
@@ -122,26 +121,6 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 
 	args := []string{fmt.Sprintf("--from-repo=%s", m.repo), "copy"}
 	args = append(args, snapshotIDs...)
-
-	if pwFile := os.Getenv("RESTIC_PASSWORD_FILE"); pwFile != "" {
-		args = append(args, "--from-password-file", pwFile, "--password-file", pwFile)
-	} else if pw := os.Getenv("RESTIC_PASSWORD"); pw != "" {
-		//TODO: Verify whether to always write a temp password file?
-		tmpFile, err := os.CreateTemp("", "restic-pw-*")
-		if err != nil {
-			return fmt.Errorf("create temp password file: %w", err)
-		}
-		tmpName := tmpFile.Name()
-		defer func() { _ = os.Remove(tmpName) }()
-		if _, err := tmpFile.WriteString(pw + "\n"); err != nil {
-			_ = tmpFile.Close()
-			return fmt.Errorf("write temp password file: %w", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("close temp password file: %w", err)
-		}
-		args = append(args, "--from-password-file", tmpName, "--password-file", tmpName)
-	}
 
 	if v := log.Verbosity(); v > 0 {
 		args = append(args, fmt.Sprintf("--verbose=%d", v))

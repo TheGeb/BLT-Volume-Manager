@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func OwnerRouter(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {

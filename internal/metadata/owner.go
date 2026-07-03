@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,7 +10,7 @@ import (
 )
 
 func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (myKey string, err error) {
-	//TODO: Thoroughly examine every call in this method
+	// TODO: Thoroughly examine every call in this method
 	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
 	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
 	data, err := json.Marshal(proposal)
@@ -33,7 +32,7 @@ func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (my
 		return "", fmt.Errorf("list proposals: %w", err)
 	}
 
-	SortOwnerObjects(objects)
+	SortOwnersByExpiry(objects)
 
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -50,9 +49,9 @@ func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (my
 	if err != nil {
 		return "", fmt.Errorf("re-list proposals: %w", err)
 	}
-	SortOwnerObjects(objects)
+	SortOwnersByExpiry(objects)
 
-	key, _, _ := FindOwner(store, objects)
+	key, _, _ := FindOwner(objects)
 	if key != myKey {
 		return "", fmt.Errorf("another owner proposal was earlier")
 	}
@@ -62,18 +61,18 @@ func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (my
 
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
-		return 1<<62 - 1 //FIXME: This seems like an ugly way of handling no expiration
+		return 1<<62 - 1 // FIXME: This seems like an ugly way of handling no expiration
 	}
 	return o.ExpiryTime - time.Now().Unix()
 }
 
 func (e *OwnerLockError) Error() string { return e.Msg }
 
-func OwnerFolder(volumeName string) string { //FIXME: Rename. Folder is misleading, but Prefix has other meaning? maybe Base or similar?
+func OwnerFolder(volumeName string) string { // FIXME: Rename. Folder is misleading, but Prefix has other meaning? maybe Base or similar?
 	return OwnerPrefix + volumeName + "/"
 }
 
-func SortOwnerObjects(objects []Object) { //TODO: Update name to specify that sort is chronological
+func SortOwnersByExpiry(objects []Object) {
 	sort.Slice(objects, func(i, j int) bool {
 		ti, tj := objects[i].LastModified, objects[j].LastModified
 		if ti != nil && tj != nil && !ti.Equal(*tj) {
@@ -108,13 +107,10 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 	if err != nil {
 		return "", "", 0, fmt.Errorf("parse expiry from owner key: %w", err)
 	}
-	if expiry > 1e15 { //FIXME: Ugly no-expiration handling, seems like it can be completely removed
-		return volume, owner, 0, ErrOldOwnerKeyFormat
-	}
 	return volume, owner, expiry, nil
 }
 
-func FindOwner(store ObjectStore, objects []Object) (firstKey string, firstOwner string, firstExpiry int64) {
+func FindOwner(objects []Object) (firstKey string, firstOwner string, firstExpiry int64) {
 	now := time.Now().Unix()
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -122,20 +118,6 @@ func FindOwner(store ObjectStore, objects []Object) (firstKey string, firstOwner
 		}
 		_, owner, expiry, err := ParseOwnerKey(*obj.Key)
 		if err != nil {
-			if errors.Is(err, ErrOldOwnerKeyFormat) && store != nil {
-				raw, readErr := store.ReadObject(*obj.Key)
-				if readErr != nil || raw == nil {
-					continue
-				}
-				var o OwnerEntry
-				if jsonErr := json.Unmarshal(raw, &o); jsonErr != nil {
-					continue
-				}
-				if o.ExpiryTime > 0 && o.RemainingSeconds() <= 0 {
-					continue
-				}
-				return *obj.Key, o.Name, o.ExpiryTime
-			}
 			continue
 		}
 		if expiry > 0 && expiry <= now {

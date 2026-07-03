@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/etcd"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/s3"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/etcd"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/s3"
 )
 
 func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
@@ -16,7 +16,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 		if cfg.S3Bucket != "" {
 			backend = metadata.BackendS3
 		} else {
-			//TODO: Finalize env and log
+			// TODO: Finalize env and log
 			return nil, fmt.Errorf("no metadata backend configured: set BLT_METADATA_BACKEND, S3_BUCKET, or METADATA_S3_BUCKET")
 		}
 	}
@@ -30,7 +30,7 @@ func OpenMetadataBackend(cfg Config) (metadata.ObjectStore, error) {
 			S3Bucket:       cfg.S3Bucket,
 			S3Endpoint:     cfg.S3Endpoint,
 			Region:         cfg.S3Region,
-			ForcePathStyle: &cfg.S3ForcePathStyle, //TODO: document the meaning of this, see S3 API
+			ForcePathStyle: &cfg.S3ForcePathStyle,
 			Logger:         log.S3Call,
 		})
 	case metadata.BackendEtcd:

@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func buildRepoStats(rm *restic.Manager) map[string]any {
@@ -29,14 +29,14 @@ func buildRepoStats(rm *restic.Manager) map[string]any {
 
 func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
 	stats := map[string]any{
-		"total": 0, "hot": 0, "cold": 0, "excluded": 0, "volumes": 0,
+		"total": 0, "hot": 0, "cold": 0, "volumes": 0,
 		"newest": "", "oldest": "",
 	}
 	snaps, err := rm.ListSnapshots()
 	if err != nil || snaps == nil {
 		return stats
 	}
-	hot, cold, excluded := 0, 0, 0
+	hot, cold := 0, 0
 	var newest, oldest time.Time
 	for i, snap := range snaps {
 		for _, tag := range snap.Tags {
@@ -45,8 +45,6 @@ func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
 				hot++
 			case restic.BackupTagCold:
 				cold++
-			case "excluded": //FIXME: Is this tag still valid? If so, add constant, otherwise remove
-				excluded++
 			}
 		}
 		if i == 0 || snap.Time.After(newest) {
@@ -64,30 +62,25 @@ func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
 	if !oldest.IsZero() {
 		oldestStr = oldest.Format(time.RFC3339)
 	}
-	var hotVols, coldVols, excludedVols, otherVols []string
+	var hotVols, coldVols, otherVols []string
 	if hot > 0 {
 		hotVols = []string{volName}
 	}
 	if cold > 0 {
 		coldVols = []string{volName}
 	}
-	if excluded > 0 {
-		excludedVols = []string{volName}
-	}
-	if o := len(snaps) - hot - cold - excluded; o > 0 {
+	if o := len(snaps) - hot - cold; o > 0 {
 		otherVols = []string{volName}
 	}
 	stats = map[string]any{
-		"total":            len(snaps),
-		"hot":              hot,
-		"cold":             cold,
-		"excluded":         excluded,
-		"newest":           newestStr,
-		"oldest":           oldestStr,
-		"hot_volumes":      hotVols,
-		"cold_volumes":     coldVols,
-		"excluded_volumes": excludedVols,
-		"other_volumes":    otherVols,
+		"total":         len(snaps),
+		"hot":           hot,
+		"cold":          cold,
+		"newest":        newestStr,
+		"oldest":        oldestStr,
+		"hot_volumes":   hotVols,
+		"cold_volumes":  coldVols,
+		"other_volumes": otherVols,
 	}
 	return stats
 }
@@ -104,7 +97,7 @@ func Stats(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	rm := s.VolumeManager(volName)
 
 	resp := map[string]any{
-		"snapshots": buildSnapshotStats(rm, volName), //FIXME: Is this even used on the UI anymore? Might be able to completely remove
+		"snapshots": buildSnapshotStats(rm, volName), // FIXME: Is this even used on the UI anymore? Might be able to completely remove
 		"repo":      buildRepoStats(rm),
 		"volume":    volName,
 	}

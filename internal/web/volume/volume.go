@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func CleanupVolumeData(s *server.Server, volumeName string) {
@@ -21,14 +21,14 @@ func CleanupVolumeData(s *server.Server, volumeName string) {
 			if err := volStore.DeleteObjectsWithPrefix(metadata.OwnerFolder(volumeName)); err != nil {
 				log.Error("delete_owner_objects_failed", err)
 			}
-			if err := volStore.DeleteVolumeMarker(volumeName); err != nil {
-				log.Error("delete_volume_marker_failed", err)
+			if err := volStore.DeleteRegisteredVolume(volumeName); err != nil {
+				log.Error("delete_registered_volume_failed", err)
 			}
 			if err := volStore.DeleteRestorePoint(volumeName); err != nil {
 				log.Error("delete_restore_point_failed", err)
 			}
 		}
-		if s.IsS3Backend() {
+		if s.BackupStoreType() == "s3" {
 			if dataStore, err := s.StoreForResticData(); err == nil && dataStore != nil {
 				if err := dataStore.DeleteObjectsWithPrefix(restic.Dir + "/" + volumeName + "/"); err != nil {
 					log.Error("delete_restic_data_failed", err)
@@ -36,7 +36,7 @@ func CleanupVolumeData(s *server.Server, volumeName string) {
 			}
 		}
 	}
-	if !s.IsS3Backend() { //FIXME: hardcoding paths based on backend should be avoided and abstracted away
+	if s.BackupStoreType() == "local" {
 		repoPath := filepath.Join(s.ResticBase, restic.Dir, volumeName)
 		absPath, err := filepath.Abs(repoPath)
 		if err != nil {

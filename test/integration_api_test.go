@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/s3"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/s3"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func setupAPITest(t *testing.T) (*httptest.Server, *GarageServer) {

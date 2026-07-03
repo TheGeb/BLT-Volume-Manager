@@ -4,13 +4,13 @@ import "testing"
 
 func sPtr(s string) *string { return &s }
 
-func TestListVolumeMarkers(t *testing.T) {
+func TestListRegisteredVolumes(t *testing.T) {
 	st := New(&MockObjectStore{
 		ListFunc: func(prefix string) ([]Object, error) {
 			return nil, nil
 		},
 	})
-	names, err := st.ListVolumeMarkers("prefix/")
+	names, err := st.ListRegisteredVolumes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,17 +19,17 @@ func TestListVolumeMarkers(t *testing.T) {
 	}
 }
 
-func TestListVolumeMarkersWithVolumes(t *testing.T) {
+func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 	st := New(&MockObjectStore{
 		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
-				{Key: sPtr("prefix/vol-a.json")},
-				{Key: sPtr("prefix/vol-b.json")},
-				{Key: sPtr("prefix/deep/nested-vol.json")},
+				{Key: sPtr(RegisteredVolumesPrefix + "vol-a.json")},
+				{Key: sPtr(RegisteredVolumesPrefix + "vol-b.json")},
+				{Key: sPtr(RegisteredVolumesPrefix + "deep/nested-vol.json")},
 			}, nil
 		},
 	})
-	names, err := st.ListVolumeMarkers("prefix/")
+	names, err := st.ListRegisteredVolumes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,16 +44,16 @@ func TestListVolumeMarkersWithVolumes(t *testing.T) {
 	}
 }
 
-func TestListVolumeMarkersSkipsNilKey(t *testing.T) {
+func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 	st := New(&MockObjectStore{
 		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
 				{Key: nil},
-				{Key: sPtr("prefix/valid.json")},
+				{Key: sPtr(RegisteredVolumesPrefix + "valid.json")},
 			}, nil
 		},
 	})
-	names, err := st.ListVolumeMarkers("prefix/")
+	names, err := st.ListRegisteredVolumes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,15 +62,15 @@ func TestListVolumeMarkersSkipsNilKey(t *testing.T) {
 	}
 }
 
-func TestListVolumeMarkersSkipsEmptyName(t *testing.T) {
+func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
 	st := New(&MockObjectStore{
 		ListFunc: func(prefix string) ([]Object, error) {
 			return []Object{
-				{Key: sPtr("prefix/.json")},
+				{Key: sPtr(RegisteredVolumesPrefix + ".json")},
 			}, nil
 		},
 	})
-	names, err := st.ListVolumeMarkers("prefix/")
+	names, err := st.ListRegisteredVolumes()
 	if err != nil {
 		t.Fatal(err)
 	}

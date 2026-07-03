@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+//TODO: Make all of these private? Only expose structured metadata classes and methods to manipulate them
+
 var (
 	ErrKeyNotFound    = errors.New("key not found")
 	ErrNotImplemented = errors.New("not implemented")
@@ -53,8 +55,11 @@ func NewOwnerClient(s ObjectStore, maxHoldMins int) OwnerClient {
 
 func (c *objectStoreOwnerClient) Lock(ctx context.Context, name string) (OwnerLock, error) {
 	folder := OwnerFolder(name)
-	myName := fmt.Sprintf("%s-%d", Hostname(), os.Getpid()) //TODO: Allow environment override for name?
-	expiry := time.Now().Add(time.Minute * time.Duration(c.maxHoldMins+2)).Unix() //FIXME: Why max mins + 2?
+	myName := os.Getenv("BLT_OWNER_NAME")
+	if myName == "" {
+		myName = fmt.Sprintf("%s-%d", Hostname(), os.Getpid())
+	}
+	expiry := time.Now().Add(time.Minute * time.Duration(c.maxHoldMins+2)).Unix() // FIXME: Why max mins + 2?
 
 	myKey, err := AcquireOwnerLock(c.store, folder, myName, expiry)
 	if err != nil {

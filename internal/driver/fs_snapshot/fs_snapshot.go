@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
 type Type int

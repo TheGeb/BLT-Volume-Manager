@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver" //FIXME: Web should not depend on driver
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func DevMode(s *server.Server, w http.ResponseWriter, r *http.Request) { //FIXME: sync name with test mode var
-	enabled := os.Getenv("BLT_TEST_MODE") != ""
+func TestMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
+	enabled := os.Getenv("BLT_DEV_MODE") != ""
 	server.RespondJSON(w, map[string]bool{"enabled": enabled})
 }
 
@@ -44,7 +43,7 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 	}
 	defer func() { _ = os.RemoveAll(volPath) }()
 
-	if err := os.WriteFile(filepath.Join(volPath, driver.VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil { //TODO: get rid of magic number across app
+	if err := os.WriteFile(filepath.Join(volPath, VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil { // TODO: get rid of magic number across app
 		server.RespondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -70,8 +69,8 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 	}
 
 	if ms, err := s.MetadataStore(); err == nil && ms != nil {
-		if err := ms.WriteVolumeMarker(req.Name); err != nil {
-			log.Error("write_volume_marker_failed", err)
+		if err := ms.WriteRegisteredVolume(req.Name); err != nil {
+			log.Error("write_registered_volume_failed", err)
 		}
 	}
 
@@ -133,7 +132,7 @@ func writeDummyFiles(dir string) int {
 	}
 	for path, content := range dummyContent {
 		fullPath := filepath.Join(dir, path)
-		_ = os.MkdirAll(filepath.Dir(fullPath), 0o755) //TODO: get rid of magic number across app
+		_ = os.MkdirAll(filepath.Dir(fullPath), 0o755) // TODO: get rid of magic number across app
 		_ = os.WriteFile(fullPath, []byte(content), 0o644)
 	}
 	return len(dummyContent)

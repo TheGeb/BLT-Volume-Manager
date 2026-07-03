@@ -15,12 +15,15 @@ type Config struct {
 	S3Bucket         string
 	S3Endpoint       string
 	S3Region         string
+	// S3ForcePathStyle controls whether to use path-style S3 URLs (s3://bucket/key)
+	// instead of virtual-hosted-style (bucket.s3.amazonaws.com/key).
+	// Most S3-compatible stores require path-style URLs.
 	S3ForcePathStyle bool
 	EtcdEndpoints    []string
 	OwnerMaxMins     int
 }
 
-func FromEnv(dataDir string) (Config, error) { //FIXME: shouldn't this consider dotenv? And finalize env vars
+func FromEnv(dataDir string) (Config, error) { // FIXME: shouldn't this consider dotenv? And finalize env vars
 	abs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return Config{}, err
@@ -43,7 +46,7 @@ func FromEnv(dataDir string) (Config, error) { //FIXME: shouldn't this consider 
 		S3Bucket:         deriveOwnerBucket(),
 		S3Endpoint:       deriveS3Endpoint(),
 		S3Region:         os.Getenv("S3_REGION"),
-		S3ForcePathStyle: strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "1") || strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "true"),
+		S3ForcePathStyle: os.Getenv("S3_FORCE_PATH_STYLE") == "" || !strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "0") && !strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "false"),
 		EtcdEndpoints:    etcdEndpoints,
 		OwnerMaxMins:     ownerMaxMins,
 	}, nil

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/owner"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/repo"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/snapshot"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/volume"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/owner"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/repo"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/volume"
 )
 
 func Register(s *server.Server, mux *http.ServeMux) error {
@@ -76,9 +76,9 @@ func Register(s *server.Server, mux *http.ServeMux) error {
 	})
 
 	inner.HandleFunc("/api/dev-mode", func(w http.ResponseWriter, r *http.Request) {
-		DevMode(s, w, r)
+		TestMode(s, w, r)
 	})
-	if os.Getenv("BLT_TEST_MODE") != "" {
+	if os.Getenv("BLT_DEV_MODE") != "" {
 		inner.HandleFunc("/api/dummy-volume", func(w http.ResponseWriter, r *http.Request) {
 			CreateDummyVolume(s, w, r)
 		})

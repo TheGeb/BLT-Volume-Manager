@@ -20,11 +20,11 @@ const (
 const levelTrace = slog.LevelDebug - 4
 
 var levelNames = map[string]slog.Level{
-	"error":   slog.LevelError,
-	"warn":    slog.LevelWarn,
-	"info":    slog.LevelInfo,
-	"debug":   slog.LevelDebug,
-	"trace":   levelTrace,
+	"error": slog.LevelError,
+	"warn":  slog.LevelWarn,
+	"info":  slog.LevelInfo,
+	"debug": slog.LevelDebug,
+	"trace": levelTrace,
 }
 
 var levelVar = new(slog.LevelVar)

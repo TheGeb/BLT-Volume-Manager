@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
@@ -292,7 +292,7 @@ func (d *Driver) collectVolumeNames(base, rel string, names *[]string) {
 		}
 		child := rel + e.Name()
 		childPath := filepath.Join(base, child)
-		if _, err := os.Stat(filepath.Join(childPath, VolumeConfigFile)); err == nil {
+		if _, err := os.Stat(filepath.Join(childPath, "volume.json")); err == nil {
 			*names = append(*names, child)
 		} else {
 			d.collectVolumeNames(base, child+"/", names)
@@ -305,11 +305,11 @@ func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(volPath, VolumeConfigFile), data, 0o644)
+	return os.WriteFile(filepath.Join(volPath, "volume.json"), data, 0o644)
 }
 
 func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {
-	data, err := os.ReadFile(filepath.Join(volPath, VolumeConfigFile))
+	data, err := os.ReadFile(filepath.Join(volPath, "volume.json"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

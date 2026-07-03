@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 )
 
 type btrfsProvider struct{}

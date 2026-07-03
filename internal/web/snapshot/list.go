@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 type VersionRange struct {
@@ -25,7 +25,7 @@ type SnapshotFilter struct {
 
 func ParseVersionParam(s string) (major, minor int, ok bool) {
 	parts := strings.SplitN(s, ".", 2)
-	if len(parts) != 2 { //TODO: Should major version alone be supported?
+	if len(parts) != 2 { // TODO: Should major version alone be supported?
 		return 0, 0, false
 	}
 	maj, err1 := strconv.Atoi(parts[0])
@@ -132,14 +132,14 @@ func ParseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 		}
 	}
 
-	if tf := r.URL.Query().Get("timeFrom"); tf != "" { //TODO: consider rename to distinguish from timeOfDay params
+	if tf := r.URL.Query().Get("timestampFrom"); tf != "" {
 		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
 			t := time.UnixMilli(n)
 			ensureFilter()
 			filter.TimeFrom = &t
 		}
 	}
-	if tf := r.URL.Query().Get("timeTo"); tf != "" {
+	if tf := r.URL.Query().Get("timestampTo"); tf != "" {
 		if n, err := strconv.ParseInt(tf, 10, 64); err == nil {
 			t := time.UnixMilli(n)
 			ensureFilter()
@@ -252,28 +252,4 @@ func ListSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, resp)
 }
 
-//FIXME: hosts might deserve its own file
-func ListSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if !server.RequireMethod(w, r, http.MethodGet) {
-		return
-	}
-	volName, ok := server.RequireVolumeParam(w, r)
-	if !ok {
-		return
-	}
 
-	rm := s.VolumeManager(volName)
-	latest := 1
-	if l := r.URL.Query().Get("latest"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 {
-			latest = n
-		}
-	}
-
-	hosts, err := rm.SnapshotHosts(latest)
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	server.RespondJSON(w, hosts)
-}

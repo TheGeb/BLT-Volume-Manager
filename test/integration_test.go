@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/driver"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata/s3"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/s3"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 func TestResticBackupRestoreWithGarage(t *testing.T) {
@@ -96,7 +96,7 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 		t.Fatalf("expected restore point %s, got %s", snaps[0].ShortID, rp2)
 	}
 
-	if err := rm.ForgetSnapshot(snaps[0].ShortID); err != nil {
+	if err := rm.ForgetSnapshots(snaps[0].ShortID); err != nil {
 		t.Fatalf("forget: %v", err)
 	}
 	snaps, err = rm.ListSnapshots()

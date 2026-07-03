@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func TestOwnerRouter_GetNoBackend(t *testing.T) {
@@ -60,30 +60,6 @@ func TestOwnerRouter_PostInvalidJSON(t *testing.T) {
 	}
 	if resp["error"] == "" {
 		t.Error("expected error message")
-	}
-}
-
-func TestListVolumeOwners_NoBackend(t *testing.T) {
-	s := &server.Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/owners", nil)
-	rec := httptest.NewRecorder()
-	ListVolumeOwners(s, rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	var resp struct {
-		Owners map[string]any `json:"owners"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-	if resp.Owners == nil {
-		t.Error("expected non-nil owners map")
-	}
-	if len(resp.Owners) != 0 {
-		t.Errorf("expected empty owners, got %d", len(resp.Owners))
 	}
 }
 

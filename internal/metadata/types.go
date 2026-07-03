@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+//TODO: Move to metadata.go
+
 type ObjectStore interface {
 	PutObject(key string, data []byte) error
 	ReadObject(key string) ([]byte, error)
@@ -41,8 +43,6 @@ type OwnerLockError struct {
 	Msg  string
 }
 
-var ErrOldOwnerKeyFormat = errors.New("old owner key format, GET needed") //FIXME: Get rid of this error type, no need to worry about old format
-
 type OwnerClient interface {
 	Lock(ctx context.Context, name string) (OwnerLock, error)
 }
@@ -62,7 +62,7 @@ type RestorePoint struct {
 	FallbackHash string `json:"fallbackHash"`
 }
 
-type RestorePointStore interface { //FIXME: Shouldn't this just use objectStore?
+type RestorePointStore interface { // FIXME: Shouldn't this just use objectStore?
 	WriteRestorePoint(vol string, rp RestorePoint) error
 	ReadRestorePoint(vol string) (*RestorePoint, error)
 	DeleteRestorePoint(vol string) error

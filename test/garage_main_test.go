@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("AWS_SECRET_ACCESS_KEY", sharedSecretKey)
 	os.Setenv("RESTIC_PASSWORD", "test-password")
 	os.Setenv("S3_FORCE_PATH_STYLE", "true")
-	os.Setenv("BLT_TEST_MODE", "1")
+	os.Setenv("BLT_DEV_MODE", "1")
 
 	code := m.Run()
 	stopSharedGarage()

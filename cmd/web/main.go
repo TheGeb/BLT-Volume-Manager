@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func main() {
@@ -47,8 +47,10 @@ func run() int {
 		log.Error("config_validation_failed", err)
 		return 1
 	}
-	if conf.MetadataBackend != "" || conf.S3Bucket != "" {
-		log.Info("metadata_backend_configured")
+
+	if _, err := cfg.OpenMetadataBackend(conf); err != nil {
+		log.Error("metadata_backend_config_error", err)
+		return 1
 	}
 
 	mux := http.NewServeMux()

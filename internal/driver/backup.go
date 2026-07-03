@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 const (

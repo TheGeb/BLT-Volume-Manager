@@ -4,14 +4,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
+	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 )
 
 const (
-	VolumesDir       = "volumes"
-	OwnersDir        = "owners"
-	SnapshotsDir     = "snapshots"
-	VolumeConfigFile = "volume.json"
+	VolumesDir   = "volumes"
+	SnapshotsDir = "snapshots"
 )
 
 func VolumePath(root, name string) string {

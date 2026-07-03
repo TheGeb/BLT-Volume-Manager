@@ -1,4 +1,4 @@
-module github.com/TheGeb/docker-s3-volume-plugin
+module github.com/TheGeb/BLT-Volume-Manager
 
 go 1.26.3
 

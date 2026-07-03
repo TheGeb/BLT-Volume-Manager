@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
 var (

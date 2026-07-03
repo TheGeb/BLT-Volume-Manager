@@ -5,10 +5,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
+)
+
+const (
+	snapshotOpTag     = "tag"
+	snapshotOpRestore = "restore"
+	snapshotOpDelete  = "delete"
 )
 
 func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
@@ -24,7 +28,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(trimmed, "/")
-	if len(parts) != 2 || (parts[1] != "tag" && parts[1] != "restore" && parts[1] != "delete") { //FIXME: extract these to constants
+	if len(parts) != 2 || (parts[1] != snapshotOpTag && parts[1] != snapshotOpRestore && parts[1] != snapshotOpDelete) {
 		http.NotFound(w, r)
 		return
 	}
@@ -35,65 +39,14 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.VolumeManager(volName)
-	store, _ := s.MetadataStore()
 
-	if parts[1] == "delete" {
+	switch parts[1] {
+	case snapshotOpDelete:
 		handleDeleteSnapshot(s, w, r, rm, snapshotID)
-		return
-	}
-
-	if parts[1] == "restore" {
+	case snapshotOpRestore:
 		handleRestoreSnapshot(s, w, r, rm, snapshotID)
-		return
-	}
-
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		http.Error(w, "missing tag", http.StatusBadRequest)
-		return
-	}
-
-	switch r.Method { //FIXME: organization is a bit awkward, maybe split by path first then method?
-	case http.MethodPost:
-		if tag == "restore-point" {
-			if err := metadata.SetRestorePoint(store, volName, snapshotID); err != nil {
-				server.RespondError(w, err, http.StatusInternalServerError)
-				return
-			}
-		} else {
-			if err := rm.TagSnapshot(snapshotID, tag); err != nil {
-				server.RespondError(w, err, http.StatusInternalServerError)
-				return
-			}
-		}
-		resp, err := SnapshotListResponse(s, volName, nil, nil, 0, 0)
-		if err != nil {
-			server.RespondError(w, err, http.StatusInternalServerError)
-			return
-		}
-		resp["status"] = "tag added"
-		server.RespondJSON(w, resp)
-	case http.MethodDelete:
-		if tag == "restore-point" {
-			if err := metadata.DeleteRestorePoint(store, volName); err != nil {
-				server.RespondError(w, err, http.StatusInternalServerError)
-				return
-			}
-		} else {
-			if err := rm.UntagSnapshot(snapshotID, tag); err != nil {
-				server.RespondError(w, err, http.StatusInternalServerError)
-				return
-			}
-		}
-		resp, err := SnapshotListResponse(s, volName, nil, nil, 0, 0)
-		if err != nil {
-			server.RespondError(w, err, http.StatusInternalServerError)
-			return
-		}
-		resp["status"] = "tag removed"
-		server.RespondJSON(w, resp)
-	default:
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+	case snapshotOpTag:
+		handleTagSnapshot(s, w, r, rm, snapshotID)
 	}
 }
 
@@ -124,7 +77,7 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 
 	resolve := func(id, ver, fallback string) string {
 		if ver != "" {
-			if resolved, err := FindSnapshotByVersion(rm, ver); err == nil {
+			if resolved, err := FindSnapshotByVersion(rm, ver, volName); err == nil {
 				return resolved
 			}
 		}
@@ -149,108 +102,45 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 	}
 }
 
-func handleListSnapshotFiles(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
-	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
-		return
-	}
-	path := r.URL.Query().Get("path")
-	nodes, err := rm.ListSnapshotFiles(rawID, path)
-	if err != nil && fallbackHash != "" {
-		if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-			nodes, err = rm.ListSnapshotFiles(snap.ID, path)
-		}
-	}
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	server.RespondJSON(w, nodes)
-}
-
-func handleDumpSnapshotFile(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
-	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
-		return
-	}
-	path := r.URL.Query().Get("path")
-	if path == "" {
-		http.Error(w, "missing path", http.StatusBadRequest)
-		return
-	}
-	data, err := rm.DumpFile(rawID, path)
-	if err != nil && fallbackHash != "" {
-		if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-			data, err = rm.DumpFile(snap.ID, path)
-		}
-	}
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	//nolint:gosec // Intentional dump of restic file contents as text/plain with X-Content-Type-Options: nosniff
-	_, _ = w.Write(data)
-}
-
-func handleDiffSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, secondID, fallbackHash, diffFallback string) {
-	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
-		return
-	}
-	result, err := rm.DiffSnapshots(rawID, secondID)
-	if err != nil {
-		resolvedFirst, resolvedSecond := rawID, secondID
-		if fallbackHash != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-				resolvedFirst = snap.ID
-			}
-		}
-		if diffFallback != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(diffFallback); lookupErr == nil {
-				resolvedSecond = snap.ID
-			}
-		}
-		result, err = rm.DiffSnapshots(resolvedFirst, resolvedSecond)
-	}
-	if err != nil {
-		server.RespondError(w, err, http.StatusNotFound)
-		return
-	}
-	server.RespondJSON(w, result)
-}
-
 func handleDeleteSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
 	if !server.RequireMethod(w, r, http.MethodDelete) {
 		return
 	}
-	if err := rm.ForgetSnapshot(snapshotID); err != nil {
+	if err := rm.ForgetSnapshots(snapshotID); err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
 	server.RespondJSON(w, map[string]string{"status": "snapshot deleted"})
 }
 
-func handleRestoreSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
-	target := r.URL.Query().Get("path")
-	if target == "" {
-		http.Error(w, "missing path query parameter", http.StatusBadRequest)
+	var req struct {
+		Volume string   `json:"volume"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	s.AddWork()
-	go func() {
-		defer s.DoneWork()
-		if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
-			log.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
+	if req.Volume == "" || len(req.IDs) == 0 {
+		http.Error(w, "missing volume or ids", http.StatusBadRequest)
+		return
+	}
+
+	rm := s.VolumeManager(req.Volume)
+	resp := batchDeleteResponse{Errors: []batchDeleteError{}}
+	for _, id := range req.IDs {
+		if err := rm.ForgetSnapshots(id); err != nil {
+			resp.Failed++
+			resp.Errors = append(resp.Errors, batchDeleteError{ID: id, Error: err.Error()})
 		} else {
-			log.Info("restore_ok")
+			resp.Deleted++
 		}
-	}()
-	server.RespondJSON(w, map[string]string{"status": "restore started – see server logs for results"})
+	}
+	server.RespondJSON(w, resp)
 }
 
 func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
@@ -281,34 +171,4 @@ func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		result[id] = stats.TotalSize
 	}
 	server.RespondJSON(w, result)
-}
-
-func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if !server.RequireMethod(w, r, http.MethodPost) {
-		return
-	}
-	var req struct {
-		Volume string   `json:"volume"`
-		IDs    []string `json:"ids"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-	if req.Volume == "" || len(req.IDs) == 0 {
-		http.Error(w, "missing volume or ids", http.StatusBadRequest)
-		return
-	}
-
-	rm := s.VolumeManager(req.Volume)
-	resp := batchDeleteResponse{Errors: []batchDeleteError{}}
-	for _, id := range req.IDs {
-		if err := rm.ForgetSnapshot(id); err != nil {
-			resp.Failed++
-			resp.Errors = append(resp.Errors, batchDeleteError{ID: id, Error: err.Error()})
-		} else {
-			resp.Deleted++
-		}
-	}
-	server.RespondJSON(w, resp)
 }

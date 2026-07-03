@@ -4,14 +4,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	appcfg "github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	snapshot "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	appcfg "github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 
-	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot/btrfs"
-	_ "github.com/TheGeb/docker-s3-volume-plugin/internal/driver/fs_snapshot/zfs"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/btrfs"
+	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/zfs"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 type volumeConfig struct {

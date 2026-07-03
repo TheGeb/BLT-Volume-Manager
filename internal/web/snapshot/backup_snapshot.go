@@ -3,7 +3,8 @@ package snapshot
 import (
 	"strings"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 type WithVolume struct {
@@ -11,7 +12,7 @@ type WithVolume struct {
 	Volume string `json:"volume"`
 }
 
-func FindSnapshotByVersion(rm *restic.Manager, version string) (string, error) {
+func FindSnapshotByVersion(rm *restic.Manager, version, volumeName string) (string, error) {
 	tag := version
 	if !strings.HasPrefix(version, "v") {
 		tag = "v" + version
@@ -24,7 +25,10 @@ func FindSnapshotByVersion(rm *restic.Manager, version string) (string, error) {
 		return "", &snapshotNotFoundError{version: version}
 	}
 	newest := snapshots[0]
-	for _, s := range snapshots[1:] { //TODO: warn if there are multiple matches?
+	if len(snapshots) > 1 {
+		log.Warnf("multiple_snapshots_found", "version=%s count=%d volume=%s", version, len(snapshots), volumeName)
+	}
+	for _, s := range snapshots[1:] {
 		if s.Time.After(newest.Time) {
 			newest = s
 		}

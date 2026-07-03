@@ -6,19 +6,31 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
+type mockObjectStore struct {
+	objects    []metadata.Object
+	objectsErr error
+}
+
+func (m *mockObjectStore) PutObject(string, []byte) error                      { return nil }
+func (m *mockObjectStore) ReadObject(string) ([]byte, error)                   { return nil, metadata.ErrKeyNotFound }
+func (m *mockObjectStore) DeleteObject(string) error                           { return nil }
+func (m *mockObjectStore) ListObjects(string) ([]metadata.Object, error)       { return m.objects, m.objectsErr }
+func (m *mockObjectStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
+func (m *mockObjectStore) DeleteObjectsWithPrefix(string) error                { return nil }
+
 func mockStore(objects []metadata.Object, objectsErr error) *metadata.Store {
-	return metadata.New(&metadata.MockObjectStore{Objects: objects, ObjectsErr: objectsErr})
+	return metadata.New(&mockObjectStore{objects: objects, objectsErr: objectsErr})
 }
 
 func volumeObjects(names ...string) []metadata.Object {
 	var objs []metadata.Object
 	for _, n := range names {
-		key := metadata.VolumesPrefix + n + ".json"
+		key := metadata.RegisteredVolumesPrefix + n + ".json"
 		objs = append(objs, metadata.Object{Key: &key})
 	}
 	return objs

@@ -6,8 +6,7 @@ import (
 	"testing"
 )
 
-//FIXME: This doesn't seem to test much
-
+// FIXME: This doesn't seem to test much
 func TestLoggingResponseWriter(t *testing.T) {
 	w := httptest.NewRecorder()
 	lw := &loggingResponseWriter{ResponseWriter: w, status: 200}

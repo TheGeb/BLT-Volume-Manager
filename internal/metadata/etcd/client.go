@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 )
 
-//TODO: Integrate/wrap official etcd client, go.etcd.io/etcd/client/v3
+// TODO: Integrate/wrap official etcd client, go.etcd.io/etcd/client/v3
 
 // Config configures an etcd backend client.
 type Config struct {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
 const gzipMinSize = 1024
@@ -48,7 +48,7 @@ func Gzip(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/") { //TODO: should gzip be limited to API?
+		if !strings.HasPrefix(r.URL.Path, "/api/") { // TODO: should gzip be limited to API?
 			next.ServeHTTP(w, r)
 			return
 		}

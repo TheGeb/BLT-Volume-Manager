@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/cfg"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 type StatsCache struct {
@@ -46,17 +46,14 @@ func (s *Server) HasBackend() bool {
 }
 
 func (s *Server) MetadataStore() (*metadata.Store, error) {
-	if !s.HasBackend() {
-		return nil, fmt.Errorf("metadata backend not configured")
-	}
 	return s.initMetadataStore()
 }
 
-func (s *Server) StoreForVolume() (*metadata.Store, error) { //FIXME: This naming is awkward
+func (s *Server) StoreForVolume() (*metadata.Store, error) { // FIXME: This naming is awkward
 	return s.MetadataStore()
 }
 
-func (s *Server) StoreForResticData() (metadata.ObjectStore, error) { //FIXME: name is a bit too verbose, and awkwardly returns metadata store
+func (s *Server) StoreForResticData() (metadata.ObjectStore, error) { // FIXME: name is a bit too verbose, and awkwardly returns metadata store
 	if s.Config.S3Bucket == "" {
 		return nil, fmt.Errorf("S3 bucket not configured")
 	}
@@ -77,9 +74,11 @@ func (s *Server) initMetadataStore() (*metadata.Store, error) {
 	return s.metadataStore, nil
 }
 
-// FIXME: update name to specify that this is for backup data, not metadata. Also avoid S3 naming and return backend type?
-func (s *Server) IsS3Backend() bool {
-	return strings.HasPrefix(s.ResticBase, "s3:")
+func (s *Server) BackupStoreType() string {
+	if strings.HasPrefix(s.ResticBase, "s3:") {
+		return "s3"
+	}
+	return "local"
 }
 
 func (s *Server) VolumeManager(volName string) *restic.Manager {
@@ -103,7 +102,7 @@ func (s *Server) VolumeNames() []string {
 	if err != nil || ms == nil {
 		return nil
 	}
-	if names, err := ms.ListVolumeMarkers(metadata.VolumesPrefix); err == nil {
+	if names, err := ms.ListRegisteredVolumes(); err == nil {
 		return names
 	}
 	return nil
@@ -143,5 +142,5 @@ func (s *Server) AddWork()  { s.wg.Add(1) }
 func (s *Server) DoneWork() { s.wg.Done() }
 
 func ValidVolumeName(name string) bool {
-	return name != "" && !strings.Contains(name, "..") && !strings.Contains(name, "\\")
+	return name != "" && !strings.ContainsAny(name, "/\\") && !strings.Contains(name, "..")
 }

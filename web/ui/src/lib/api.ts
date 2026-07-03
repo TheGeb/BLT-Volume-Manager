@@ -41,10 +41,10 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 			p.set('limit', String(params.limit));
 		}
 		if (params.timeFrom !== undefined) {
-			p.set('timeFrom', String(params.timeFrom));
+			p.set('timestampFrom', String(params.timeFrom));
 		}
 		if (params.timeTo !== undefined) {
-			p.set('timeTo', String(params.timeTo));
+			p.set('timestampTo', String(params.timeTo));
 		}
 		if (params.timeOfDayFrom !== undefined) {
 			p.set('timeOfDayFrom', String(params.timeOfDayFrom));

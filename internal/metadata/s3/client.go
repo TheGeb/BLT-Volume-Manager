@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -75,7 +75,7 @@ func NewClient(cfg Config) (metadata.ObjectStore, error) {
 			o.UsePathStyle = true
 		})
 	}
-	forcePathStyle := cfg.ForcePathStyle 
+	forcePathStyle := cfg.ForcePathStyle
 	if forcePathStyle != nil && *forcePathStyle {
 		clientOpts = append(clientOpts, func(o *s3sdk.Options) {
 			o.UsePathStyle = true

@@ -3,8 +3,8 @@ package repo
 import (
 	"net/http"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/metadata"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func InitRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {

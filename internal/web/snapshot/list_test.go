@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
 func TestParseVersionParam(t *testing.T) {
@@ -189,7 +189,7 @@ func TestParseSnapshotListOpts(t *testing.T) {
 		{"hosts", "/api/snapshots?volume=test&host=h1&host=h2", []string{"h1", "h2"}, nil, 0, 0, false},
 		{"tags", "/api/snapshots?volume=test&tag=v1.0&tag=backup:hot", nil, []string{"v1.0", "backup:hot"}, 0, 0, false},
 		{"offset limit", "/api/snapshots?volume=test&offset=10&limit=5", nil, nil, 10, 5, false},
-		{"timeFrom", "/api/snapshots?volume=test&timeFrom=1700000000000", nil, nil, 0, 0, true},
+		{"timestampFrom", "/api/snapshots?volume=test&timestampFrom=1700000000000", nil, nil, 0, 0, true},
 		{"timeOfDay", "/api/snapshots?volume=test&timeOfDayFrom=3600", nil, nil, 0, 0, true},
 		{"versionFrom", "/api/snapshots?volume=test&versionFrom=1.0", nil, nil, 0, 0, true},
 		{"query", "/api/snapshots?volume=test&query=search", nil, nil, 0, 0, true},

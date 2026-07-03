@@ -3,8 +3,8 @@ package repo
 import (
 	"net/http"
 
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/app/log"
-	"github.com/TheGeb/docker-s3-volume-plugin/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 func CheckRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
