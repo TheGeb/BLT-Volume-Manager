@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
@@ -52,7 +53,7 @@ func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request
 	}
 	defer func() { _ = os.RemoveAll(volPath) }()
 
-	if err := os.WriteFile(filepath.Join(volPath, VolumeConfigFile), []byte(`{"fs_type":""}`), 0o644); err != nil { // TODO: get rid of magic number across app
+	if err := os.WriteFile(filepath.Join(volPath, VolumeConfigFile), []byte(`{"fs_type":""}`), app.DefaultFilePerm); err != nil {
 		server.RespondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -139,8 +140,8 @@ func writeDummyFiles(dir string) int {
 	}
 	for path, content := range dummyContent {
 		fullPath := filepath.Join(dir, path)
-		_ = os.MkdirAll(filepath.Dir(fullPath), 0o755) // TODO: get rid of magic number across app
-		_ = os.WriteFile(fullPath, []byte(content), 0o644)
+		_ = os.MkdirAll(filepath.Dir(fullPath), app.DefaultDirPerm)
+		_ = os.WriteFile(fullPath, []byte(content), app.DefaultFilePerm)
 	}
 	return len(dummyContent)
 }

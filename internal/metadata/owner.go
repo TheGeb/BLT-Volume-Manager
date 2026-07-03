@@ -3,6 +3,7 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,7 +63,7 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
-		return 1<<62 - 1
+		return math.MaxInt64
 	}
 	return o.ExpiryTime - time.Now().Unix()
 }

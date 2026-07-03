@@ -120,6 +120,34 @@ func TestListVolumesMethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestValidVolumeName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"empty", "", false},
+		{"simple", "my-volume", true},
+		{"with group", "group/my-volume", true},
+		{"nested group", "a/b/c", true},
+		{"backslash", "bad\\name", false},
+		{"dotdot", "../etc", false},
+		{"dotdot middle", "a/../b", false},
+		{"just dotdot", "..", false},
+		{"single char", "a", true},
+		{"hyphens", "my-volume-name", true},
+		{"underscores", "my_volume", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validVolumeName(tt.input)
+			if got != tt.want {
+				t.Errorf("validVolumeName(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListVolumesNoS3(t *testing.T) {
 	s := &server.Service{}
 

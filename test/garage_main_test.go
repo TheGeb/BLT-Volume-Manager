@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 )
 
 const (
@@ -50,7 +52,7 @@ func startSharedGarage() error {
 	sharedAccessKey = randomHex(20)
 	sharedSecretKey = randomHex(40)
 
-	if err := os.MkdirAll(garageSharedBuildDir, 0o755); err != nil {
+	if err := os.MkdirAll(garageSharedBuildDir, app.DefaultDirPerm); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
@@ -76,11 +78,11 @@ root_domain = ".web.garage.localhost"
 api_bind_addr = "0.0.0.0:3903"
 `, rpcSecret)
 
-	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "config.toml"), []byte(config), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "config.toml"), []byte(config), app.DefaultFilePerm); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	dockerfile := "FROM " + garageImage + "\nCOPY config.toml /etc/garage.toml\n"
-	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "Dockerfile"), []byte(dockerfile), app.DefaultFilePerm); err != nil {
 		return fmt.Errorf("write dockerfile: %w", err)
 	}
 

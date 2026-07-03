@@ -31,9 +31,9 @@ func ListVolumes(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, VolumeListResponse{Volumes: volumes})
 }
 
-// Allows groups with "/"
+// Note: Allows groups with "/"
 func validVolumeName(name string) bool {
-	return name != "" && !strings.ContainsAny(name, "/\\") && !strings.Contains(name, "..")
+	return name != "" && !strings.ContainsAny(name, "\\") && !strings.Contains(name, "..")
 }
 
 func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {

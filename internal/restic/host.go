@@ -15,8 +15,7 @@ func (m *Manager) SnapshotHosts(latest int) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	args := []string{"snapshots", "--no-lock", "--json", "--group-by", "host", "--latest", "1"}
-	cmd, err := m.resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, m.hostSnapshotsCommand()...)
 	if err != nil {
 		return nil, err
 	}

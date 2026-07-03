@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
@@ -25,10 +26,10 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 
 	backupDir := t.TempDir()
 	srcDir := filepath.Join(backupDir, "data")
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+	if err := os.MkdirAll(srcDir, app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(srcDir, "test.txt"), []byte("hello garage"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(srcDir, "test.txt"), []byte("hello garage"), app.DefaultFilePerm); err != nil {
 		t.Fatal(err)
 	}
 	if err := rm.Backup(srcDir, restic.BackupTagCold); err != nil {

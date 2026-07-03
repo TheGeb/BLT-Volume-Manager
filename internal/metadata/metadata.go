@@ -17,7 +17,6 @@ const (
 	BackendEtcd = "etcd"
 )
 
-// TODO: Are these only used for S3? perhaps move them to that package
 const (
 	OwnerPrefix             = "blt-volume-manager/owners/"
 	RegisteredVolumesPrefix = "blt-volume-manager/registered-volumes/"
@@ -94,12 +93,12 @@ func (c *ownerLocker) Lock(ctx context.Context, name string) (OwnerLock, error) 
 	}
 	expiry := time.Now().Add(time.Minute * time.Duration(c.maxHoldMins+2)).Unix()
 
-	myKey, err := AcquireOwnerLock(c.stores.be, folder, myName, expiry)
+	myKey, err := AcquireOwnerLock(c.stores.backend, folder, myName, expiry)
 	if err != nil {
 		return nil, &OwnerLockError{Code: OwnerLockHeldByAnother, Msg: err.Error()}
 	}
 
-	return &ownerLock{be: c.stores.be, myKey: myKey}, nil
+	return &ownerLock{be: c.stores.backend, myKey: myKey}, nil
 }
 
 func (o *ownerLock) Release() error {

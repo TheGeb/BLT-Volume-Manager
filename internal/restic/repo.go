@@ -36,7 +36,7 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", "--json", "--mode", "raw-data")
+	cmd, err := m.resticCommand(ctx, m.statsCommand("raw-data")...)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "stats", "--no-lock", snapshotID, "--json")
+	cmd, err := m.resticCommand(ctx, m.statsSnapshotCommand(snapshotID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (m *Manager) repositoryExists() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "snapshots", "--no-lock", "--json")
+	cmd, err := m.resticCommand(ctx, m.repoExistsCommand()...)
 	if err != nil {
 		return false, err
 	}
@@ -93,17 +93,13 @@ func (m *Manager) repositoryExists() (bool, error) {
 }
 
 func (m *Manager) initRepository() error {
-	return m.runSimple(context.Background(), "init")
+	return m.runSimple(context.Background(), m.initCommand()...)
 }
 
 func (m *Manager) Check(noLock bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
 	defer cancel()
-	args := []string{"check"}
-	if noLock {
-		args = append(args, "--no-lock")
-	}
-	return m.runSimple(ctx, args...)
+	return m.runSimple(ctx, m.checkCommand(noLock)...)
 }
 
 func (m *Manager) Repair() error {
@@ -112,21 +108,14 @@ func (m *Manager) Repair() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
-	return m.runSimple(ctx, "repair", "index")
+	return m.runSimple(ctx, m.repairCommand()...)
 }
 
 func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
 
-	args := []string{fmt.Sprintf("--from-repo=%s", m.repo), "copy"}
-	args = append(args, snapshotIDs...)
-
-	if v := log.Verbosity(); v > 0 {
-		args = append(args, fmt.Sprintf("--verbose=%d", v))
-	}
-
-	cmd, err := m.resticCommandForRepo(ctx, destRepo, args...)
+	cmd, err := m.resticCommandForRepo(ctx, destRepo, m.copyCommand(destRepo, snapshotIDs...)...)
 	if err != nil {
 		return err
 	}
@@ -136,5 +125,5 @@ func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 func (m *Manager) Unlock() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return m.runSimple(ctx, "unlock")
+	return m.runSimple(ctx, m.unlockCommand()...)
 }

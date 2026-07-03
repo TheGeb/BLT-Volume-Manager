@@ -6,10 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 )
-
-// TODO: Consider splitting further — singular actions (tag, restore, forget) could each have their own file
 
 type ListSnapshotsOpts struct {
 	Hosts  []string
@@ -25,20 +22,7 @@ func (m *Manager) ListSnapshotsWithOpts(opts *ListSnapshotsOpts) ([]Snapshot, er
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	args := []string{"snapshots", "--no-lock", "--json"}
-	if opts != nil {
-		for _, h := range opts.Hosts {
-			args = append(args, "--host", h)
-		}
-		if opts.Latest > 0 {
-			args = append(args, "--latest", strconv.Itoa(opts.Latest))
-		}
-		for _, t := range opts.Tags {
-			args = append(args, "--tag", t)
-		}
-	}
-
-	cmd, err := m.resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, m.snapshotsCommand(opts)...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,33 +49,28 @@ func (m *Manager) ForgetSnapshots(snapshotIDs ...string) error {
 	if len(snapshotIDs) == 0 {
 		return errors.New("at least one snapshot ID is required")
 	}
-	args := append([]string{"forget"}, snapshotIDs...)
-	return m.runSimple(context.Background(), args...)
+	return m.runSimple(context.Background(), m.forgetCommand(snapshotIDs...)...)
 }
 
 func (m *Manager) TagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	return m.runSimple(context.Background(), "tag", "--add", tag, snapshotID)
+	return m.runSimple(context.Background(), m.tagAddCommand(snapshotID, tag)...)
 }
 
 func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 	if snapshotID == "" || tag == "" {
 		return errors.New("snapshot ID and tag are required")
 	}
-	return m.runSimple(context.Background(), "tag", "--remove", tag, snapshotID)
+	return m.runSimple(context.Background(), m.tagRemoveCommand(snapshotID, tag)...)
 }
 
-func (m *Manager) RestoreIfExists(path, preferred string) error {
+func (m *Manager) RestoreIfExists(path, preferred string) error { //FIXME: currently unused?
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	args := []string{"snapshots", "--no-lock", "--last", "1", "--json"}
-	if preferred == BackupTagHot || preferred == BackupTagCold {
-		args = []string{"snapshots", "--no-lock", "--tag", preferred, "--last", "1", "--json"}
-	}
-	cmd, err := m.resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, m.snapshotsLastCommand(preferred)...)
 	if err != nil {
 		return err
 	}
@@ -130,5 +109,5 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
 	defer cancel()
-	return m.runSimple(ctx, "restore", snapshotID, "--target", target)
+	return m.runSimple(ctx, m.restoreCommand(snapshotID, target)...)
 }

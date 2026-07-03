@@ -1,6 +1,8 @@
 package metadata
 
-import "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+import (
+	backendpkg "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+)
 
 type Stores struct {
 	Volumes       *VolumeStore
@@ -8,15 +10,15 @@ type Stores struct {
 	Versions      *VersionStore
 	Owners        *OwnerStore
 
-	be backend.KeyValueStore
+	backend backendpkg.KeyValueStore
 }
 
-func NewStores(be backend.KeyValueStore) *Stores {
+func NewStores(backend backendpkg.KeyValueStore) *Stores {
 	return &Stores{
-		Volumes:       NewVolumeStore(be),
-		RestorePoints: NewRestorePointStore(be),
-		Versions:      NewVersionStore(be),
-		Owners:        NewOwnerStore(be),
-		be:            be,
+		Volumes:       NewVolumeStore(backend),
+		RestorePoints: NewRestorePointStore(backend),
+		Versions:      NewVersionStore(backend),
+		Owners:        NewOwnerStore(backend),
+		backend:       backend,
 	}
 }

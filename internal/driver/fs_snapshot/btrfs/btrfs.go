@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 )
@@ -26,7 +27,7 @@ func (b *btrfsProvider) Init(path string, _ snapshot.FsOptions) error {
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("remove path: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), app.DefaultDirPerm); err != nil {
 		return fmt.Errorf("create parent: %w", err)
 	}
 	log.Debugf("btrfs_create_subvolume", "path=%s", path)
@@ -49,7 +50,7 @@ func (b *btrfsProvider) CreateSnapshot(volPath, accessPath, volName string, info
 	if !isSubvolume(volPath) {
 		return fmt.Errorf("%s is not a btrfs subvolume; init with btrfs first", volPath)
 	}
-	if err := os.MkdirAll(info.SnapDir, 0o755); err != nil {
+	if err := os.MkdirAll(info.SnapDir, app.DefaultDirPerm); err != nil {
 		return fmt.Errorf("create snap dir: %w", err)
 	}
 	return btrfsCreate(volPath, accessPath)

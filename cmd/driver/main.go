@@ -36,7 +36,7 @@ func run() int {
 		return 0
 	}
 
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+	if err := os.MkdirAll(dataDir, app.DefaultDirPerm); err != nil {
 		log.Errorf("create_data_dir_failed", err, "data_dir=%s error=%v", dataDir, err)
 		return 1
 	}

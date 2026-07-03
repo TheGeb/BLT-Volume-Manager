@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
 	"github.com/docker/go-plugins-helpers/volume"
 )
@@ -13,7 +14,7 @@ import (
 func TestVolumeConfigReadWrite(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
 	volPath := filepath.Join(d.root, "volumes", "test-vol")
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
@@ -43,7 +44,7 @@ func TestVolumeConfigReadNonExistent(t *testing.T) {
 func TestVolumeConfigDefaultFsType(t *testing.T) {
 	d := &Driver{root: t.TempDir()}
 	volPath := filepath.Join(d.root, "volumes", "plain-vol")
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,28 +112,28 @@ func TestCollectVolumeNames(t *testing.T) {
 	volumesDir := filepath.Join(root, "volumes")
 
 	vol1 := filepath.Join(volumesDir, "my-vol")
-	if err := os.MkdirAll(vol1, 0o755); err != nil {
+	if err := os.MkdirAll(vol1, app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(vol1, "volume.json"), []byte(`{}`), app.DefaultFilePerm); err != nil {
 		t.Fatal(err)
 	}
 
 	vol2 := filepath.Join(volumesDir, "group", "nested-vol")
-	if err := os.MkdirAll(vol2, 0o755); err != nil {
+	if err := os.MkdirAll(vol2, app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(vol2, "volume.json"), []byte(`{}`), app.DefaultFilePerm); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(volumesDir, "no-config"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(volumesDir, "no-config"), app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(volumesDir, ".hidden-vol"), app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(volumesDir, ".hidden-vol", "volume.json"), []byte(`{}`), app.DefaultFilePerm); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,10 +176,10 @@ func TestVolumeNames(t *testing.T) {
 
 	for _, name := range []string{"vol-a", "vol-b"} {
 		p := filepath.Join(root, "volumes", name)
-		if err := os.MkdirAll(p, 0o755); err != nil {
+		if err := os.MkdirAll(p, app.DefaultDirPerm); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), app.DefaultFilePerm); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -223,10 +224,10 @@ func TestList(t *testing.T) {
 
 	for _, name := range []string{"vol-a", "vol-b", "group/nested-vol"} {
 		p := filepath.Join(root, "volumes", name)
-		if err := os.MkdirAll(p, 0o755); err != nil {
+		if err := os.MkdirAll(p, app.DefaultDirPerm); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(p, "volume.json"), []byte(`{}`), app.DefaultFilePerm); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -2,10 +2,13 @@ package restic
 
 import (
 	"time"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/run"
 )
 
 type Manager struct {
-	repo string
+	repo   string
+	runner *run.Runner
 }
 
 type Snapshot struct {
@@ -31,7 +34,9 @@ const (
 	TimeoutLong   = 30 * time.Minute
 )
 
-func NewManager(repo string) *Manager { return &Manager{repo: repo} }
+func NewManager(repo string) *Manager {
+	return &Manager{repo: repo, runner: &run.Runner{Repo: repo}}
+}
 
 func WithTags(base string, extra ...string) []string {
 	return append([]string{base}, extra...)

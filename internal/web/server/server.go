@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,11 +20,6 @@ type StatsCache struct {
 type Service struct {
 	ResticBase string
 	Config     cfg.Config
-
-	volumeStore       *metadata.VolumeStore
-	restorePointStore *metadata.RestorePointStore
-	versionStore      *metadata.VersionStore
-	ownerStore        *metadata.OwnerStore
 
 	stores       *metadata.Stores
 	metadataMu   sync.Mutex
@@ -47,10 +41,6 @@ func (s *Service) SetStores(stores *metadata.Stores) {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
 	s.stores = stores
-	s.volumeStore = stores.Volumes
-	s.restorePointStore = stores.RestorePoints
-	s.versionStore = stores.Versions
-	s.ownerStore = stores.Owners
 }
 
 func (s *Service) initBackend() error {
@@ -64,10 +54,6 @@ func (s *Service) initBackend() error {
 		return err
 	}
 	s.stores = stores
-	s.volumeStore = stores.Volumes
-	s.restorePointStore = stores.RestorePoints
-	s.versionStore = stores.Versions
-	s.ownerStore = stores.Owners
 	return nil
 }
 
@@ -75,28 +61,28 @@ func (s *Service) VolumeStore() (*metadata.VolumeStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.volumeStore, nil
+	return s.stores.Volumes, nil
 }
 
 func (s *Service) RestorePointStore() (*metadata.RestorePointStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.restorePointStore, nil
+	return s.stores.RestorePoints, nil
 }
 
 func (s *Service) VersionStore() (*metadata.VersionStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.versionStore, nil
+	return s.stores.Versions, nil
 }
 
 func (s *Service) OwnerStore() (*metadata.OwnerStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.ownerStore, nil
+	return s.stores.Owners, nil
 }
 
 func (s *Service) RegisterVolume(name string) error {

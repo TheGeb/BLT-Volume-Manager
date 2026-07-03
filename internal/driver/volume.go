@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
@@ -24,7 +25,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		fsType = d.initFsType(r.Options, name, volPath)
 	}
 	if fsType == "" {
-		if err := os.MkdirAll(volPath, 0o755); err != nil {
+		if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 			return err
 		}
 	}
@@ -123,7 +124,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	name := r.Name
 	volPath := VolumePath(d.root, name)
-	if err := os.MkdirAll(volPath, 0o755); err != nil {
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		return nil, fmt.Errorf("create volume dir: %w", err)
 	}
 
@@ -317,7 +318,7 @@ func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(volPath, "volume.json"), data, 0o644)
+	return os.WriteFile(filepath.Join(volPath, "volume.json"), data, app.DefaultFilePerm)
 }
 
 func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {

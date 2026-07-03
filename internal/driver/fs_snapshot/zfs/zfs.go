@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	snapshot "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot"
 )
@@ -84,7 +85,7 @@ func zfsCreateSnapshot(fullSnap, mountPath string) error {
 		return fmt.Errorf("zfs snapshot: %w\n%s", err, string(out))
 	}
 
-	if err := os.MkdirAll(mountPath, 0o755); err != nil {
+	if err := os.MkdirAll(mountPath, app.DefaultDirPerm); err != nil {
 		_ = zfsDestroy(fullSnap)
 		return fmt.Errorf("create mount dir: %w", err)
 	}

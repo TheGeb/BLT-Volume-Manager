@@ -34,11 +34,7 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	args := []string{"ls", "--no-lock", snapshotID}
-	if path != "" && path != "/" {
-		args = append(args, path)
-	}
-	cmd, err := m.resticCommand(ctx, args...)
+	cmd, err := m.resticCommand(ctx, m.lsCommand(snapshotID, path)...)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +117,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "dump", "--no-lock", snapshotID, path)
+	cmd, err := m.resticCommand(ctx, m.dumpCommand(snapshotID, path)...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +132,7 @@ func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, "diff", "--no-lock", "--json", snapID1, snapID2)
+	cmd, err := m.resticCommand(ctx, m.diffCommand(snapID1, snapID2)...)
 	if err != nil {
 		return nil, err
 	}
