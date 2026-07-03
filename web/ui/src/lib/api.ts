@@ -79,14 +79,29 @@ export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<st
 }
 
 export async function fetchOwnerStatus(volume: string): Promise<OwnerStatus> {
-  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`);
-  return resp.json() as Promise<OwnerStatus>;
+  const controller = new AbortController();
+  const timer = setTimeout(() => { controller.abort(); }, 10000);
+  try {
+    const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, { signal: controller.signal });
+    if (!resp.ok) throw new Error(resp.statusText);
+    const result = await resp.json() as OwnerStatus;
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function fetchAllOwnerStatus(): Promise<Record<string, OwnerStatus>> {
-  const resp = await fetch('/api/volumes/owners');
-  const data = await resp.json() as { owners?: Record<string, OwnerStatus> };
-  return data.owners ?? {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => { controller.abort(); }, 10000);
+  try {
+    const resp = await fetch('/api/volumes/owners', { signal: controller.signal });
+    if (!resp.ok) throw new Error(resp.statusText);
+    const data = await resp.json() as { owners?: Record<string, OwnerStatus> };
+    return data.owners ?? {};
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function createOwnerLock(volume: string, owner?: string, durationMinutes?: number): Promise<void> {

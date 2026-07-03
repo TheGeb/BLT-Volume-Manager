@@ -1,4 +1,4 @@
-package etcd
+package backend
 
 import (
 	"net/http"
@@ -7,29 +7,29 @@ import (
 )
 
 func TestNewClient_NoEndpoints(t *testing.T) {
-	_, err := NewClient(Config{})
+	_, err := NewEtcdClient(EtcdConfig{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestNewClient_DialTimeout(t *testing.T) {
-	store, err := NewClient(Config{Endpoints: []string{"http://localhost:2379"}, DialTimeout: 10 * time.Second})
+	store, err := NewEtcdClient(EtcdConfig{Endpoints: []string{"http://localhost:2379"}, DialTimeout: 10 * time.Second})
 	if err != nil {
 		t.Fatalf("NewClient() error: %v", err)
 	}
-	cl := store.(*Client)
+	cl := store.(*etcdClient)
 	if cl.hc.Timeout != 10*time.Second {
 		t.Errorf("expected timeout 10s, got %v", cl.hc.Timeout)
 	}
 }
 
 func TestNewClient_DefaultDialTimeout(t *testing.T) {
-	store, err := NewClient(Config{Endpoints: []string{"http://localhost:2379"}})
+	store, err := NewEtcdClient(EtcdConfig{Endpoints: []string{"http://localhost:2379"}})
 	if err != nil {
 		t.Fatalf("NewClient() error: %v", err)
 	}
-	cl := store.(*Client)
+	cl := store.(*etcdClient)
 	if cl.hc.Timeout != 5*time.Second {
 		t.Errorf("expected default timeout 5s, got %v", cl.hc.Timeout)
 	}
@@ -70,7 +70,7 @@ func TestPrefixRangeEnd(t *testing.T) {
 }
 
 func TestURLFor(t *testing.T) {
-	c := &Client{
+	c := &etcdClient{
 		endpoints: []string{"http://etcd:2379"},
 		hc:        &http.Client{},
 	}
@@ -82,7 +82,7 @@ func TestURLFor(t *testing.T) {
 }
 
 func TestURLFor_WithTrailingSlash(t *testing.T) {
-	c := &Client{
+	c := &etcdClient{
 		endpoints: []string{"http://etcd:2379/"},
 		hc:        &http.Client{},
 	}
@@ -94,7 +94,7 @@ func TestURLFor_WithTrailingSlash(t *testing.T) {
 }
 
 func TestEndpoint(t *testing.T) {
-	c := &Client{
+	c := &etcdClient{
 		endpoints: []string{"http://localhost:2379", "http://backup:2379"},
 	}
 	if got := c.endpoint(); got != "http://localhost:2379" {

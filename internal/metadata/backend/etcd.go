@@ -1,4 +1,4 @@
-package etcd
+package backend
 
 import (
 	"bytes"
@@ -11,27 +11,25 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 )
 
 // TODO: Integrate/wrap official etcd client, go.etcd.io/etcd/client/v3
 
-// Config configures an etcd backend client.
-type Config struct {
+// EtcdConfig configures an etcd backend client.
+type EtcdConfig struct {
 	Endpoints   []string
 	DialTimeout time.Duration
 }
 
-// Client implements metadata.ObjectStore backed by etcd's v3 gRPC-gateway API.
-type Client struct {
+// etcdClient implements KeyValueStore backed by etcd's v3 gRPC-gateway API.
+type etcdClient struct {
 	endpoints []string
 	hc        *http.Client
 }
 
-var _ metadata.ObjectStore = (*Client)(nil)
+var _ KeyValueStore = (*etcdClient)(nil)
 
-func NewClient(cfg Config) (metadata.ObjectStore, error) {
+func NewEtcdClient(cfg EtcdConfig) (KeyValueStore, error) {
 	if len(cfg.Endpoints) == 0 {
 		return nil, fmt.Errorf("etcd: at least one endpoint required")
 	}
@@ -39,7 +37,7 @@ func NewClient(cfg Config) (metadata.ObjectStore, error) {
 	if dialTimeout <= 0 {
 		dialTimeout = 5 * time.Second
 	}
-	return &Client{
+	return &etcdClient{
 		endpoints: cfg.Endpoints,
 		hc: &http.Client{
 			Timeout: dialTimeout,
@@ -47,9 +45,9 @@ func NewClient(cfg Config) (metadata.ObjectStore, error) {
 	}, nil
 }
 
-func (c *Client) endpoint() string { return c.endpoints[0] }
+func (c *etcdClient) endpoint() string { return c.endpoints[0] }
 
-func (c *Client) urlFor(path string) string {
+func (c *etcdClient) urlFor(path string) string {
 	ep := c.endpoint()
 	if !strings.HasSuffix(ep, "/") {
 		ep += "/"
@@ -97,7 +95,7 @@ type etcdError struct {
 	Code    int    `json:"code"`
 }
 
-func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte, error) {
+func (c *etcdClient) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	var reqBody []byte
 	if body != nil {
 		var err error
@@ -152,16 +150,16 @@ func prefixRangeEnd(prefix string) string {
 }
 
 // ---------------------------------------------------------------------------
-// ObjectStore implementation
+// KeyValueStore implementation
 // ---------------------------------------------------------------------------
 
-func (c *Client) PutObject(key string, data []byte) error {
+func (c *etcdClient) PutObject(key string, data []byte) error {
 	body := kvPut{Key: b64(key), Value: b64(string(data))}
 	_, err := c.do(context.Background(), http.MethodPost, "kv/put", body)
 	return err
 }
 
-func (c *Client) ReadObject(key string) ([]byte, error) {
+func (c *etcdClient) ReadObject(key string) ([]byte, error) {
 	body := kvRange{Key: b64(key)}
 	data, err := c.do(context.Background(), http.MethodPost, "kv/range", body)
 	if err != nil {
@@ -172,7 +170,7 @@ func (c *Client) ReadObject(key string) ([]byte, error) {
 		return nil, fmt.Errorf("etcd: decode range response: %w", err)
 	}
 	if len(resp.Kvs) == 0 {
-		return nil, metadata.ErrKeyNotFound
+		return nil, ErrKeyNotFound
 	}
 	val, err := base64.StdEncoding.DecodeString(resp.Kvs[0].Value)
 	if err != nil {
@@ -181,13 +179,13 @@ func (c *Client) ReadObject(key string) ([]byte, error) {
 	return val, nil
 }
 
-func (c *Client) DeleteObject(key string) error {
+func (c *etcdClient) DeleteObject(key string) error {
 	body := kvDelete{Key: b64(key)}
 	_, err := c.do(context.Background(), http.MethodPost, "kv/deleterange", body)
 	return err
 }
 
-func (c *Client) ListObjects(prefix string) ([]metadata.Object, error) {
+func (c *etcdClient) ListObjects(prefix string) ([]Entry, error) {
 	body := kvRange{Key: b64(prefix), RangeEnd: prefixRangeEnd(prefix)}
 	data, err := c.do(context.Background(), http.MethodPost, "kv/range", body)
 	if err != nil {
@@ -198,19 +196,19 @@ func (c *Client) ListObjects(prefix string) ([]metadata.Object, error) {
 		return nil, fmt.Errorf("etcd: decode range response: %w", err)
 	}
 
-	objects := make([]metadata.Object, 0, len(resp.Kvs))
+	entries := make([]Entry, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		k, err := base64.StdEncoding.DecodeString(kv.Key)
 		if err != nil {
 			continue
 		}
 		keyStr := string(k)
-		objects = append(objects, metadata.Object{Key: &keyStr})
+		entries = append(entries, Entry{Key: &keyStr})
 	}
-	return objects, nil
+	return entries, nil
 }
 
-func (c *Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
+func (c *etcdClient) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	objects, err := c.ListObjects(prefix)
 	if err != nil {
 		return nil, err
@@ -237,7 +235,7 @@ func (c *Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) 
 	return prefixes, nil
 }
 
-func (c *Client) DeleteObjectsWithPrefix(prefix string) error {
+func (c *etcdClient) DeleteObjectsWithPrefix(prefix string) error {
 	body := kvDelete{Key: b64(prefix), RangeEnd: prefixRangeEnd(prefix)}
 	_, err := c.do(context.Background(), http.MethodPost, "kv/deleterange", body)
 	return err

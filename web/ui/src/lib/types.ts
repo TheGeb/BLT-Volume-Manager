@@ -12,15 +12,13 @@ export interface Snapshot {
 
 export interface OwnerStatus {
   volume: string;
-  owned: boolean;
-  owner?: string;
-  expires_in?: number;
+  owner: string;
+  expiry?: number;
 }
 
 export interface VolumeOwnerInfo {
-  owned: boolean;
   owner: string;
-  expiresIn: number;
+  expiry: number;
   status: 'owned' | 'unclaimed';
 }
 
@@ -30,38 +28,14 @@ export interface RepoStatus {
 }
 
 export interface StatsResponse {
-  snapshots: {
-    total: number;
-    hot: number;
-    cold: number;
-    excluded: number;
-    volumes: number;
-    newest: string;
-    oldest: string;
-    hot_volumes?: string[];
-    cold_volumes?: string[];
-    excluded_volumes?: string[];
-    other_volumes?: string[];
-  };
   repo: {
     total_size?: number;
     total_file_count?: number;
     total_blob_count?: number;
     total_uncompressed_size?: number;
     unique_blob_count?: number;
-    unique_blob_size?: number;
     error?: string;
   };
-  owners: {
-    total_volumes: number;
-    active: number;
-    expired: number;
-    unclaimed: number;
-    active_volumes?: string[];
-    expired_volumes?: string[];
-  };
-  total_volumes?: number;
-  cached_at?: string;
 }
 
 export interface FileNode {

@@ -6,9 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 type VersionRange struct {
@@ -25,7 +23,7 @@ type SnapshotFilter struct {
 
 func ParseVersionParam(s string) (major, minor int, ok bool) {
 	parts := strings.SplitN(s, ".", 2)
-	if len(parts) != 2 { // TODO: Should major version alone be supported?
+	if len(parts) != 2 {
 		return 0, 0, false
 	}
 	maj, err1 := strconv.Atoi(parts[0])
@@ -187,69 +185,3 @@ func ParseSnapshotListOpts(r *http.Request) (*restic.ListSnapshotsOpts, *Snapsho
 	}
 	return opts, filter, offset, limit
 }
-
-func SnapshotListResponse(s *server.Server, volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (map[string]any, error) {
-	rm := s.VolumeManager(volName)
-	snaps, err := rm.ListSnapshotsWithOpts(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	snaps = ApplySnapshotFilter(snaps, filter)
-
-	rawLen := len(snaps)
-	hasMore := false
-	if limit > 0 {
-		switch {
-		case offset+limit <= rawLen:
-			hasMore = rawLen > offset+limit
-			snaps = snaps[offset : offset+limit]
-		case offset < rawLen:
-			snaps = snaps[offset:]
-		default:
-			snaps = nil
-		}
-	} else if offset > 0 && offset < rawLen {
-		snaps = snaps[offset:]
-	}
-
-	store, _ := s.MetadataStore()
-
-	restorePointID := ""
-	if id, err := metadata.FindRestorePointByName(store, volName); err == nil {
-		restorePointID = id
-	}
-
-	result := make([]WithVolume, 0, len(snaps))
-	for _, snap := range snaps {
-		fullHash := rm.GenerateHash(snap)
-		snap.FallbackHash = fullHash[:len(snap.ShortID)]
-		result = append(result, WithVolume{Snapshot: snap, Volume: volName})
-	}
-
-	return map[string]any{
-		"snapshots":      result,
-		"restorePointID": restorePointID,
-		"hasMore":        hasMore,
-	}, nil
-}
-
-func ListSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
-	if !server.RequireMethod(w, r, http.MethodGet) {
-		return
-	}
-	volName, ok := server.RequireVolumeParam(w, r)
-	if !ok {
-		return
-	}
-
-	opts, filter, offset, limit := ParseSnapshotListOpts(r)
-	resp, err := SnapshotListResponse(s, volName, opts, filter, offset, limit)
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	server.RespondJSON(w, resp)
-}
-
-

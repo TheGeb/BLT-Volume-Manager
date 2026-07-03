@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-
 )
 
 // TODO: Consider splitting further — singular actions (tag, restore, forget) could each have their own file
@@ -107,7 +106,7 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		return nil
 	}
 
-	var snaps []map[string]any
+	var snaps []Snapshot
 	if err := json.Unmarshal(out, &snaps); err != nil {
 		return fmt.Errorf("parse snapshot list: %w", err)
 	}
@@ -117,18 +116,9 @@ func (m *Manager) RestoreIfExists(path, preferred string) error {
 		}
 		return m.runRestore(ctx, "latest", path)
 	}
-	id := ""
-	if v, ok := snaps[0]["short_id"]; ok {
-		if s, ok := v.(string); ok {
-			id = s
-		}
-	}
+	id := snaps[0].ShortID
 	if id == "" {
-		if v, ok := snaps[0]["id"]; ok {
-			if s, ok := v.(string); ok {
-				id = s
-			}
-		}
+		id = snaps[0].ID
 	}
 	if id == "" {
 		return m.runRestore(ctx, "latest", path)

@@ -24,17 +24,17 @@
     <h2 class="panel-title">Status</h2>
     <div class="panel-info">
       <div class="panel-info-primary">
-        {ownerStatus.owned ? 'Locked' : 'Unclaimed'}
+        {ownerStatus.owner ? 'Locked' : 'Unclaimed'}
       </div>
       {#if ownerStatus.owner}
         <div class="panel-info-secondary">Owner: {ownerStatus.owner}</div>
       {/if}
-      {#if ownerStatus.expires_in != null}
-        <div class="owner-expiry">{formatExpiration(ownerStatus.expires_in)}</div>
+      {#if ownerStatus.expiry != null && ownerStatus.expiry > 0}
+        <div class="owner-expiry">{formatExpiration(ownerStatus.expiry - Math.floor(Date.now() / 1000))}</div>
       {/if}
     </div>
     <div class="owner-actions">
-      <Button.Root class="button button-block button-destructive" onclick={deleteOwner} disabled={deleting || !ownerStatus.owned}>
+      <Button.Root class="button button-block button-destructive" onclick={deleteOwner} disabled={deleting || !ownerStatus.owner}>
         {deleting ? 'Deleting...' : 'Delete owner'}
       </Button.Root>
     </div>

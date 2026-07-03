@@ -48,7 +48,7 @@
     const ownerInfo = currentVolumeOwnerInfo[v];
     if (ownerFilter.length > 0) {
       if (!ownerInfo) return false;
-      const matchUnclaimed = ownerFilter.includes('__unclaimed__') && !ownerInfo.owned;
+      const matchUnclaimed = ownerFilter.includes('__unclaimed__') && !ownerInfo.owner;
       const matchOwner = ownerInfo.owner && ownerFilter.includes(ownerInfo.owner);
       if (!matchUnclaimed && !matchOwner) return false;
     }
@@ -175,7 +175,7 @@
       for (const node of ns) {
         if (!node.children) continue;
         const leaves = collectLeafVolumes([node]);
-        const ownedVolumes = leaves.map(l => ownerInfo[l]).filter(l => l && l.owned);
+        const ownedVolumes = leaves.map(l => ownerInfo[l]).filter(l => l && l.owner);
         if (ownedVolumes.length > 0 && ownedVolumes.length === leaves.length) {
           const owners = [...new Set(ownedVolumes.map(l => l!.owner).filter(Boolean))];
           result[node.path] = owners.length === 1 ? { owner: owners[0]! } : null;
@@ -202,9 +202,8 @@
       }
     } else {
       const li = currentVolumeOwnerInfo[item.path];
-      if (li && li.owned) {
+      if (li && li.owner) {
         owner = li.owner;
-        status = li.status;
       }
     }
     return { path: item.path, owner, status };

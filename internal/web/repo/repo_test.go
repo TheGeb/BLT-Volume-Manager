@@ -10,7 +10,7 @@ import (
 )
 
 func TestInitRepo_MissingVolume(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/init", nil)
 	rec := httptest.NewRecorder()
 	InitRepo(s, rec, req)
@@ -23,7 +23,7 @@ func TestInitRepo_MissingVolume(t *testing.T) {
 func TestInitRepo_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/init?volume=test", nil)
 	rec := httptest.NewRecorder()
-	InitRepo(&server.Server{}, rec, req)
+	InitRepo(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -33,7 +33,7 @@ func TestInitRepo_WrongMethod(t *testing.T) {
 func TestRepoStatus_MissingVolume(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/status", nil)
 	rec := httptest.NewRecorder()
-	RepoStatus(&server.Server{}, rec, req)
+	RepoStatus(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -43,7 +43,7 @@ func TestRepoStatus_MissingVolume(t *testing.T) {
 func TestRepoStatus_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/status?volume=test", nil)
 	rec := httptest.NewRecorder()
-	RepoStatus(&server.Server{}, rec, req)
+	RepoStatus(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -53,7 +53,7 @@ func TestRepoStatus_WrongMethod(t *testing.T) {
 func TestStats_MissingVolume(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
 	rec := httptest.NewRecorder()
-	Stats(&server.Server{}, rec, req)
+	Stats(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -63,7 +63,7 @@ func TestStats_MissingVolume(t *testing.T) {
 func TestStats_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/stats?volume=test", nil)
 	rec := httptest.NewRecorder()
-	Stats(&server.Server{}, rec, req)
+	Stats(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -73,7 +73,7 @@ func TestStats_WrongMethod(t *testing.T) {
 func TestRefreshStats(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/stats/refresh", nil)
 	rec := httptest.NewRecorder()
-	RefreshStats(&server.Server{}, rec, req)
+	RefreshStats(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -91,7 +91,7 @@ func TestRefreshStats(t *testing.T) {
 func TestRefreshStats_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/stats/refresh", nil)
 	rec := httptest.NewRecorder()
-	RefreshStats(&server.Server{}, rec, req)
+	RefreshStats(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -101,7 +101,7 @@ func TestRefreshStats_WrongMethod(t *testing.T) {
 func TestCheckRepo_MissingVolume(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/check", nil)
 	rec := httptest.NewRecorder()
-	CheckRepo(&server.Server{}, rec, req)
+	CheckRepo(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -111,7 +111,7 @@ func TestCheckRepo_MissingVolume(t *testing.T) {
 func TestCheckRepo_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/check?volume=test", nil)
 	rec := httptest.NewRecorder()
-	CheckRepo(&server.Server{}, rec, req)
+	CheckRepo(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -121,7 +121,7 @@ func TestCheckRepo_WrongMethod(t *testing.T) {
 func TestRepairRepo_MissingVolume(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/repair", nil)
 	rec := httptest.NewRecorder()
-	RepairRepo(&server.Server{}, rec, req)
+	RepairRepo(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -131,7 +131,7 @@ func TestRepairRepo_MissingVolume(t *testing.T) {
 func TestRepairRepo_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/repair?volume=test", nil)
 	rec := httptest.NewRecorder()
-	RepairRepo(&server.Server{}, rec, req)
+	RepairRepo(&server.Service{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)

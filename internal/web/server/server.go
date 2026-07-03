@@ -1,7 +1,7 @@
 package server
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -11,108 +11,167 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
+var ErrNoBackend = errors.New("metadata backend not available")
+
 type StatsCache struct {
 	CachedAt     string `json:"cached_at"`
 	TotalVolumes int    `json:"total_volumes"`
 }
 
-type Server struct {
-	ResticBase    string
-	Config        cfg.Config
-	metadataStore *metadata.Store
-	metadataMu    sync.Mutex
-	statsMu       sync.RWMutex
-	statsCacheVal *StatsCache
-	statsCacheAt  time.Time
-	wg            sync.WaitGroup
+type Service struct {
+	ResticBase string
+	Config     cfg.Config
+
+	volumeStore       *metadata.VolumeStore
+	restorePointStore *metadata.RestorePointStore
+	versionStore      *metadata.VersionStore
+	ownerStore        *metadata.OwnerStore
+
+	stores       *metadata.Stores
+	metadataMu   sync.Mutex
+	statsMu      sync.RWMutex
+	statsCache   *StatsCache
+	statsCacheAt time.Time
+	wg           sync.WaitGroup
 }
 
-func (s *Server) Shutdown() {
+func (s *Service) Shutdown() {
 	s.wg.Wait()
 }
 
-func New(cfg cfg.Config) *Server {
-	return &Server{ResticBase: cfg.ResticBase, Config: cfg}
+func New(cfg cfg.Config) *Service {
+	return &Service{ResticBase: cfg.ResticBase, Config: cfg}
 }
 
-func (s *Server) SetMetadataStore(st *metadata.Store) {
+func (s *Service) SetStores(stores *metadata.Stores) {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
-	s.metadataStore = st
+	s.stores = stores
+	s.volumeStore = stores.Volumes
+	s.restorePointStore = stores.RestorePoints
+	s.versionStore = stores.Versions
+	s.ownerStore = stores.Owners
 }
 
-func (s *Server) HasBackend() bool {
-	return s.Config.MetadataBackend != "" || s.Config.S3Bucket != ""
-}
-
-func (s *Server) MetadataStore() (*metadata.Store, error) {
-	return s.initMetadataStore()
-}
-
-func (s *Server) StoreForVolume() (*metadata.Store, error) { // FIXME: This naming is awkward
-	return s.MetadataStore()
-}
-
-func (s *Server) StoreForResticData() (metadata.ObjectStore, error) { // FIXME: name is a bit too verbose, and awkwardly returns metadata store
-	if s.Config.S3Bucket == "" {
-		return nil, fmt.Errorf("S3 bucket not configured")
-	}
-	return s.initMetadataStore()
-}
-
-func (s *Server) initMetadataStore() (*metadata.Store, error) {
+func (s *Service) initBackend() error {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
-	if s.metadataStore != nil {
-		return s.metadataStore, nil
+	if s.stores != nil {
+		return nil
 	}
-	raw, err := cfg.OpenMetadataBackend(s.Config)
+	stores, err := cfg.OpenMetadataBackend(s.Config)
 	if err != nil {
+		return err
+	}
+	s.stores = stores
+	s.volumeStore = stores.Volumes
+	s.restorePointStore = stores.RestorePoints
+	s.versionStore = stores.Versions
+	s.ownerStore = stores.Owners
+	return nil
+}
+
+func (s *Service) VolumeStore() (*metadata.VolumeStore, error) {
+	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	s.metadataStore = metadata.New(raw)
-	return s.metadataStore, nil
+	return s.volumeStore, nil
 }
 
-func (s *Server) BackupStoreType() string {
-	if strings.HasPrefix(s.ResticBase, "s3:") {
-		return "s3"
+func (s *Service) RestorePointStore() (*metadata.RestorePointStore, error) {
+	if err := s.initBackend(); err != nil {
+		return nil, err
 	}
-	return "local"
+	return s.restorePointStore, nil
 }
 
-func (s *Server) VolumeManager(volName string) *restic.Manager {
+func (s *Service) VersionStore() (*metadata.VersionStore, error) {
+	if err := s.initBackend(); err != nil {
+		return nil, err
+	}
+	return s.versionStore, nil
+}
+
+func (s *Service) OwnerStore() (*metadata.OwnerStore, error) {
+	if err := s.initBackend(); err != nil {
+		return nil, err
+	}
+	return s.ownerStore, nil
+}
+
+func (s *Service) RegisterVolume(name string) error {
+	vs, err := s.VolumeStore()
+	if err != nil {
+		return err
+	}
+	return vs.Register(name)
+}
+
+func (s *Service) SetRestorePoint(volume, snapshotID string) error {
+	rs, err := s.RestorePointStore()
+	if err != nil {
+		return err
+	}
+	return rs.Set(volume, snapshotID)
+}
+
+func (s *Service) DeleteRestorePoint(volume string) error {
+	rs, err := s.RestorePointStore()
+	if err != nil {
+		return err
+	}
+	return rs.Delete(volume)
+}
+
+func (s *Service) FindRestorePointByName(volName string) (string, error) {
+	rs, err := s.RestorePointStore()
+	if err != nil {
+		return "", err
+	}
+	return rs.FindByName(volName)
+}
+
+func (s *Service) DeleteVolumeData(volumeName string) error {
+	vs, err := s.VolumeStore()
+	if err != nil {
+		return err
+	}
+	return vs.DeleteVolumeData(volumeName)
+}
+
+func (s *Service) ResticManager(volName string) *restic.Manager {
 	return restic.NewManager(s.ResticBase + "/restic/" + volName)
 }
 
-func (s *Server) NextVersionTags(volName string, major bool) []string {
-	ms, err := s.MetadataStore()
-	if err != nil || ms == nil {
+func (s *Service) NextVersionTags(volName string, major bool) []string {
+	vs, err := s.VersionStore()
+	if err != nil {
 		return nil
 	}
-	tags, err := ms.NextVersionTags(volName, major)
+	tags, err := vs.NextTags(volName, major)
 	if err != nil {
 		return nil
 	}
 	return tags
 }
 
-func (s *Server) VolumeNames() []string {
-	ms, err := s.MetadataStore()
-	if err != nil || ms == nil {
+func (s *Service) VolumeNames() []string {
+	vs, err := s.VolumeStore()
+	if err != nil {
 		return nil
 	}
-	if names, err := ms.ListRegisteredVolumes(); err == nil {
-		return names
+	names, err := vs.List()
+	if err != nil {
+		return nil
 	}
-	return nil
+	return names
 }
 
-func (s *Server) RefreshStats() {
+func (s *Service) RefreshStats() {
 	volNames := s.VolumeNames()
 
 	s.statsMu.Lock()
-	s.statsCacheVal = &StatsCache{
+	s.statsCache = &StatsCache{
 		CachedAt:     time.Now().UTC().Format(time.RFC3339),
 		TotalVolumes: len(volNames),
 	}
@@ -120,27 +179,23 @@ func (s *Server) RefreshStats() {
 	s.statsMu.Unlock()
 }
 
-func (s *Server) WithStatsLock(f func()) {
+func (s *Service) WithStatsLock(f func()) {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
 	f()
 }
 
-func (s *Server) WithStatsRLock(f func()) {
+func (s *Service) WithStatsRLock(f func()) {
 	s.statsMu.RLock()
 	defer s.statsMu.RUnlock()
 	f()
 }
 
-func (s *Server) StatsCache() *StatsCache {
+func (s *Service) StatsCache() *StatsCache {
 	s.statsMu.RLock()
 	defer s.statsMu.RUnlock()
-	return s.statsCacheVal
+	return s.statsCache
 }
 
-func (s *Server) AddWork()  { s.wg.Add(1) }
-func (s *Server) DoneWork() { s.wg.Done() }
-
-func ValidVolumeName(name string) bool {
-	return name != "" && !strings.ContainsAny(name, "/\\") && !strings.Contains(name, "..")
-}
+func (s *Service) AddWork()  { s.wg.Add(1) }
+func (s *Service) DoneWork() { s.wg.Done() }

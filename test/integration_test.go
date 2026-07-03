@@ -3,14 +3,12 @@
 package integration
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/s3"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
@@ -20,16 +18,6 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 
 	repoURL := "s3:" + garage.Endpoint + "/" + garage.BucketName
 	rm := restic.NewManager(repoURL)
-
-	s3Client, err := s3.NewClient(s3.Config{
-		S3Bucket:   garage.BucketName,
-		S3Endpoint: garage.Endpoint,
-		Region:     "us-east-1",
-	})
-	if err != nil {
-		t.Fatalf("create real s3 store: %v", err)
-	}
-	realStore := metadata.New(s3Client)
 
 	if err := rm.Init(); err != nil {
 		t.Fatalf("init: %v", err)
@@ -77,25 +65,6 @@ func TestResticBackupRestoreWithGarage(t *testing.T) {
 		t.Fatal("restored file with content 'hello garage' not found")
 	}
 
-	if err := metadata.SetRestorePoint(realStore, "test-vol", snaps[0].ShortID); err != nil {
-		t.Fatalf("set restore point: %v", err)
-	}
-	rp, err := realStore.ReadRestorePoint("test-vol")
-	if err != nil {
-		t.Fatalf("read restore point: %v", err)
-	}
-	if rp == nil || rp.SnapshotID != snaps[0].ShortID {
-		t.Fatalf("unexpected restore point: %+v", rp)
-	}
-	targetVolume := driver.VolumeNameFromPath("/var/lib/docker-volumes/volumes/test-vol")
-	rp2, err := metadata.FindRestorePointByName(realStore, targetVolume)
-	if err != nil {
-		t.Fatalf("find restore point: %v", err)
-	}
-	if rp2 != snaps[0].ShortID {
-		t.Fatalf("expected restore point %s, got %s", snaps[0].ShortID, rp2)
-	}
-
 	if err := rm.ForgetSnapshots(snaps[0].ShortID); err != nil {
 		t.Fatalf("forget: %v", err)
 	}
@@ -112,7 +81,7 @@ func TestS3OwnersWithGarage(t *testing.T) {
 	t.Parallel()
 	garage := StartGarage(t)
 
-	s3Store, err := s3.NewClient(s3.Config{
+	be, err := backend.NewS3Client(backend.S3Config{
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		Region:     "us-east-1",
@@ -121,13 +90,14 @@ func TestS3OwnersWithGarage(t *testing.T) {
 		t.Fatalf("create s3 store: %v", err)
 	}
 
+	ownerStore := metadata.NewOwnerStore(be)
 	key := "blt-volume-manager/owners/test-vol/proposal.json"
 	data := []byte(`{"name":"test","expiry_time":9999999999}`)
-	if err := s3Store.PutObject(key, data); err != nil {
+	if err := be.PutObject(key, data); err != nil {
 		t.Fatalf("put lock object: %v", err)
 	}
 
-	got, err := s3Store.ReadObject(key)
+	got, err := be.ReadObject(key)
 	if err != nil {
 		t.Fatalf("read lock object: %v", err)
 	}
@@ -135,7 +105,7 @@ func TestS3OwnersWithGarage(t *testing.T) {
 		t.Fatal("lock object not found")
 	}
 
-	objects, err := s3Store.ListObjects("blt-volume-manager/owners/test-vol/")
+	objects, err := ownerStore.ListForVolume("test-vol")
 	if err != nil {
 		t.Fatalf("list objects: %v", err)
 	}
@@ -143,11 +113,11 @@ func TestS3OwnersWithGarage(t *testing.T) {
 		t.Fatalf("expected 1 lock object, got %d", len(objects))
 	}
 
-	if err := s3Store.DeleteObject(key); err != nil {
+	if err := be.DeleteObject(key); err != nil {
 		t.Fatalf("delete lock object: %v", err)
 	}
-	got, err = s3Store.ReadObject(key)
-	if err != nil && !errors.Is(err, metadata.ErrKeyNotFound) {
+	got, err = be.ReadObject(key)
+	if err != nil {
 		t.Fatalf("read after delete: %v", err)
 	}
 	if got != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func ListSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -16,7 +16,7 @@ func ListSnapshotHosts(s *server.Server, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 	latest := 1
 	if l := r.URL.Query().Get("latest"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {

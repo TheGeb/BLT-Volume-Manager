@@ -1,16 +1,20 @@
 package metadata
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+)
 
 func sPtr(s string) *string { return &s }
 
 func TestListRegisteredVolumes(t *testing.T) {
-	st := New(&MockObjectStore{
-		ListFunc: func(prefix string) ([]Object, error) {
+	st := NewVolumeStore(&MockKeyValueStore{
+		ListFunc: func(prefix string) ([]backend.Entry, error) {
 			return nil, nil
 		},
 	})
-	names, err := st.ListRegisteredVolumes()
+	names, err := st.List()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,16 +24,16 @@ func TestListRegisteredVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesWithVolumes(t *testing.T) {
-	st := New(&MockObjectStore{
-		ListFunc: func(prefix string) ([]Object, error) {
-			return []Object{
+	st := NewVolumeStore(&MockKeyValueStore{
+		ListFunc: func(prefix string) ([]backend.Entry, error) {
+			return []backend.Entry{
 				{Key: sPtr(RegisteredVolumesPrefix + "vol-a.json")},
 				{Key: sPtr(RegisteredVolumesPrefix + "vol-b.json")},
 				{Key: sPtr(RegisteredVolumesPrefix + "deep/nested-vol.json")},
 			}, nil
 		},
 	})
-	names, err := st.ListRegisteredVolumes()
+	names, err := st.List()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,15 +49,15 @@ func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
-	st := New(&MockObjectStore{
-		ListFunc: func(prefix string) ([]Object, error) {
-			return []Object{
+	st := NewVolumeStore(&MockKeyValueStore{
+		ListFunc: func(prefix string) ([]backend.Entry, error) {
+			return []backend.Entry{
 				{Key: nil},
 				{Key: sPtr(RegisteredVolumesPrefix + "valid.json")},
 			}, nil
 		},
 	})
-	names, err := st.ListRegisteredVolumes()
+	names, err := st.List()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,14 +67,14 @@ func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
-	st := New(&MockObjectStore{
-		ListFunc: func(prefix string) ([]Object, error) {
-			return []Object{
+	st := NewVolumeStore(&MockKeyValueStore{
+		ListFunc: func(prefix string) ([]backend.Entry, error) {
+			return []backend.Entry{
 				{Key: sPtr(RegisteredVolumesPrefix + ".json")},
 			}, nil
 		},
 	})
-	names, err := st.ListRegisteredVolumes()
+	names, err := st.List()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 func TestOwnerRouter_GetNoBackend(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	req := httptest.NewRequest(http.MethodGet, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
 	OwnerRouter(s, rec, req, "test")
@@ -22,7 +22,7 @@ func TestOwnerRouter_GetNoBackend(t *testing.T) {
 }
 
 func TestOwnerRouter_DeleteNoBackend(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
 	OwnerRouter(s, rec, req, "test")
@@ -33,7 +33,7 @@ func TestOwnerRouter_DeleteNoBackend(t *testing.T) {
 }
 
 func TestOwnerRouter_MethodNotAllowed(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	req := httptest.NewRequest(http.MethodPut, "/api/volume/test/owner", nil)
 	rec := httptest.NewRecorder()
 	OwnerRouter(s, rec, req, "test")
@@ -44,7 +44,7 @@ func TestOwnerRouter_MethodNotAllowed(t *testing.T) {
 }
 
 func TestOwnerRouter_PostInvalidJSON(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	body := strings.NewReader(`not json`)
 	req := httptest.NewRequest(http.MethodPost, "/api/volume/test/owner", body)
 	rec := httptest.NewRecorder()
@@ -64,7 +64,7 @@ func TestOwnerRouter_PostInvalidJSON(t *testing.T) {
 }
 
 func TestListVolumeOwners_MethodNotAllowed(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 	req := httptest.NewRequest(http.MethodPost, "/api/owners", nil)
 	rec := httptest.NewRecorder()
 	ListVolumeOwners(s, rec, req)

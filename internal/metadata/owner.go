@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
-func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (myKey string, err error) {
-	// TODO: Thoroughly examine every call in this method
+func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry int64) (myKey string, err error) {
 	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
 	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
 	data, err := json.Marshal(proposal)
@@ -61,18 +62,18 @@ func AcquireOwnerLock(store ObjectStore, folder, owner string, expiry int64) (my
 
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
-		return 1<<62 - 1 // FIXME: This seems like an ugly way of handling no expiration
+		return 1<<62 - 1
 	}
 	return o.ExpiryTime - time.Now().Unix()
 }
 
 func (e *OwnerLockError) Error() string { return e.Msg }
 
-func OwnerFolder(volumeName string) string { // FIXME: Rename. Folder is misleading, but Prefix has other meaning? maybe Base or similar?
+func OwnerFolder(volumeName string) string {
 	return OwnerPrefix + volumeName + "/"
 }
 
-func SortOwnersByExpiry(objects []Object) {
+func SortOwnersByExpiry(objects []backend.Entry) {
 	sort.Slice(objects, func(i, j int) bool {
 		ti, tj := objects[i].LastModified, objects[j].LastModified
 		if ti != nil && tj != nil && !ti.Equal(*tj) {
@@ -110,7 +111,7 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 	return volume, owner, expiry, nil
 }
 
-func FindOwner(objects []Object) (firstKey string, firstOwner string, firstExpiry int64) {
+func FindOwner(objects []backend.Entry) (firstKey string, firstOwner string, firstExpiry int64) {
 	now := time.Now().Unix()
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -128,8 +129,8 @@ func FindOwner(objects []Object) (firstKey string, firstOwner string, firstExpir
 	return "", "", 0
 }
 
-func RemoveStaleObjects(store ObjectStore, objects []Object, ttl time.Duration) []Object {
-	kept := make([]Object, 0, len(objects))
+func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, ttl time.Duration) []backend.Entry {
+	kept := make([]backend.Entry, 0, len(objects))
 	for _, obj := range objects {
 		if obj.Key == nil {
 			continue
@@ -143,11 +144,4 @@ func RemoveStaleObjects(store ObjectStore, objects []Object, ttl time.Duration) 
 		kept = append(kept, obj)
 	}
 	return kept
-}
-
-func (s *Store) DeleteOwnerObjects(ownerFolder string) error {
-	if ownerFolder == "" {
-		return nil
-	}
-	return s.store.DeleteObjectsWithPrefix(ownerFolder)
 }

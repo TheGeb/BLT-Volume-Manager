@@ -25,6 +25,7 @@ func TestVolumeConfigReadWrite(t *testing.T) {
 	read := d.readVolumeConfig(volPath)
 	if read == nil {
 		t.Fatal("readVolumeConfig returned nil")
+		return
 	}
 	if read.FsType != "btrfs" {
 		t.Errorf("FsType = %q, want %q", read.FsType, "btrfs")
@@ -52,6 +53,7 @@ func TestVolumeConfigDefaultFsType(t *testing.T) {
 	read := d.readVolumeConfig(volPath)
 	if read == nil {
 		t.Fatal("expected non-nil config")
+		return
 	}
 	if read.FsType != "" {
 		t.Errorf("expected empty FsType, got %q", read.FsType)
@@ -71,13 +73,17 @@ func TestSnapVolumes(t *testing.T) {
 	if len(snaps) != 2 {
 		t.Fatalf("expected 2 snap volumes, got %d", len(snaps))
 	}
-	if snaps["vol1"] != "btrfs" {
-		t.Errorf("vol1 = %q, want btrfs", snaps["vol1"])
+	m := make(map[string]string)
+	for _, sv := range snaps {
+		m[sv.Name] = sv.FsType
 	}
-	if snaps["vol3"] != "zfs" {
-		t.Errorf("vol3 = %q, want zfs", snaps["vol3"])
+	if m["vol1"] != "btrfs" {
+		t.Errorf("vol1 = %q, want btrfs", m["vol1"])
 	}
-	if _, ok := snaps["vol2"]; ok {
+	if m["vol3"] != "zfs" {
+		t.Errorf("vol3 = %q, want zfs", m["vol3"])
+	}
+	if _, ok := m["vol2"]; ok {
 		t.Error("vol2 should not be in snap volumes (no fs_type)")
 	}
 }
@@ -198,6 +204,7 @@ func TestNewDriverDefaults(t *testing.T) {
 	d := New(cfg.Config{DataDir: t.TempDir(), ResticBase: "/tmp/restic"}, context.Background())
 	if d == nil {
 		t.Fatal("expected non-nil driver")
+		return
 	}
 	if d.root == "" {
 		t.Error("expected non-empty root")
@@ -230,6 +237,7 @@ func TestList(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
+		return
 	}
 	if len(resp.Volumes) != 3 {
 		t.Fatalf("expected 3 volumes, got %d", len(resp.Volumes))
@@ -257,6 +265,7 @@ func TestListEmpty(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
+		return
 	}
 	if len(resp.Volumes) != 0 {
 		t.Errorf("expected 0 volumes, got %d", len(resp.Volumes))
@@ -268,6 +277,7 @@ func TestCapabilities(t *testing.T) {
 	cap := d.Capabilities()
 	if cap == nil {
 		t.Fatal("expected non-nil capabilities")
+		return
 	}
 	if cap.Capabilities.Scope != "local" {
 		t.Errorf("expected 'local', got %q", cap.Capabilities.Scope)

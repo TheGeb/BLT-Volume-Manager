@@ -16,7 +16,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/volume"
 )
 
-func Register(s *server.Server, mux *http.ServeMux) error {
+func Register(s *server.Service, mux *http.ServeMux) error {
 	inner := http.NewServeMux()
 
 	inner.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {

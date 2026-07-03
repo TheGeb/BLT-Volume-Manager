@@ -9,12 +9,12 @@ import (
 )
 
 type Config struct {
-	DataDir          string
-	ResticBase       string
-	MetadataBackend  string // "s3" (default) or "etcd"
-	S3Bucket         string
-	S3Endpoint       string
-	S3Region         string
+	DataDir         string
+	ResticBase      string
+	MetadataBackend string // "s3" (default) or "etcd"
+	S3Bucket        string
+	S3Endpoint      string
+	S3Region        string
 	// S3ForcePathStyle controls whether to use path-style S3 URLs (s3://bucket/key)
 	// instead of virtual-hosted-style (bucket.s3.amazonaws.com/key).
 	// Most S3-compatible stores require path-style URLs.

@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func handleListSnapshotFiles(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+func handleListSnapshotFiles(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -26,7 +26,7 @@ func handleListSnapshotFiles(s *server.Server, w http.ResponseWriter, r *http.Re
 	server.RespondJSON(w, nodes)
 }
 
-func handleDumpSnapshotFile(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+func handleDumpSnapshotFile(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -48,10 +48,10 @@ func handleDumpSnapshotFile(s *server.Server, w http.ResponseWriter, r *http.Req
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) //nolint:gosec // data is restic dump output, text/plain with nosniff
 }
 
-func handleDiffSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, secondID, fallbackHash, diffFallback string) {
+func handleDiffSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, secondID, fallbackHash, diffFallback string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return

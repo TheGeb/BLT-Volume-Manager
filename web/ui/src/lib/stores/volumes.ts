@@ -55,13 +55,12 @@ async function fetchAllVolumeOwnerInfo() {
     const r = allOwners[vol];
     if (r) {
       info[vol] = {
-        owned: r.owned,
-        owner: r.owner ?? '',
-        expiresIn: r.expires_in ?? 0,
-        status: r.owned ? 'owned' : 'unclaimed',
+        owner: r.owner,
+        expiry: r.expiry ?? 0,
+        status: r.owner ? 'owned' : 'unclaimed',
       };
     } else {
-      info[vol] = { owned: false, owner: '', expiresIn: 0, status: 'unclaimed' };
+      info[vol] = { owner: '', expiry: 0, status: 'unclaimed' };
     }
   }
   volumeOwnerInfo.set(info);

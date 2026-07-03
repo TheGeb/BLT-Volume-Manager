@@ -412,7 +412,7 @@
   <h3 style="margin:0 0 12px;">Rename volume</h3>
   <p style="margin:0 0 8px;color:var(--muted);font-size:0.9rem;">
     Rename <strong>{$copyRenameSource}</strong> to a new name.
-    {#if $volumeOwnerInfo[$copyRenameSource]?.owned}
+    {#if $volumeOwnerInfo[$copyRenameSource]?.owner}
       <span style="color:var(--red);display:block;margin-top:6px;">
         This volume has an owner and cannot be renamed.
       </span>
@@ -429,7 +429,7 @@
   {/if}
   <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $renameVolModal = false}>Cancel</Button.Root>
-    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || $volumeOwnerInfo[$copyRenameSource]?.owned}
+    <Button.Root class="button" disabled={!$copyRenameTarget || $copyRenameLoading || !!$volumeOwnerInfo[$copyRenameSource]?.owner}
       onclick={confirmRenameVolume}>
       {$copyRenameLoading ? 'Renaming...' : 'Rename'}
     </Button.Root>

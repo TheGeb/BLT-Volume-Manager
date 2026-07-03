@@ -9,32 +9,56 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func buildRepoStats(rm *restic.Manager) map[string]any {
-	stats := map[string]any{}
+type RepoStats struct {
+	TotalSize             int64  `json:"total_size,omitempty"`
+	TotalFileCount        int64  `json:"total_file_count,omitempty"`
+	TotalBlobCount        int64  `json:"total_blob_count,omitempty"`
+	TotalUncompressedSize int64  `json:"total_uncompressed_size,omitempty"`
+	UniqueBlobCount       int64  `json:"unique_blob_count,omitempty"`
+	Error                 string `json:"error,omitempty"`
+}
+
+type SnapshotStats struct {
+	Total        int      `json:"total"`
+	Hot          int      `json:"hot"`
+	Cold         int      `json:"cold"`
+	Newest       string   `json:"newest"`
+	Oldest       string   `json:"oldest"`
+	HotVolumes   []string `json:"hot_volumes,omitempty"`
+	ColdVolumes  []string `json:"cold_volumes,omitempty"`
+	OtherVolumes []string `json:"other_volumes,omitempty"`
+}
+
+type StatsResponse struct {
+	Volume       string        `json:"volume"`
+	Snapshots    SnapshotStats `json:"snapshots"`
+	Repo         *RepoStats    `json:"repo"`
+	CachedAt     string        `json:"cached_at,omitempty"`
+	TotalVolumes int           `json:"total_volumes,omitempty"`
+}
+
+func buildRepoStats(rm *restic.Manager) *RepoStats {
 	rst, err := rm.Stats()
 	if err != nil {
 		log.Error("stats_failed", err)
-		stats["error"] = err.Error()
-	} else if rst != nil {
-		stats = map[string]any{
-			"total_size":              rst.TotalSize,
-			"total_file_count":        rst.TotalFileCount,
-			"total_blob_count":        rst.TotalBlobCount,
-			"total_uncompressed_size": rst.TotalUncompressedSize,
-			"unique_blob_count":       rst.UniqueBlobCount,
-		}
+		return &RepoStats{Error: err.Error()}
 	}
-	return stats
+	if rst == nil {
+		return nil
+	}
+	return &RepoStats{
+		TotalSize:             rst.TotalSize,
+		TotalFileCount:        rst.TotalFileCount,
+		TotalBlobCount:        rst.TotalBlobCount,
+		TotalUncompressedSize: rst.TotalUncompressedSize,
+		UniqueBlobCount:       rst.UniqueBlobCount,
+	}
 }
 
-func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
-	stats := map[string]any{
-		"total": 0, "hot": 0, "cold": 0, "volumes": 0,
-		"newest": "", "oldest": "",
-	}
+func buildSnapshotStats(rm *restic.Manager, volName string) SnapshotStats {
 	snaps, err := rm.ListSnapshots()
 	if err != nil || snaps == nil {
-		return stats
+		return SnapshotStats{}
 	}
 	hot, cold := 0, 0
 	var newest, oldest time.Time
@@ -72,20 +96,19 @@ func buildSnapshotStats(rm *restic.Manager, volName string) map[string]any {
 	if o := len(snaps) - hot - cold; o > 0 {
 		otherVols = []string{volName}
 	}
-	stats = map[string]any{
-		"total":         len(snaps),
-		"hot":           hot,
-		"cold":          cold,
-		"newest":        newestStr,
-		"oldest":        oldestStr,
-		"hot_volumes":   hotVols,
-		"cold_volumes":  coldVols,
-		"other_volumes": otherVols,
+	return SnapshotStats{
+		Total:        len(snaps),
+		Hot:          hot,
+		Cold:         cold,
+		Newest:       newestStr,
+		Oldest:       oldestStr,
+		HotVolumes:   hotVols,
+		ColdVolumes:  coldVols,
+		OtherVolumes: otherVols,
 	}
-	return stats
 }
 
-func Stats(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func Stats(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -94,23 +117,23 @@ func Stats(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 
-	resp := map[string]any{
-		"snapshots": buildSnapshotStats(rm, volName), // FIXME: Is this even used on the UI anymore? Might be able to completely remove
-		"repo":      buildRepoStats(rm),
-		"volume":    volName,
+	resp := StatsResponse{
+		Volume:    volName,
+		Snapshots: buildSnapshotStats(rm, volName),
+		Repo:      buildRepoStats(rm),
 	}
 
 	if c := s.StatsCache(); c != nil {
-		resp["cached_at"] = c.CachedAt
-		resp["total_volumes"] = c.TotalVolumes
+		resp.CachedAt = c.CachedAt
+		resp.TotalVolumes = c.TotalVolumes
 	}
 
 	server.RespondJSON(w, resp)
 }
 
-func RefreshStats(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func RefreshStats(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}

@@ -1,4 +1,4 @@
-package s3
+package backend
 
 import (
 	"bytes"
@@ -10,14 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type Config struct {
+type S3Config struct {
 	S3Bucket       string
 	S3OwnerFolder  string
 	S3VolumePrefix string
@@ -27,21 +26,21 @@ type Config struct {
 	Logger         func(op, bucket, key string, dur time.Duration, err error)
 }
 
-func (cfg Config) validate() error {
+func (cfg S3Config) validate() error {
 	if cfg.S3Bucket == "" {
 		return fmt.Errorf("S3Bucket required")
 	}
 	return nil
 }
 
-type Client struct {
+type s3Client struct {
 	s3Client *s3sdk.Client
-	cfg      Config
+	cfg      S3Config
 }
 
-var _ metadata.ObjectStore = (*Client)(nil)
+var _ KeyValueStore = (*s3Client)(nil)
 
-func NewClient(cfg Config) (metadata.ObjectStore, error) {
+func NewS3Client(cfg S3Config) (KeyValueStore, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid S3 store config: %w", err)
 	}
@@ -88,19 +87,19 @@ func NewClient(cfg Config) (metadata.ObjectStore, error) {
 
 	client := s3sdk.NewFromConfig(awsCfg, clientOpts...)
 
-	return &Client{
+	return &s3Client{
 		s3Client: client,
 		cfg:      cfg,
 	}, nil
 }
 
-func (s *Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
+func (s *s3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
 	if fn := s.cfg.Logger; fn != nil {
 		fn(op, bucket, key, dur, err)
 	}
 }
 
-func (s *Client) PutObject(key string, data []byte) error {
+func (s *s3Client) PutObject(key string, data []byte) error {
 	start := time.Now()
 	_, err := s.s3Client.PutObject(context.Background(), &s3sdk.PutObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
@@ -111,7 +110,7 @@ func (s *Client) PutObject(key string, data []byte) error {
 	return err
 }
 
-func (s *Client) ReadObject(key string) ([]byte, error) {
+func (s *s3Client) ReadObject(key string) ([]byte, error) {
 	start := time.Now()
 	output, err := s.s3Client.GetObject(context.Background(), &s3sdk.GetObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
@@ -121,7 +120,7 @@ func (s *Client) ReadObject(key string) ([]byte, error) {
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return nil, metadata.ErrKeyNotFound
+			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func (s *Client) ReadObject(key string) ([]byte, error) {
 	return io.ReadAll(output.Body)
 }
 
-func (s *Client) DeleteObject(key string) error {
+func (s *s3Client) DeleteObject(key string) error {
 	start := time.Now()
 	_, err := s.s3Client.DeleteObject(context.Background(), &s3sdk.DeleteObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
@@ -139,9 +138,9 @@ func (s *Client) DeleteObject(key string) error {
 	return err
 }
 
-func (s *Client) ListObjects(prefix string) ([]metadata.Object, error) {
+func (s *s3Client) ListObjects(prefix string) ([]Entry, error) {
 	start := time.Now()
-	var objects []metadata.Object
+	var objects []Entry
 	paginator := s3sdk.NewListObjectsV2Paginator(s.s3Client, &s3sdk.ListObjectsV2Input{
 		Bucket: aws.String(s.cfg.S3Bucket),
 		Prefix: aws.String(prefix),
@@ -153,14 +152,14 @@ func (s *Client) ListObjects(prefix string) ([]metadata.Object, error) {
 			return nil, err
 		}
 		for _, obj := range page.Contents {
-			objects = append(objects, metadata.Object{Key: obj.Key, LastModified: obj.LastModified})
+			objects = append(objects, Entry{Key: obj.Key, LastModified: obj.LastModified})
 		}
 	}
 	s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), nil)
 	return objects, nil
 }
 
-func (s *Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
+func (s *s3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
 	start := time.Now()
 	var prefixes []string
 	paginator := s3sdk.NewListObjectsV2Paginator(s.s3Client, &s3sdk.ListObjectsV2Input{
@@ -184,7 +183,7 @@ func (s *Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) 
 	return prefixes, nil
 }
 
-func (s *Client) DeleteObjectsWithPrefix(prefix string) error {
+func (s *s3Client) DeleteObjectsWithPrefix(prefix string) error {
 	objects, err := s.ListObjects(prefix)
 	if err != nil {
 		return fmt.Errorf("listing objects (prefix=%s): %w", prefix, err)

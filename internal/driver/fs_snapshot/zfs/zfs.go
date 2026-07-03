@@ -22,10 +22,10 @@ func (z *zfsProvider) MatchFSType(fsType string) bool {
 	return fsType == "zfs"
 }
 
-func (z *zfsProvider) Init(path string, opts map[string]string) error {
+func (z *zfsProvider) Init(path string, opts snapshot.FsOptions) error {
 	parentDataset := snapshot.RootDataset()
-	if p, ok := opts["zfs-pool"]; ok && p != "" {
-		parentDataset = p
+	if opts.ZfsPool != "" {
+		parentDataset = opts.ZfsPool
 	}
 	if parentDataset == "" {
 		return fmt.Errorf("no ZFS parent dataset configured; set zfs-pool option or run on ZFS filesystem")

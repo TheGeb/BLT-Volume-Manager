@@ -13,9 +13,30 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
+type VolumeListResponse struct {
+	Volumes []string `json:"volumes"`
+}
+
 const OwnersDir = "owners"
 
-func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func ListVolumes(s *server.Service, w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+	volumes := s.VolumeNames()
+	if volumes == nil {
+		volumes = []string{}
+	}
+	server.RespondJSON(w, VolumeListResponse{Volumes: volumes})
+}
+
+// Allows groups with "/"
+func validVolumeName(name string) bool {
+	return name != "" && !strings.ContainsAny(name, "/\\") && !strings.Contains(name, "..")
+}
+
+func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	escapedPath := r.URL.EscapedPath()
 	if !strings.HasPrefix(escapedPath, "/api/volume/") {
 		http.NotFound(w, r)
@@ -26,7 +47,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasSuffix(rawPath, "/copy") {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/copy"))
-		if err != nil || !server.ValidVolumeName(volumeName) {
+		if err != nil || !validVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -36,7 +57,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasSuffix(rawPath, "/rename") {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/rename"))
-		if err != nil || !server.ValidVolumeName(volumeName) {
+		if err != nil || !validVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -46,7 +67,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasSuffix(rawPath, "/"+OwnersDir) {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/"+OwnersDir))
-		if err != nil || !server.ValidVolumeName(volumeName) {
+		if err != nil || !validVolumeName(volumeName) {
 			http.NotFound(w, r)
 			return
 		}
@@ -55,7 +76,7 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	}
 
 	path, err := url.PathUnescape(rawPath)
-	if err != nil || !server.ValidVolumeName(path) {
+	if err != nil || !validVolumeName(path) {
 		http.NotFound(w, r)
 		return
 	}
@@ -67,19 +88,18 @@ func VolumeRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
-	if !server.ValidVolumeName(volumeName) { // TODO: Need to ensure that volume groups are handled properly
+func DeleteVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+	if !validVolumeName(volumeName) {
 		http.Error(w, "invalid volume name", http.StatusBadRequest)
 		return
 	}
 	CleanupVolumeData(s, volumeName)
 	s.RefreshStats()
-	server.RespondJSON(w, map[string]string{"status": fmt.Sprintf("Volume %q deleted", volumeName)})
+	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
-// FIXME: awkward naming
-func checkedTargetManager(s *server.Server, w http.ResponseWriter, target string) *restic.Manager {
-	if !server.ValidVolumeName(target) {
+func initTargetManager(s *server.Service, w http.ResponseWriter, target string) *restic.Manager {
+	if !validVolumeName(target) {
 		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
 		return nil
 	}
@@ -89,7 +109,7 @@ func checkedTargetManager(s *server.Server, w http.ResponseWriter, target string
 			return nil
 		}
 	}
-	tm := s.VolumeManager(target)
+	tm := s.ResticManager(target)
 	if err := tm.Init(); err != nil {
 		server.RespondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
 		return nil
@@ -97,22 +117,15 @@ func checkedTargetManager(s *server.Server, w http.ResponseWriter, target string
 	return tm
 }
 
-func writeRegisteredVolume(s *server.Server, w http.ResponseWriter, target string) bool {
-	ms, err := s.MetadataStore()
-	if err != nil {
-		server.RespondError(w, fmt.Errorf("initialize metadata store: %w", err), http.StatusInternalServerError)
+func writeRegisteredVolume(s *server.Service, w http.ResponseWriter, target string) bool {
+	if err := s.RegisterVolume(target); err != nil {
+		server.RespondError(w, fmt.Errorf("register volume: %w", err), http.StatusInternalServerError)
 		return false
-	}
-	if ms != nil {
-		if err := ms.WriteRegisteredVolume(target); err != nil {
-			server.RespondError(w, fmt.Errorf("write registered volume: %w", err), http.StatusInternalServerError)
-			return false
-		}
 	}
 	return true
 }
 
-func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
@@ -128,7 +141,7 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 		return
 	}
 
-	targetManager := checkedTargetManager(s, w, req.Target)
+	targetManager := initTargetManager(s, w, req.Target)
 	if targetManager == nil {
 		return
 	}
@@ -139,7 +152,7 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 		return
 	}
 
-	sourceManager := s.VolumeManager(volumeName)
+	sourceManager := s.ResticManager(volumeName)
 	preserveHistory := true
 	if req.PreserveHistory != nil {
 		preserveHistory = *req.PreserveHistory
@@ -179,18 +192,24 @@ func CopyVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volume
 
 	s.RefreshStats()
 
-	resp := map[string]any{
-		"status":           fmt.Sprintf("Volume %q copied to %q", volumeName, req.Target),
-		"source_owned":     owned,
-		"preserve_history": preserveHistory,
+	type copyResponse struct {
+		Status          string `json:"status"`
+		SourceOwned     bool   `json:"source_owned"`
+		PreserveHistory bool   `json:"preserve_history"`
+		SourceOwner     string `json:"source_owner,omitempty"`
+	}
+	cr := copyResponse{
+		Status:          fmt.Sprintf("Volume %q copied to %q", volumeName, req.Target),
+		SourceOwned:     owned,
+		PreserveHistory: preserveHistory,
 	}
 	if owned {
-		resp["source_owner"] = ownerName
+		cr.SourceOwner = ownerName
 	}
-	server.RespondJSON(w, resp)
+	server.RespondJSON(w, cr)
 }
 
-func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volumeName string) {
+func RenameVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
@@ -204,7 +223,7 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 		return
 	}
 
-	targetManager := checkedTargetManager(s, w, req.Target)
+	targetManager := initTargetManager(s, w, req.Target)
 	if targetManager == nil {
 		return
 	}
@@ -219,7 +238,7 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 		return
 	}
 
-	sourceManager := s.VolumeManager(volumeName)
+	sourceManager := s.ResticManager(volumeName)
 	if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
 		server.RespondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
 		return
@@ -243,7 +262,10 @@ func RenameVolume(s *server.Server, w http.ResponseWriter, r *http.Request, volu
 	CleanupVolumeData(s, volumeName)
 	s.RefreshStats()
 
-	server.RespondJSON(w, map[string]any{
-		"status": fmt.Sprintf("Volume %q renamed to %q", volumeName, req.Target),
+	type renameResponse struct {
+		Status string `json:"status"`
+	}
+	server.RespondJSON(w, renameResponse{
+		Status: fmt.Sprintf("Volume %q renamed to %q", volumeName, req.Target),
 	})
 }

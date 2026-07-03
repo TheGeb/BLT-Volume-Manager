@@ -2,87 +2,65 @@ package owner
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func VolumeOwner(s *server.Server, volumeName string) (map[string]any, error) {
-	ms, err := s.StoreForVolume()
+type OwnerInfo struct {
+	Volume string `json:"volume"`
+	Owner  string `json:"owner"`
+	Expiry int64  `json:"expiry,omitempty"`
+}
+
+type CreateOwnerResponse struct {
+	Volume    string `json:"volume"`
+	Owner     string `json:"owner"`
+	ExpiresAt int64  `json:"expires_at,omitempty"`
+}
+
+func VolumeOwner(s *server.Service, volumeName string) (*OwnerInfo, error) {
+	os, err := s.OwnerStore()
 	if err != nil {
 		return nil, err
 	}
-
-	folder := metadata.OwnerFolder(volumeName)
-	objects, err := ms.ListObjects(folder) // FIXME: more generic store methods which should use domain based methods
+	vo, err := os.FindForVolume(volumeName)
 	if err != nil {
-		return nil, fmt.Errorf("list owner objects: %w", err)
+		return nil, err
 	}
-
-	metadata.SortOwnersByExpiry(objects)
-	objects = metadata.RemoveStaleObjects(ms, objects, metadata.DefaultOwnerTTL) // FIXME: do async?
-
-	result := map[string]any{
-		"volume": volumeName,
-		"owner":  "",
-	}
-
-	key, owner, expiry := metadata.FindOwner(objects)
-	if key != "" {
-		result["owner"] = owner
-		if expiry > 0 {
-			result["expiry"] = expiry
-		}
-	}
-
-	return result, nil
+	return &OwnerInfo{Volume: vo.Volume, Owner: vo.Owner, Expiry: vo.Expiry}, nil
 }
 
-func IsVolumeOwned(s *server.Server, volumeName string) (bool, string, error) { // FIXME: consider rename like "ForVolume"?
+func IsVolumeOwned(s *server.Service, volumeName string) (bool, string, error) {
 	status, err := VolumeOwner(s, volumeName)
 	if err != nil {
 		return false, "", err
 	}
-	owner, ok := status["owner"].(string)
-	if ok && owner != "" {
-		return true, owner, nil
+	if status.Owner != "" {
+		return true, status.Owner, nil
 	}
 	return false, "", nil
 }
 
-func CreateVolumeOwner(s *server.Server, volumeName, ownerName string, ownerDurationMins int) (map[string]any, error) {
-	ms, err := s.StoreForVolume()
+func CreateVolumeOwner(s *server.Service, volumeName, ownerName string, ownerDurationMins int) (*CreateOwnerResponse, error) {
+	os, err := s.OwnerStore()
 	if err != nil {
 		return nil, err
 	}
-
-	if ownerName == "" {
-		return nil, fmt.Errorf("owner name is required")
-	}
-	var expiry int64
-	if ownerDurationMins > 0 {
-		expiry = time.Now().Add(time.Duration(ownerDurationMins) * time.Minute).Unix()
-	}
-
-	folder := metadata.OwnerFolder(volumeName)
-	_, err = metadata.AcquireOwnerLock(ms, folder, ownerName, expiry)
+	expiry, err := os.AcquireForVolume(volumeName, ownerName, ownerDurationMins)
 	if err != nil {
 		return nil, err
 	}
-
-	return map[string]any{
-		"volume":     volumeName,
-		"owner":      ownerName,
-		"expires_at": expiry,
+	return &CreateOwnerResponse{
+		Volume:    volumeName,
+		Owner:     ownerName,
+		ExpiresAt: expiry,
 	}, nil
 }
 
-func DeleteVolumeOwners(s *server.Server, volumeName string) error {
-	ms, err := s.StoreForVolume()
+func DeleteVolumeOwners(s *server.Service, volumeName string) error {
+	os, err := s.OwnerStore()
 	if err != nil {
 		return fmt.Errorf("initialize metadata store: %w", err)
 	}
-
-	return ms.DeleteOwnerObjects(metadata.OwnerFolder(volumeName))
+	return os.DeleteForVolume(volumeName)
 }

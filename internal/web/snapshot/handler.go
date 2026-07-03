@@ -15,7 +15,7 @@ const (
 	snapshotOpDelete  = "delete"
 )
 
-func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot/") {
 		http.NotFound(w, r)
 		return
@@ -38,7 +38,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 
 	switch parts[1] {
 	case snapshotOpDelete:
@@ -50,7 +50,7 @@ func SnapshotRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotFileRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
 		http.NotFound(w, r)
 		return
@@ -68,7 +68,7 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 		http.Error(w, server.ErrMissingVolume.Error(), http.StatusBadRequest)
 		return
 	}
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 
 	rawID := parts[0]
 	version := r.URL.Query().Get("tag")
@@ -102,7 +102,7 @@ func SnapshotFileRouter(s *server.Server, w http.ResponseWriter, r *http.Request
 	}
 }
 
-func handleDeleteSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+func handleDeleteSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
 	if !server.RequireMethod(w, r, http.MethodDelete) {
 		return
 	}
@@ -110,10 +110,10 @@ func handleDeleteSnapshot(s *server.Server, w http.ResponseWriter, r *http.Reque
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	server.RespondJSON(w, map[string]string{"status": "snapshot deleted"})
+	server.RespondJSON(w, server.StatusResponse{Status: "snapshot deleted"})
 }
 
-func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -130,7 +130,7 @@ func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	rm := s.VolumeManager(req.Volume)
+	rm := s.ResticManager(req.Volume)
 	resp := batchDeleteResponse{Errors: []batchDeleteError{}}
 	for _, id := range req.IDs {
 		if err := rm.ForgetSnapshots(id); err != nil {
@@ -143,7 +143,7 @@ func BatchDeleteSnapshots(s *server.Server, w http.ResponseWriter, r *http.Reque
 	server.RespondJSON(w, resp)
 }
 
-func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func SnapshotSizes(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -161,7 +161,7 @@ func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rm := s.VolumeManager(req.Volume)
+	rm := s.ResticManager(req.Volume)
 	result := map[string]int64{}
 	for _, id := range req.IDs {
 		stats, err := rm.SnapshotStats(id)
@@ -171,4 +171,73 @@ func SnapshotSizes(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		result[id] = stats.TotalSize
 	}
 	server.RespondJSON(w, result)
+}
+
+type SnapshotListResponse struct {
+	Snapshots      []WithVolume `json:"snapshots"`
+	RestorePointID string       `json:"restorePointID"`
+	HasMore        bool         `json:"hasMore"`
+	Status         string       `json:"status,omitempty"`
+}
+
+func BuildSnapshotListResponse(s *server.Service, volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (*SnapshotListResponse, error) {
+	rm := s.ResticManager(volName)
+	snaps, err := rm.ListSnapshotsWithOpts(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	snaps = ApplySnapshotFilter(snaps, filter)
+
+	rawLen := len(snaps)
+	hasMore := false
+	if limit > 0 {
+		switch {
+		case offset+limit <= rawLen:
+			hasMore = rawLen > offset+limit
+			snaps = snaps[offset : offset+limit]
+		case offset < rawLen:
+			snaps = snaps[offset:]
+		default:
+			snaps = nil
+		}
+	} else if offset > 0 && offset < rawLen {
+		snaps = snaps[offset:]
+	}
+
+	restorePointID := ""
+	if id, err := s.FindRestorePointByName(volName); err == nil {
+		restorePointID = id
+	}
+
+	result := make([]WithVolume, 0, len(snaps))
+	for _, snap := range snaps {
+		fullHash := rm.GenerateHash(snap)
+		snap.FallbackHash = fullHash[:len(snap.ShortID)]
+		result = append(result, WithVolume{Snapshot: snap, Volume: volName})
+	}
+
+	return &SnapshotListResponse{
+		Snapshots:      result,
+		RestorePointID: restorePointID,
+		HasMore:        hasMore,
+	}, nil
+}
+
+func ListSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
+	if !server.RequireMethod(w, r, http.MethodGet) {
+		return
+	}
+	volName, ok := server.RequireVolumeParam(w, r)
+	if !ok {
+		return
+	}
+
+	opts, filter, offset, limit := ParseSnapshotListOpts(r)
+	resp, err := BuildSnapshotListResponse(s, volName, opts, filter, offset, limit)
+	if err != nil {
+		server.RespondError(w, err, http.StatusInternalServerError)
+		return
+	}
+	server.RespondJSON(w, resp)
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func handleRestoreSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+func handleRestoreSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -26,5 +26,5 @@ func handleRestoreSnapshot(s *server.Server, w http.ResponseWriter, r *http.Requ
 			log.Info("restore_ok")
 		}
 	}()
-	server.RespondJSON(w, map[string]string{"status": "restore started – see server logs for results"})
+	server.RespondJSON(w, server.StatusResponse{Status: "restore started – see server logs for results"})
 }

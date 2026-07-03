@@ -28,42 +28,38 @@ type VolumeInfo struct {
 }
 
 type Driver struct {
-	root          string
-	resticBase    string
-	ownerClient   metadata.OwnerClient
-	vols          map[string]*VolumeInfo
-	mu            sync.Mutex
-	metadataStore *metadata.Store
+	root              string
+	resticBase        string
+	ownerClient       metadata.OwnerLocker
+	vols              map[string]*VolumeInfo
+	mu                sync.Mutex
+	versionStore      *metadata.VersionStore
+	restorePointStore *metadata.RestorePointStore
 }
 
 func New(c appcfg.Config, ctx context.Context) *Driver {
 	root := c.DataDir
 
-	var objectStore metadata.ObjectStore
+	var stores *metadata.Stores
 	if c.MetadataBackend != "" || c.S3Bucket != "" {
 		var err error
-		objectStore, err = appcfg.OpenMetadataBackend(c)
+		stores, err = appcfg.OpenMetadataBackend(c)
 		if err != nil {
 			log.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
 		}
 	}
 
-	var l metadata.OwnerClient
-	if objectStore != nil {
-		l = metadata.NewOwnerClient(objectStore, c.OwnerMaxMins)
-	}
-
 	snapshot.InitRoot(root)
 
 	drv := &Driver{
-		root:        root,
-		resticBase:  c.ResticBase,
-		ownerClient: l,
-		vols:        make(map[string]*VolumeInfo),
+		root:       root,
+		resticBase: c.ResticBase,
+		vols:       make(map[string]*VolumeInfo),
 	}
-
-	if objectStore != nil {
-		drv.metadataStore = metadata.New(objectStore)
+	if stores != nil {
+		drv.ownerClient = metadata.NewOwnerLocker(stores, c.OwnerMaxMins)
+		drv.versionStore = stores.Versions
+		drv.restorePointStore = stores.RestorePoints
 	}
 
 	go drv.monitorOrphanedSnapshots(ctx)
@@ -75,10 +71,10 @@ func (d *Driver) ResticManager(volName string) *restic.Manager {
 }
 
 func (d *Driver) nextVersionTags(name string, major bool) []string {
-	if d.metadataStore == nil {
+	if d.versionStore == nil {
 		return nil
 	}
-	tags, err := d.metadataStore.NextVersionTags(name, major)
+	tags, err := d.versionStore.NextTags(name, major)
 	if err != nil {
 		log.Errorf("version_counter_failed", err, "volume=%s", name)
 		return nil

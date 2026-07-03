@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func CheckRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func CheckRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -15,7 +15,7 @@ func CheckRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 	err := rm.Check(true)
 	if err != nil {
 		log.Error("check_failed", err)
@@ -23,10 +23,10 @@ func CheckRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Info("check_ok")
-	server.RespondJSON(w, map[string]string{"status": "Check completed, repository is healthy."})
+	server.RespondJSON(w, server.StatusResponse{Status: "Check completed, repository is healthy."})
 }
 
-func RepairRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func RepairRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -34,7 +34,7 @@ func RepairRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rm := s.VolumeManager(volName)
+	rm := s.ResticManager(volName)
 	err := rm.Repair()
 	if err != nil {
 		log.Error("repair_failed", err)
@@ -42,5 +42,5 @@ func RepairRepo(s *server.Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Info("repair_ok")
-	server.RespondJSON(w, map[string]string{"status": "Repair completed, index rebuilt and stale restic locks have been cleared."})
+	server.RespondJSON(w, server.StatusResponse{Status: "Repair completed, index rebuilt and stale restic locks have been cleared."})
 }

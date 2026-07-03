@@ -22,7 +22,7 @@ func (b *btrfsProvider) MatchFSType(fsType string) bool {
 	return fsType == "btrfs"
 }
 
-func (b *btrfsProvider) Init(path string, _ map[string]string) error {
+func (b *btrfsProvider) Init(path string, _ snapshot.FsOptions) error {
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("remove path: %w", err)
 	}

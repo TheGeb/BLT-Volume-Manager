@@ -8,6 +8,14 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
+type StatusResponse struct {
+	Status string `json:"status"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 var (
 	ErrMethodNotAllowed = errors.New("method not allowed")
 	ErrMissingVolume    = errors.New("missing volume query parameter")
@@ -40,7 +48,7 @@ func RespondError(w http.ResponseWriter, err error, status int) {
 		msg = err.Error()
 		log.Error("request_error", err)
 	}
-	if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": msg}); encodeErr != nil {
+	if encodeErr := json.NewEncoder(w).Encode(ErrorResponse{Error: msg}); encodeErr != nil {
 		log.Error("encode_error_response_failed", encodeErr)
 	}
 }

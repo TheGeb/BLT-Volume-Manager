@@ -71,7 +71,8 @@ func (d *Driver) initFsType(opts map[string]string, name, volPath string) string
 			log.Warnf("volume_fs_mismatch", "volume=%s fs=%s parent=%s", name, candidate, parent)
 			return ""
 		}
-		if err := snapshot.InitFs(volPath, t, opts); err != nil {
+		fsOpts := snapshot.FsOptions{ZfsPool: opts["zfs-pool"]}
+		if err := snapshot.InitFs(volPath, t, fsOpts); err != nil {
 			log.Errorf("fs_init_failed", err, "volume=%s fs=%s", name, candidate)
 			return ""
 		}
@@ -155,8 +156,8 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 			}
 		}
 
-		if vi.FsType != "" {
-			snapID, err := metadata.FindRestorePointByName(d.metadataStore, name)
+		if vi.FsType != "" && d.restorePointStore != nil {
+			snapID, err := d.restorePointStore.FindByName(name)
 			if err != nil {
 				log.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
@@ -178,7 +179,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 						log.Errorf("restore_failed", err, "volume=%s snapshot=%s", name, snapID)
 					} else {
 						log.Infof("restore_complete_removing_point", "volume=%s", name)
-						if err := metadata.DeleteRestorePoint(d.metadataStore, name); err != nil {
+						if err := d.restorePointStore.Delete(name); err != nil {
 							log.Errorf("remove_restore_point_failed", err, "volume=%s", name)
 						}
 					}
@@ -226,6 +227,12 @@ func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
 	return &volume.PathResponse{Mountpoint: volPath}, nil
 }
 
+type VolumeStatus struct {
+	State    string `json:"state"`
+	Attached string `json:"attached"`
+	FsType   string `json:"fs_type,omitempty"`
+}
+
 func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 	volPath := VolumePath(d.root, r.Name)
 	d.mu.Lock()
@@ -239,14 +246,14 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 			state = "owned"
 		}
 	}
-	status := map[string]any{
+	statusMap := map[string]any{
 		"state":    state,
 		"attached": fmt.Sprintf("%d", attached),
 	}
 	if ok && vi.FsType != "" {
-		status["fs_type"] = vi.FsType
+		statusMap["fs_type"] = vi.FsType
 	}
-	return &volume.GetResponse{Volume: &volume.Volume{Name: r.Name, Mountpoint: volPath, Status: status}}, nil
+	return &volume.GetResponse{Volume: &volume.Volume{Name: r.Name, Mountpoint: volPath, Status: statusMap}}, nil
 }
 
 func (d *Driver) List() (*volume.ListResponse, error) {
@@ -263,13 +270,18 @@ func (d *Driver) Capabilities() *volume.CapabilitiesResponse {
 	return &volume.CapabilitiesResponse{Capabilities: volume.Capability{Scope: "local"}}
 }
 
-func (d *Driver) SnapVolumes() map[string]string {
+type SnapVolume struct {
+	Name   string
+	FsType string
+}
+
+func (d *Driver) SnapVolumes() []SnapVolume {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	out := make(map[string]string, len(d.vols))
+	out := make([]SnapVolume, 0, len(d.vols))
 	for name, vi := range d.vols {
 		if vi.FsType != "" {
-			out[name] = vi.FsType
+			out = append(out, SnapVolume{Name: name, FsType: vi.FsType})
 		}
 	}
 	return out

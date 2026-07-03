@@ -8,39 +8,45 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-type mockObjectStore struct {
-	objects    []metadata.Object
+type mockKeyValueStore struct {
+	objects    []backend.Entry
 	objectsErr error
 }
 
-func (m *mockObjectStore) PutObject(string, []byte) error                      { return nil }
-func (m *mockObjectStore) ReadObject(string) ([]byte, error)                   { return nil, metadata.ErrKeyNotFound }
-func (m *mockObjectStore) DeleteObject(string) error                           { return nil }
-func (m *mockObjectStore) ListObjects(string) ([]metadata.Object, error)       { return m.objects, m.objectsErr }
-func (m *mockObjectStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
-func (m *mockObjectStore) DeleteObjectsWithPrefix(string) error                { return nil }
+func (m *mockKeyValueStore) PutObject(string, []byte) error    { return nil }
+func (m *mockKeyValueStore) ReadObject(string) ([]byte, error) { return nil, backend.ErrKeyNotFound }
+func (m *mockKeyValueStore) DeleteObject(string) error         { return nil }
+func (m *mockKeyValueStore) ListObjects(string) ([]backend.Entry, error) {
+	return m.objects, m.objectsErr
+}
+func (m *mockKeyValueStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
+func (m *mockKeyValueStore) DeleteObjectsWithPrefix(string) error                { return nil }
 
-func mockStore(objects []metadata.Object, objectsErr error) *metadata.Store {
-	return metadata.New(&mockObjectStore{objects: objects, objectsErr: objectsErr})
+func mockStores(objects []backend.Entry, objectsErr error) *metadata.Stores {
+	be := &mockKeyValueStore{objects: objects, objectsErr: objectsErr}
+	return &metadata.Stores{
+		Volumes: metadata.NewVolumeStore(be),
+	}
 }
 
-func volumeObjects(names ...string) []metadata.Object {
-	var objs []metadata.Object
+func volumeObjects(names ...string) []backend.Entry {
+	var objs []backend.Entry
 	for _, n := range names {
 		key := metadata.RegisteredVolumesPrefix + n + ".json"
-		objs = append(objs, metadata.Object{Key: &key})
+		objs = append(objs, backend.Entry{Key: &key})
 	}
 	return objs
 }
 
 func TestListVolumes(t *testing.T) {
-	s := &server.Server{
+	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(mockStore(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
+	s.SetStores(mockStores(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -72,10 +78,10 @@ func TestListVolumes(t *testing.T) {
 }
 
 func TestListVolumesEmpty(t *testing.T) {
-	s := &server.Server{
+	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(mockStore(nil, nil))
+	s.SetStores(mockStores(nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -100,10 +106,10 @@ func TestListVolumesEmpty(t *testing.T) {
 }
 
 func TestListVolumesMethodNotAllowed(t *testing.T) {
-	s := &server.Server{
+	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadataStore(mockStore(volumeObjects("vol-a"), nil))
+	s.SetStores(mockStores(volumeObjects("vol-a"), nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -115,7 +121,7 @@ func TestListVolumesMethodNotAllowed(t *testing.T) {
 }
 
 func TestListVolumesNoS3(t *testing.T) {
-	s := &server.Server{}
+	s := &server.Service{}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()

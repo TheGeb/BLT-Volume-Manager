@@ -35,6 +35,10 @@ func (t Type) String() string {
 	return ""
 }
 
+type FsOptions struct {
+	ZfsPool string
+}
+
 type Info struct {
 	VolName    string
 	SnapDir    string
@@ -48,7 +52,7 @@ type Provider interface {
 	MatchFSType(fsType string) bool
 	CreateSnapshot(volPath, accessPath, volName string, info *Info) error
 	RemoveSnapshot(info *Info) error
-	Init(path string, opts map[string]string) error
+	Init(path string, opts FsOptions) error
 	Destroy(path string) error
 }
 
@@ -192,7 +196,7 @@ func ZFSDataset(path string) (string, error) {
 	return source, nil
 }
 
-func InitFs(volPath string, t Type, opts map[string]string) error {
+func InitFs(volPath string, t Type, opts FsOptions) error {
 	s, ok := providers[t]
 	if !ok {
 		return fmt.Errorf("unsupported snapshot filesystem type: %s", t)

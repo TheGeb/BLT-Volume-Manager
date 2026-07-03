@@ -1,4 +1,4 @@
-package s3
+package backend
 
 import (
 	"testing"
@@ -7,12 +7,12 @@ import (
 func TestConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     Config
+		cfg     S3Config
 		wantErr bool
 	}{
-		{"valid", Config{S3Bucket: "my-bucket"}, false},
-		{"empty bucket", Config{}, true},
-		{"empty bucket with endpoint", Config{S3Endpoint: "http://localhost:9000"}, true},
+		{"valid", S3Config{S3Bucket: "my-bucket"}, false},
+		{"empty bucket", S3Config{}, true},
+		{"empty bucket with endpoint", S3Config{S3Endpoint: "http://localhost:9000"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

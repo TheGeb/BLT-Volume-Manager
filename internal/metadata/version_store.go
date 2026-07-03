@@ -4,10 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
-func (s *Store) NextVersionTags(name string, major bool) ([]string, error) {
-	v, err := s.ReadVersionCounter(name)
+type VersionStore struct {
+	be backend.KeyValueStore
+}
+
+func NewVersionStore(be backend.KeyValueStore) *VersionStore {
+	return &VersionStore{be: be}
+}
+
+func (s *VersionStore) NextTags(name string, major bool) ([]string, error) {
+	v, err := s.ReadCounter(name)
 	if err != nil {
 		if !errors.Is(err, ErrKeyNotFound) {
 			return nil, err
@@ -20,7 +30,7 @@ func (s *Store) NextVersionTags(name string, major bool) ([]string, error) {
 	} else {
 		v.Minor++
 	}
-	if err := s.WriteVersionCounter(name, *v); err != nil {
+	if err := s.WriteCounter(name, *v); err != nil {
 		return nil, err
 	}
 	return []string{
@@ -29,16 +39,16 @@ func (s *Store) NextVersionTags(name string, major bool) ([]string, error) {
 	}, nil
 }
 
-func (s *Store) WriteVersionCounter(vol string, v VersionCounter) error {
+func (s *VersionStore) WriteCounter(vol string, v VersionCounter) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("marshal version counter: %w", err)
 	}
-	return s.store.PutObject(VersionPrefix+vol+".json", data)
+	return s.be.PutObject(VersionPrefix+vol+".json", data)
 }
 
-func (s *Store) ReadVersionCounter(vol string) (*VersionCounter, error) {
-	data, err := s.store.ReadObject(VersionPrefix + vol + ".json")
+func (s *VersionStore) ReadCounter(vol string) (*VersionCounter, error) {
+	data, err := s.be.ReadObject(VersionPrefix + vol + ".json")
 	if err != nil {
 		if errors.Is(err, ErrKeyNotFound) {
 			return nil, ErrKeyNotFound

@@ -13,12 +13,21 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func TestMode(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func TestMode(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	enabled := os.Getenv("BLT_DEV_MODE") != ""
-	server.RespondJSON(w, map[string]bool{"enabled": enabled})
+	server.RespondJSON(w, DevModeResponse{Enabled: enabled})
 }
 
-func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request) {
+type DevModeResponse struct {
+	Enabled bool `json:"enabled"`
+}
+
+type devToolCreateResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -35,7 +44,7 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 		server.RespondError(w, fmt.Errorf("name is required"), http.StatusBadRequest)
 		return
 	}
-	rm := s.VolumeManager(req.Name)
+	rm := s.ResticManager(req.Name)
 	volPath, err := os.MkdirTemp("", "blt-dummy-volume-")
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
@@ -68,19 +77,17 @@ func CreateDummyVolume(s *server.Server, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if ms, err := s.MetadataStore(); err == nil && ms != nil {
-		if err := ms.WriteRegisteredVolume(req.Name); err != nil {
-			log.Error("write_registered_volume_failed", err)
-		}
+	if err := s.RegisterVolume(req.Name); err != nil {
+		log.Error("register_volume_failed", err)
 	}
 
-	server.RespondJSON(w, map[string]string{
-		"status":  "ok",
-		"message": fmt.Sprintf("Created test volume %q with %d files and backed up", req.Name, count),
+	server.RespondJSON(w, devToolCreateResponse{
+		Status:  "ok",
+		Message: fmt.Sprintf("Created test volume %q with %d files and backed up", req.Name, count),
 	})
 }
 
-func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Request) {
+func CreateDummySnapshot(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -98,7 +105,7 @@ func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	rm := s.VolumeManager(req.Volume)
+	rm := s.ResticManager(req.Volume)
 	volPath, err := os.MkdirTemp("", "blt-dummy-snapshot-")
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("create temp dir: %w", err), http.StatusInternalServerError)
@@ -114,9 +121,9 @@ func CreateDummySnapshot(s *server.Server, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	server.RespondJSON(w, map[string]string{
-		"status":  "ok",
-		"message": fmt.Sprintf("Created test snapshot with %d files on volume %q", count, req.Volume),
+	server.RespondJSON(w, devToolCreateResponse{
+		Status:  "ok",
+		Message: fmt.Sprintf("Created test snapshot with %d files on volume %q", count, req.Volume),
 	})
 }
 

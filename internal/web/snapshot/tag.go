@@ -3,12 +3,11 @@ package snapshot
 import (
 	"net/http"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func handleTagSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
+func handleTagSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
 		http.Error(w, "missing tag", http.StatusBadRequest)
@@ -25,10 +24,9 @@ func handleTagSnapshot(s *server.Server, w http.ResponseWriter, r *http.Request,
 	}
 }
 
-func handleAddTag(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
-	store, _ := s.MetadataStore()
+func handleAddTag(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
 	if tag == "restore-point" {
-		if err := metadata.SetRestorePoint(store, r.URL.Query().Get("volume"), snapshotID); err != nil {
+		if err := s.SetRestorePoint(r.URL.Query().Get("volume"), snapshotID); err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -38,19 +36,18 @@ func handleAddTag(s *server.Server, w http.ResponseWriter, r *http.Request, rm *
 			return
 		}
 	}
-	resp, err := SnapshotListResponse(s, r.URL.Query().Get("volume"), nil, nil, 0, 0)
+	resp, err := BuildSnapshotListResponse(s, r.URL.Query().Get("volume"), nil, nil, 0, 0)
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	resp["status"] = "tag added"
+	resp.Status = "tag added"
 	server.RespondJSON(w, resp)
 }
 
-func handleRemoveTag(s *server.Server, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
-	store, _ := s.MetadataStore()
+func handleRemoveTag(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
 	if tag == "restore-point" {
-		if err := metadata.DeleteRestorePoint(store, r.URL.Query().Get("volume")); err != nil {
+		if err := s.DeleteRestorePoint(r.URL.Query().Get("volume")); err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -60,11 +57,11 @@ func handleRemoveTag(s *server.Server, w http.ResponseWriter, r *http.Request, r
 			return
 		}
 	}
-	resp, err := SnapshotListResponse(s, r.URL.Query().Get("volume"), nil, nil, 0, 0)
+	resp, err := BuildSnapshotListResponse(s, r.URL.Query().Get("volume"), nil, nil, 0, 0)
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
-	resp["status"] = "tag removed"
+	resp.Status = "tag removed"
 	server.RespondJSON(w, resp)
 }
