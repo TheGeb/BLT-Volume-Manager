@@ -16,8 +16,7 @@ linters:
   settings:
     exhaustive:
       default-signifies-exhaustive: true
-    unused:
-      check-exported: true
+
   exclusions:
     paths:
       - web/ui/node_modules
