@@ -1,15 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import StatsGrid from '../../components/StoragePanel.svelte';
   import OwnerPanel from './OwnerPanel.svelte';
   import TroubleshootPanel from './ActionsPanel.svelte';
   import { onSelectVolume, switchTab } from '$lib/stores/navigation';
   import { activeTab, ownerStatus, stats, statsLoading, checking, repairing, loadOwnerStatus, handleCheck, handleRepair } from '$lib/stores/repo';
   import { selectedVolume, openDeleteVolModal } from '$lib/stores/volumes';
-
-  onMount(() => {
-    loadOwnerStatus();
-  });
 </script>
 
 <div id="volume-view">

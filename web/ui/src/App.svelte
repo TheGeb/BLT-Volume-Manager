@@ -293,7 +293,7 @@
     </div>
   </header>
 
-  <Toaster position="bottom-right" visibleToasts={3} toastOptions={{ style: 'padding:18px 28px;font-size:1rem;font-weight:500;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:0 6px 24px rgb(0 0 0 / 30%);' }} />
+  <Toaster position="bottom-right" visibleToasts={3} toastOptions={{ style: 'padding:18px 28px;font-size:1rem;font-weight:500;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:0 6px 24px rgb(0 0 0 / 30%);', actionButtonStyle: 'background:var(--accent);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;margin-left:12px;flex-shrink:0;' }} />
 
   {#if !$selectedVolume}
     <VolumesPage

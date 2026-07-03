@@ -1,10 +1,15 @@
+import { writable } from 'svelte/store';
 import { toast as sonnerToast } from 'svelte-sonner';
+import ToastCopyButton from './ToastCopyButton.svelte';
+
+export const toastCopyMsg = writable('');
 
 export function showToast(msg: string, isError = false) {
   if (!msg) return;
+  toastCopyMsg.set(msg);
   if (isError) {
-    sonnerToast.error(msg);
+    sonnerToast.error(msg, { action: ToastCopyButton });
   } else {
-    sonnerToast(msg);
+    sonnerToast(msg, { action: ToastCopyButton });
   }
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { Button, Popover } from 'bits-ui';
   import {
     hostFilter, typeFilter, versionFrom, versionTo, reloadWithFilters, allHosts, loadHosts,
@@ -124,7 +124,7 @@
 
   function handleVersionOpenChange(o: boolean) {
     versionOpen = o;
-    if (o) versionInputs?.loadFields();
+    if (o) tick().then(() => versionInputs?.loadFields());
   }
 
   function commitVersion(from: string, to: string) {
@@ -466,7 +466,7 @@
     font-size: 0.85rem;
     font-weight: 600;
     height: auto;
-    background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 35%, var(--accent-soft)));
+    background: var(--accent);
     color: #fff;
     border: 1px solid var(--accent);
     cursor: pointer;
@@ -475,7 +475,7 @@
   }
 
   :global(.search-btn:hover) {
-    background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 85%, #fff), color-mix(in srgb, color-mix(in srgb, var(--accent) 35%, var(--accent-soft)) 85%, #fff));
+    background: color-mix(in srgb, var(--accent) 85%, #000);
   }
 
   :global(.search-btn:focus-visible) {

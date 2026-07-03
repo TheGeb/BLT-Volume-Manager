@@ -442,6 +442,7 @@
                     checked={isSelected(sn.id)}
                     disabled={sn.id === disabledId}
                     onchange={() => handleSelect(sn.id)}
+                    onclick={(e) => e.stopPropagation()}
                     name="snap-picker"
                   />
                 </td>

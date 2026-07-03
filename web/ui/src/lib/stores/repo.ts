@@ -75,7 +75,9 @@ export async function loadOwnerStatus() {
   if (!vol) { ownerStatus.set(null); return; }
   try {
     ownerStatus.set(await api.fetchOwnerStatus(vol));
-  } catch { ownerStatus.set(null); }
+  } catch {
+    ownerStatus.set({ volume: vol, owner: '' });
+  }
 }
 
 export async function loadStats(volume: string) {
