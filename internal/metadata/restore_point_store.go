@@ -54,7 +54,3 @@ func (s *RestorePointStore) FindByName(volName string) (string, error) {
 func (s *RestorePointStore) Delete(volume string) error {
 	return s.be.DeleteObject(RestorePointPrefix + volume + ".json")
 }
-
-func deleteRestorePoint(be backend.KeyValueStore, volume string) error {
-	return be.DeleteObject(RestorePointPrefix + volume + ".json")
-}

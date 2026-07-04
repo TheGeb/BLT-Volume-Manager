@@ -36,11 +36,7 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.statsCommand("raw-data")...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.Stats(ctx, "raw-data")
 	if err != nil {
 		log.Errorf("restic_stats_failed", err, "stderr=%s", string(out))
 		return nil, fmt.Errorf("restic stats: %w", err)
@@ -58,11 +54,7 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.statsSnapshotCommand(snapshotID)...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.StatsSnapshot(ctx, snapshotID)
 	if err != nil {
 		return nil, fmt.Errorf("restic snapshot stats: %w", err)
 	}
@@ -78,11 +70,7 @@ func (m *Manager) repositoryExists() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.repoExistsCommand()...)
-	if err != nil {
-		return false, err
-	}
-	out, err := cmd.CombinedOutput()
+	out, err := m.runner.RepoExists(ctx)
 	if err != nil {
 		if isRepositoryMissing(string(out)) {
 			return false, nil
@@ -93,13 +81,13 @@ func (m *Manager) repositoryExists() (bool, error) {
 }
 
 func (m *Manager) initRepository() error {
-	return m.runSimple(context.Background(), m.initCommand()...)
+	return m.runner.Init(context.Background())
 }
 
 func (m *Manager) Check(noLock bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
 	defer cancel()
-	return m.runSimple(ctx, m.checkCommand(noLock)...)
+	return m.runner.Check(ctx, noLock)
 }
 
 func (m *Manager) Repair() error {
@@ -108,22 +96,22 @@ func (m *Manager) Repair() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
-	return m.runSimple(ctx, m.repairCommand()...)
+	return m.runner.Repair(ctx)
 }
 
 func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
 	defer cancel()
-
-	cmd, err := m.resticCommandForRepo(ctx, destRepo, m.copyCommand(destRepo, snapshotIDs...)...)
-	if err != nil {
-		return err
-	}
-	return m.runCommand(cmd)
+	return m.runner.Copy(ctx, destRepo, snapshotIDs...)
 }
 
 func (m *Manager) Unlock() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return m.runSimple(ctx, m.unlockCommand()...)
+	return m.runner.Unlock(ctx)
+}
+
+func isRepositoryMissing(output string) bool {
+	out := strings.ToLower(output)
+	return strings.Contains(out, "not found") || strings.Contains(out, "does not exist") || strings.Contains(out, "not initialized")
 }

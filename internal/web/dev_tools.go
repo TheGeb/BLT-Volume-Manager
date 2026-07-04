@@ -14,7 +14,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func TestMode(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func DevMode(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	enabled := os.Getenv("BLT_DEV_MODE") != ""
 	server.RespondJSON(w, DevModeResponse{Enabled: enabled})
 }
@@ -53,7 +53,7 @@ func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request
 	}
 	defer func() { _ = os.RemoveAll(volPath) }()
 
-	if err := os.WriteFile(filepath.Join(volPath, VolumeConfigFile), []byte(`{"fs_type":""}`), app.DefaultFilePerm); err != nil {
+	if err := os.WriteFile(filepath.Join(volPath, "volume.json"), []byte(`{"fs_type":""}`), app.DefaultFilePerm); err != nil {
 		server.RespondError(w, fmt.Errorf("write volume config: %w", err), http.StatusInternalServerError)
 		return
 	}

@@ -12,12 +12,14 @@ import (
 
 // EtcdConfig configures an etcd backend client.
 type EtcdConfig struct {
-	Endpoints   []string
-	DialTimeout time.Duration
+	Endpoints      []string
+	DialTimeout    time.Duration
+	RequestTimeout time.Duration
 }
 
 type etcdClient struct {
 	client *clientv3.Client
+	cfg    EtcdConfig
 }
 
 var _ KeyValueStore = (*etcdClient)(nil)
@@ -30,6 +32,9 @@ func NewEtcdClient(cfg EtcdConfig) (KeyValueStore, error) {
 	if dialTimeout <= 0 {
 		dialTimeout = 5 * time.Second
 	}
+	if cfg.RequestTimeout <= 0 {
+		cfg.RequestTimeout = 10 * time.Second
+	}
 
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   cfg.Endpoints,
@@ -39,11 +44,11 @@ func NewEtcdClient(cfg EtcdConfig) (KeyValueStore, error) {
 		return nil, fmt.Errorf("etcd: create client: %w", err)
 	}
 
-	return &etcdClient{client: cli}, nil
+	return &etcdClient{client: cli, cfg: cfg}, nil
 }
 
 func (c *etcdClient) PutObject(key string, data []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
 	defer cancel()
 
 	_, err := c.client.Put(ctx, key, string(data))
@@ -51,7 +56,7 @@ func (c *etcdClient) PutObject(key string, data []byte) error {
 }
 
 func (c *etcdClient) ReadObject(key string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
 	defer cancel()
 
 	resp, err := c.client.Get(ctx, key)
@@ -65,7 +70,7 @@ func (c *etcdClient) ReadObject(key string) ([]byte, error) {
 }
 
 func (c *etcdClient) DeleteObject(key string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
 	defer cancel()
 
 	_, err := c.client.Delete(ctx, key)
@@ -73,7 +78,7 @@ func (c *etcdClient) DeleteObject(key string) error {
 }
 
 func (c *etcdClient) ListObjects(prefix string) ([]Entry, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
 	defer cancel()
 
 	resp, err := c.client.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
@@ -117,7 +122,7 @@ func (c *etcdClient) ListCommonPrefixes(prefix, delimiter string) ([]string, err
 }
 
 func (c *etcdClient) DeleteObjectsWithPrefix(prefix string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
 	defer cancel()
 
 	_, err := c.client.Delete(ctx, prefix, clientv3.WithPrefix())

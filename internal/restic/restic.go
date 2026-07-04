@@ -3,12 +3,12 @@ package restic
 import (
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/run"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
 
 type Manager struct {
 	repo   string
-	runner *run.Runner
+	runner *cli.Runner
 }
 
 type Snapshot struct {
@@ -35,7 +35,7 @@ const (
 )
 
 func NewManager(repo string) *Manager {
-	return &Manager{repo: repo, runner: &run.Runner{Repo: repo}}
+	return &Manager{repo: repo, runner: &cli.Runner{Repo: repo}}
 }
 
 func WithTags(base string, extra ...string) []string {

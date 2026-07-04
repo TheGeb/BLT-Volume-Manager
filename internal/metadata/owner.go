@@ -12,6 +12,12 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
+type OwnerEntry struct {
+	Name       string `json:"name"`
+	ExpiryTime int64  `json:"expiry_time"`
+}
+
+// Locking algorithm: Create a proposal with current time, then list all proposals. If another owner already exists and has an earlier timestamp, delete your proposal
 func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry int64) (myKey string, err error) {
 	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
 	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
@@ -47,7 +53,7 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 		_ = store.DeleteObject(k)
 	}
 
-	objects, err = store.ListObjects(folder)
+	objects, err = store.ListObjects(folder) // FIXME: Always double reading is unnecessary
 	if err != nil {
 		return "", fmt.Errorf("re-list proposals: %w", err)
 	}
@@ -67,8 +73,6 @@ func (o *OwnerEntry) RemainingSeconds() int64 {
 	}
 	return o.ExpiryTime - time.Now().Unix()
 }
-
-func (e *OwnerLockError) Error() string { return e.Msg }
 
 func OwnerFolder(volumeName string) string {
 	return OwnerPrefix + volumeName + "/"
@@ -112,6 +116,7 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 	return volume, owner, expiry, nil
 }
 
+// FIXME: Rename this
 func FindOwner(objects []backend.Entry) (firstKey string, firstOwner string, firstExpiry int64) {
 	now := time.Now().Unix()
 	for _, obj := range objects {
@@ -131,6 +136,7 @@ func FindOwner(objects []backend.Entry) (firstKey string, firstOwner string, fir
 }
 
 func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, ttl time.Duration) []backend.Entry {
+	now := time.Now()
 	kept := make([]backend.Entry, 0, len(objects))
 	for _, obj := range objects {
 		if obj.Key == nil {
@@ -138,7 +144,11 @@ func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, tt
 		}
 		_, _, expiry, err := ParseOwnerKey(*obj.Key)
 		isPermanent := err == nil && expiry == 0
-		if !isPermanent && obj.LastModified != nil && time.Since(*obj.LastModified) > ttl {
+		if err == nil && expiry > now.Unix() {
+			kept = append(kept, obj)
+			continue
+		}
+		if !isPermanent && obj.LastModified != nil && now.Sub(*obj.LastModified) > ttl {
 			_ = store.DeleteObject(*obj.Key)
 			continue
 		}

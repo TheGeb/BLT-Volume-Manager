@@ -21,6 +21,30 @@ func NewOwnerStore(be backend.KeyValueStore) *OwnerStore {
 	return &OwnerStore{be: be}
 }
 
+func (s *OwnerStore) LockVolume(volumeName, ownerName string, expiry int64) (string, error) {
+	folder := OwnerFolder(volumeName)
+	return AcquireOwnerLock(s.be, folder, ownerName, expiry)
+}
+
+func (s *OwnerStore) LockIsValid(key string) (bool, error) {
+	_, _, expiry, err := ParseOwnerKey(key)
+	if err != nil {
+		return false, fmt.Errorf("parse lock key: %w", err)
+	}
+	if expiry > 0 && expiry <= time.Now().Unix() {
+		return false, nil
+	}
+	_, err = s.be.ReadObject(key)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *OwnerStore) ReleaseLock(key string) error {
+	return s.be.DeleteObject(key)
+}
+
 func (s *OwnerStore) FindForVolume(volumeName string) (*VolumeOwner, error) {
 	objects, err := s.be.ListObjects(OwnerFolder(volumeName))
 	if err != nil {
@@ -81,8 +105,7 @@ func (s *OwnerStore) AcquireForVolume(volumeName, ownerName string, durationMins
 		expiry = time.Now().Add(time.Duration(durationMins) * time.Minute).Unix()
 	}
 
-	folder := OwnerFolder(volumeName)
-	_, err := AcquireOwnerLock(s.be, folder, ownerName, expiry)
+	_, err := s.LockVolume(volumeName, ownerName, expiry)
 	if err != nil {
 		return 0, err
 	}

@@ -48,7 +48,7 @@ func (s *VolumeStore) DeleteVolumeData(volumeName string) error {
 	if err := s.be.DeleteObjectsWithPrefix(OwnerPrefix + volumeName + "/"); err != nil {
 		return err
 	}
-	if err := deleteRestorePoint(s.be, volumeName); err != nil {
+	if err := s.be.DeleteObject(RestorePointPrefix + volumeName + ".json"); err != nil {
 		return err
 	}
 	return s.be.DeleteObjectsWithPrefix("restic/" + volumeName + "/")

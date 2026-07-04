@@ -19,20 +19,21 @@ type volumeConfig struct {
 }
 
 type VolumeInfo struct {
-	Name      string
-	Path      string
-	OwnerLock metadata.OwnerLock
-	FsType    string
-	attached  int
-	cancel    context.CancelFunc
+	Name     string
+	Path     string
+	LockKey  string
+	FsType   string
+	attached int
+	cancel   context.CancelFunc
 }
 
 type Driver struct {
-	root              string
-	resticBase        string
-	ownerClient       metadata.OwnerLocker
+	root              string // TODO: Rename to something like volumePath?
+	resticBase        string // TODO: Rename to something like resticPath?
+	ownerMaxMins      int
 	vols              map[string]*VolumeInfo
 	mu                sync.Mutex
+	ownerStore        *metadata.OwnerStore
 	versionStore      *metadata.VersionStore
 	restorePointStore *metadata.RestorePointStore
 }
@@ -45,6 +46,7 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 		var err error
 		stores, err = appcfg.OpenMetadataBackend(c)
 		if err != nil {
+			// TODO: Throw error?
 			log.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
 		}
 	}
@@ -57,7 +59,8 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 		vols:       make(map[string]*VolumeInfo),
 	}
 	if stores != nil {
-		drv.ownerClient = metadata.NewOwnerLocker(stores, c.OwnerMaxMins)
+		drv.ownerMaxMins = c.OwnerMaxMins
+		drv.ownerStore = stores.Owners
 		drv.versionStore = stores.Versions
 		drv.restorePointStore = stores.RestorePoints
 	}

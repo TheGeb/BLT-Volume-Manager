@@ -15,11 +15,7 @@ func (m *Manager) SnapshotHosts(latest int) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.hostSnapshotsCommand()...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.HostSnapshots(ctx)
 	if err != nil {
 		if isRepositoryMissing(string(out)) {
 			return nil, nil

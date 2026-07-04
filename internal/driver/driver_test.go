@@ -213,8 +213,8 @@ func TestNewDriverDefaults(t *testing.T) {
 	if d.vols == nil {
 		t.Error("expected non-nil vols map")
 	}
-	if d.ownerClient != nil {
-		t.Error("expected nil ownerClient (no S3)")
+	if d.ownerStore != nil {
+		t.Error("expected nil ownerStore (no S3)")
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -33,13 +34,14 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		return fmt.Errorf("write volume config: %w", err)
 	}
 
-	ctx := context.Background()
-	if d.ownerClient != nil {
-		ownerLock, err := d.ownerClient.Lock(ctx, name)
+	if d.ownerStore != nil {
+		myName := ownerName()
+		expiry := time.Now().Add(time.Minute * time.Duration(d.ownerMaxMins+2)).Unix()
+		lockKey, err := d.ownerStore.LockVolume(name, myName, expiry)
 		if err != nil {
 			return err
 		}
-		if rerr := ownerLock.Release(); rerr != nil {
+		if rerr := d.ownerStore.ReleaseLock(lockKey); rerr != nil {
 			log.Errorf("release_owner_failed", rerr, "volume=%s", name)
 		}
 	}
@@ -87,9 +89,9 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	name := r.Name
 	d.mu.Lock()
 	vi, ok := d.vols[name]
-	var ownerLock metadata.OwnerLock
+	var lockKey string
 	if ok && vi != nil {
-		ownerLock = vi.OwnerLock
+		lockKey = vi.LockKey
 	}
 	d.mu.Unlock()
 
@@ -113,8 +115,8 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 			log.Errorf("remove_volume_dir_failed", err, "path=%s", volPath)
 		}
 	}
-	if ownerLock != nil {
-		if err := ownerLock.Release(); err != nil {
+	if lockKey != "" {
+		if err := d.ownerStore.ReleaseLock(lockKey); err != nil {
 			log.Errorf("release_owner_failed", err, "volume=%s", name)
 		}
 	}
@@ -144,12 +146,11 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 
 	rm := d.ResticManager(name)
 
-	ctx := context.Background()
-	ownerLock, err := d.ownerClient.Lock(ctx, name)
+	lockKey, err := d.ownerStore.LockVolume(name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
 	if err != nil {
 		log.Errorf("mount_owner_lock_failed", err, "volume=%s", name)
 	} else {
-		vi.OwnerLock = ownerLock
+		vi.LockKey = lockKey
 
 		if vt := d.nextVersionTags(name, true); vt != nil {
 			if err := rm.Backup(volPath, restic.WithTags("cold", vt...)...); err != nil {
@@ -162,7 +163,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 			if err != nil {
 				log.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
-				valid, verr := vi.OwnerLock.IsValid()
+				valid, verr := d.ownerStore.LockIsValid(vi.LockKey)
 				switch {
 				case verr != nil:
 					log.Errorf("owner_check_failed", verr, "volume=%s", name)
@@ -243,7 +244,7 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 	attached := 0
 	if ok {
 		attached = vi.attached
-		if vi.OwnerLock != nil {
+		if vi.LockKey != "" {
 			state = "owned"
 		}
 	}
@@ -319,6 +320,14 @@ func (d *Driver) writeVolumeConfig(volPath string, cfg *volumeConfig) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(volPath, "volume.json"), data, app.DefaultFilePerm)
+}
+
+func ownerName() string {
+	name := os.Getenv("BLT_OWNER_NAME")
+	if name == "" {
+		name = fmt.Sprintf("%s-%d", metadata.Hostname(), os.Getpid())
+	}
+	return name
 }
 
 func (d *Driver) readVolumeConfig(volPath string) *volumeConfig {

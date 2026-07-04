@@ -1,19 +1,13 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
 	"compress/gzip"
-	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
-
-const gzipMinSize = 1024
 
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,46 +46,25 @@ func Gzip(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		buf := &bufferResponseWriter{ResponseWriter: w, buf: &bytes.Buffer{}, code: http.StatusOK}
-		next.ServeHTTP(buf, r)
-		if buf.code >= 300 || buf.buf.Len() < gzipMinSize {
-			w.WriteHeader(buf.code)
-			if _, err := w.Write(buf.buf.Bytes()); err != nil {
-				log.Error("write_gzip_passthrough_failed", err)
-			}
-			return
-		}
 		w.Header().Del("Content-Length")
 		w.Header().Set("Content-Encoding", "gzip")
-		w.WriteHeader(buf.code)
 		gz := gzip.NewWriter(w)
-		if _, err := gz.Write(buf.buf.Bytes()); err != nil {
-			log.Error("write_gzip_failed", err)
-		}
-		if err := gz.Close(); err != nil {
-			log.Error("close_gzip_writer_failed", err)
-		}
+		defer gz.Close()
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, gw: gz}, r)
 	})
 }
 
-type bufferResponseWriter struct {
+type gzipResponseWriter struct {
 	http.ResponseWriter
-	buf  *bytes.Buffer
-	code int
+	gw *gzip.Writer
 }
 
-func (b *bufferResponseWriter) Write(p []byte) (int, error) {
-	return b.buf.Write(p)
+func (g *gzipResponseWriter) Write(p []byte) (int, error) {
+	return g.gw.Write(p)
 }
 
-func (b *bufferResponseWriter) WriteHeader(code int) {
-	b.code = code
-}
-
-func (b *bufferResponseWriter) Flush() {}
-
-func (b *bufferResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return nil, nil, fmt.Errorf("gzip middleware does not support hijacking")
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	g.ResponseWriter.WriteHeader(code)
 }
 
 type loggingResponseWriter struct {

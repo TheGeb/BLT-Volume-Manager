@@ -8,6 +8,7 @@ on:
 
 jobs:
   go:
+    needs: [ui]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +17,11 @@ jobs:
         with:
           go-version: '1.26'
           cache: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-build
+          path: internal/web/static
 
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -64,6 +70,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-build
+          path: internal/web/static
 
   hadolint:
     runs-on: ubuntu-latest

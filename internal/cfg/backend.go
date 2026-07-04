@@ -44,8 +44,9 @@ func openBackend(cfg Config) (backend.KeyValueStore, error) {
 			return nil, fmt.Errorf("ETCD_ENDPOINTS required for etcd metadata backend")
 		}
 		return backend.NewEtcdClient(backend.EtcdConfig{
-			Endpoints:   cfg.EtcdEndpoints,
-			DialTimeout: 5 * time.Second,
+			Endpoints:      cfg.EtcdEndpoints,
+			DialTimeout:    5 * time.Second,
+			RequestTimeout: 10 * time.Second,
 		})
 	default:
 		return nil, fmt.Errorf("unknown metadata backend %q (supported: s3, etcd)", beType)

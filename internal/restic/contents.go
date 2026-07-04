@@ -34,11 +34,7 @@ func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error)
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.lsCommand(snapshotID, path)...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.Ls(ctx, snapshotID, path)
 	if err != nil {
 		return nil, fmt.Errorf("restic ls: %w", err)
 	}
@@ -117,11 +113,7 @@ func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.dumpCommand(snapshotID, path)...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.Dump(ctx, snapshotID, path)
 	if err != nil {
 		return nil, fmt.Errorf("restic dump: %w", err)
 	}
@@ -132,11 +124,7 @@ func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	cmd, err := m.resticCommand(ctx, m.diffCommand(snapID1, snapID2)...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := cmd.Output()
+	out, err := m.runner.Diff(ctx, snapID1, snapID2)
 	if err != nil {
 		return nil, fmt.Errorf("restic diff: %w\n%s", err, string(out))
 	}

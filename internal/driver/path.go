@@ -17,15 +17,19 @@ func VolumePath(root, name string) string {
 }
 
 func VolumeNameFromPath(path string) string {
+	cleanPath := filepath.Clean(path)
 	marker := "/" + VolumesDir + "/"
-	if idx := strings.Index(path, marker); idx >= 0 {
-		rest := strings.TrimPrefix(path[idx+len(marker):], "/")
+	if idx := strings.Index(cleanPath, marker); idx >= 0 {
+		rest := strings.TrimPrefix(cleanPath[idx+len(marker):], "/")
 		if parts := strings.SplitN(rest, "/", 2); len(parts) > 0 && parts[0] != "" {
+			if strings.Contains(parts[0], "..") || strings.Contains(parts[0], "/") {
+				return ""
+			}
 			return parts[0]
 		}
 	}
 
-	parts := strings.Split(strings.Trim(path, "/"), "/")
+	parts := strings.Split(strings.Trim(cleanPath, "/"), "/")
 	if len(parts) == 0 {
 		return ""
 	}

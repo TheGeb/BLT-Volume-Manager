@@ -30,7 +30,7 @@ func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
 	for _, s := range snapshots {
 		fullHash := m.GenerateHash(s)
 		shortHash := fullHash[:len(s.ShortID)]
-		log.Debugf("comparing_hash", "hash=%x snapshot=%s", hash, s.ID)
+		log.Debugf("comparing_hash", "hash=%s snapshot=%s", hash, s.ID)
 		if shortHash == hash {
 			return &s, nil
 		}

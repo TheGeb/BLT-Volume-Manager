@@ -18,7 +18,7 @@ type StatsCache struct {
 }
 
 type Service struct {
-	ResticBase string
+	ResticBase string // TODO: Seems like this can be removed and accessed through config
 	Config     cfg.Config
 
 	stores       *metadata.Stores
@@ -94,27 +94,27 @@ func (s *Service) RegisterVolume(name string) error {
 }
 
 func (s *Service) SetRestorePoint(volume, snapshotID string) error {
-	rs, err := s.RestorePointStore()
+	rps, err := s.RestorePointStore()
 	if err != nil {
 		return err
 	}
-	return rs.Set(volume, snapshotID)
+	return rps.Set(volume, snapshotID)
 }
 
 func (s *Service) DeleteRestorePoint(volume string) error {
-	rs, err := s.RestorePointStore()
+	rps, err := s.RestorePointStore()
 	if err != nil {
 		return err
 	}
-	return rs.Delete(volume)
+	return rps.Delete(volume)
 }
 
 func (s *Service) FindRestorePointByName(volName string) (string, error) {
-	rs, err := s.RestorePointStore()
+	rps, err := s.RestorePointStore()
 	if err != nil {
 		return "", err
 	}
-	return rs.FindByName(volName)
+	return rps.FindByName(volName)
 }
 
 func (s *Service) DeleteVolumeData(volumeName string) error {

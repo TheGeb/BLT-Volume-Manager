@@ -12,7 +12,7 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/s3"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
@@ -188,7 +188,7 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 
 	apiOK(t, ts, "POST", "/api/volume/persist-vol/owners", nil)
 
-	directStore, err := s3.NewClient(s3.Config{
+	directStore, err := backend.NewS3Client(backend.S3Config{
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		Region:     "us-east-1",

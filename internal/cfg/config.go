@@ -40,15 +40,21 @@ func FromEnv(dataDir string) (Config, error) {
 	etcdEndpoints := parseEtcdEndpoints(os.Getenv("ETCD_ENDPOINTS"))
 
 	return Config{
-		DataDir:          abs,
-		ResticBase:       deriveResticBase(),
-		MetadataBackend:  metaBackend,
-		S3Bucket:         deriveOwnerBucket(),
-		S3Endpoint:       deriveS3Endpoint(),
-		S3Region:         os.Getenv("S3_REGION"),
-		S3ForcePathStyle: os.Getenv("S3_FORCE_PATH_STYLE") == "" || !strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "0") && !strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "false"),
-		EtcdEndpoints:    etcdEndpoints,
-		OwnerMaxMins:     ownerMaxMins,
+		DataDir:         abs,
+		ResticBase:      deriveResticBase(),
+		MetadataBackend: metaBackend,
+		S3Bucket:        deriveOwnerBucket(),
+		S3Endpoint:      deriveS3Endpoint(),
+		S3Region:        os.Getenv("S3_REGION"),
+		S3ForcePathStyle: func() bool {
+			v := os.Getenv("S3_FORCE_PATH_STYLE")
+			if v == "" {
+				return true
+			}
+			return !strings.EqualFold(v, "0") && !strings.EqualFold(v, "false")
+		}(),
+		EtcdEndpoints: etcdEndpoints,
+		OwnerMaxMins:  ownerMaxMins,
 	}, nil
 }
 

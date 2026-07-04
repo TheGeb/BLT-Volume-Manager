@@ -1,0 +1,70 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+)
+
+type Runner struct {
+	Repo string
+}
+
+func (r *Runner) command(ctx context.Context, args ...string) (*exec.Cmd, error) {
+	return r.commandForRepo(ctx, r.Repo, args...)
+}
+
+func (r *Runner) commandForRepo(ctx context.Context, repo string, args ...string) (*exec.Cmd, error) {
+	global := []string{fmt.Sprintf("--repo=%s", repo)}
+	if v := log.Verbosity(); v > 0 {
+		global = append(global, fmt.Sprintf("--verbose=%d", v))
+	}
+
+	global = append(global, args...)
+	log.Debugf("restic_command", "args=%s", strings.Join(global, " "))
+	// gosec G204: all args are --flag=value pairs passed via exec.CommandContext
+	// (no shell invocation). repo is passed as --repo=<value>. Each arg is treated
+	// atomically by the restic binary.
+	//nolint:gosec
+	cmd := exec.CommandContext(ctx, "restic", global...)
+	cmd.Env = os.Environ()
+	return cmd, nil
+}
+
+func (r *Runner) run(ctx context.Context, args ...string) error {
+	cmd, err := r.command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	return r.runCommand(cmd)
+}
+
+func (r *Runner) capture(ctx context.Context, args ...string) ([]byte, error) {
+	cmd, err := r.command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Output()
+}
+
+func (r *Runner) combinedCapture(ctx context.Context, args ...string) ([]byte, error) {
+	cmd, err := r.command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.CombinedOutput()
+}
+
+func (r *Runner) runCommand(cmd *exec.Cmd) error {
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Errorf("restic_failed", err, "output=%s", strings.TrimSpace(string(output)))
+	} else if len(output) > 0 {
+		log.Debugf("restic_output", "output=%s", strings.TrimSpace(string(output)))
+	}
+	return err
+}

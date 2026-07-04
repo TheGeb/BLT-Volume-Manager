@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -33,6 +34,9 @@ func (z *zfsProvider) Init(path string, opts snapshot.FsOptions) error {
 	}
 
 	name := filepath.Base(path)
+	if strings.Contains(name, "/") || strings.Contains(name, "..") {
+		return fmt.Errorf("invalid volume name: %q", name)
+	}
 	full := parentDataset + "/" + name
 
 	if err := os.RemoveAll(path); err != nil {

@@ -19,21 +19,50 @@ import (
 func Register(s *server.Service, mux *http.ServeMux) error {
 	inner := http.NewServeMux()
 
+	registerHealth(s, inner)
+	registerRepoRoutes(s, inner)
+	registerSnapshotRoutes(s, inner)
+	registerVolumeRoutes(s, inner)
+	registerStatsRoutes(s, inner)
+	registerDevRoutes(s, inner)
+
+	uiFS, err := initUI()
+	if err != nil {
+		return err
+	}
+	registerUIRoutes(inner, uiFS)
+
+	mux.Handle("/", server.NoSniff(server.Gzip(server.Logging(inner))))
+	return nil
+}
+
+func registerHealth(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		// TODO: More robust health check - actually serving files (and can access backends? Or is that out of scope)
 		if s.ResticBase == "" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	})
+}
 
+func registerRepoRoutes(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/repo/init", func(w http.ResponseWriter, r *http.Request) {
 		repo.InitRepo(s, w, r)
 	})
 	inner.HandleFunc("/api/repo/status", func(w http.ResponseWriter, r *http.Request) {
 		repo.RepoStatus(s, w, r)
 	})
+	inner.HandleFunc("/api/repo/check", func(w http.ResponseWriter, r *http.Request) {
+		repo.CheckRepo(s, w, r)
+	})
+	inner.HandleFunc("/api/repo/repair", func(w http.ResponseWriter, r *http.Request) {
+		repo.RepairRepo(s, w, r)
+	})
+}
 
+func registerSnapshotRoutes(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/snapshots", func(w http.ResponseWriter, r *http.Request) {
 		snapshot.ListSnapshots(s, w, r)
 	})
@@ -49,34 +78,32 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 	inner.HandleFunc("/api/snapshots/hosts", func(w http.ResponseWriter, r *http.Request) {
 		snapshot.ListSnapshotHosts(s, w, r)
 	})
+}
 
+func registerVolumeRoutes(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/volume/", func(w http.ResponseWriter, r *http.Request) {
 		volume.VolumeRouter(s, w, r)
 	})
-
-	inner.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
-		repo.Stats(s, w, r)
-	})
-	inner.HandleFunc("/api/stats/refresh", func(w http.ResponseWriter, r *http.Request) {
-		repo.RefreshStats(s, w, r)
-	})
-
 	inner.HandleFunc("/api/volumes", func(w http.ResponseWriter, r *http.Request) {
 		volume.ListVolumes(s, w, r)
 	})
 	inner.HandleFunc("/api/volumes/owners", func(w http.ResponseWriter, r *http.Request) {
 		owner.ListVolumeOwners(s, w, r)
 	})
+}
 
-	inner.HandleFunc("/api/repo/check", func(w http.ResponseWriter, r *http.Request) {
-		repo.CheckRepo(s, w, r)
+func registerStatsRoutes(s *server.Service, inner *http.ServeMux) {
+	inner.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
+		repo.Stats(s, w, r)
 	})
-	inner.HandleFunc("/api/repo/repair", func(w http.ResponseWriter, r *http.Request) {
-		repo.RepairRepo(s, w, r)
+	inner.HandleFunc("/api/stats/refresh", func(w http.ResponseWriter, r *http.Request) {
+		repo.RefreshStats(s, w, r)
 	})
+}
 
+func registerDevRoutes(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/dev-mode", func(w http.ResponseWriter, r *http.Request) {
-		TestMode(s, w, r)
+		DevMode(s, w, r)
 	})
 	if os.Getenv("BLT_DEV_MODE") != "" {
 		inner.HandleFunc("/api/dummy-volume", func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +113,9 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 			CreateDummySnapshot(s, w, r)
 		})
 	}
+}
 
+func initUI() (fs.FS, error) {
 	var verifyOnce sync.Once
 	verifyStaticFiles := func() error {
 		var err error
@@ -99,13 +128,17 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 		return nil
 	}
 	if err := verifyStaticFiles(); err != nil {
-		return err
+		return nil, err
 	}
 
 	uiFS, err := fs.Sub(StaticFiles, "static")
 	if err != nil {
-		return fmt.Errorf("failed to initialize web static files: %w", err)
+		return nil, fmt.Errorf("failed to initialize web static files: %w", err)
 	}
+	return uiFS, nil
+}
+
+func registerUIRoutes(inner *http.ServeMux, uiFS fs.FS) {
 	rootFileServer := http.FileServer(http.FS(uiFS))
 	uiHandler := http.StripPrefix("/ui", rootFileServer)
 
@@ -141,7 +174,4 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 	inner.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)
 	})
-
-	mux.Handle("/", server.NoSniff(server.Gzip(server.Logging(inner))))
-	return nil
 }

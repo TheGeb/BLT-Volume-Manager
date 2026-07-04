@@ -15,9 +15,9 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
 STATICCHECK ?= $(shell command -v staticcheck >/dev/null 2>&1 && echo staticcheck || echo 'GOTOOLCHAIN=go1.26.3 go run honnef.co/go/tools/cmd/staticcheck@latest')
 
 LDFLAGS = -s -w \
-	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Version=$(VERSION)' \
-	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Commit=$(COMMIT)' \
-	-X 'github.com/TheGeb/docker-s3-volume-plugin/internal/app.Date=$(DATE)'
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$(VERSION)' \
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$(COMMIT)' \
+	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(DATE)'
 
 # Default target
 all: lint build

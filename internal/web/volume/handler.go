@@ -7,8 +7,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/owner"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
@@ -29,11 +27,6 @@ func ListVolumes(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		volumes = []string{}
 	}
 	server.RespondJSON(w, VolumeListResponse{Volumes: volumes})
-}
-
-// Note: Allows groups with "/"
-func validVolumeName(name string) bool {
-	return name != "" && !strings.ContainsAny(name, "\\") && !strings.Contains(name, "..")
 }
 
 func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
@@ -98,31 +91,19 @@ func DeleteVolume(s *server.Service, w http.ResponseWriter, r *http.Request, vol
 	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
-func initTargetManager(s *server.Service, w http.ResponseWriter, target string) *restic.Manager {
-	if !validVolumeName(target) {
-		server.RespondError(w, fmt.Errorf("invalid target volume name"), http.StatusBadRequest)
-		return nil
+func errorStatus(err error) int {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "invalid target volume name"),
+		strings.Contains(msg, "invalid JSON"),
+		strings.Contains(msg, "no snapshots to copy"):
+		return http.StatusBadRequest
+	case strings.Contains(msg, "already exists"),
+		strings.Contains(msg, "cannot rename owned volume"):
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
 	}
-	for _, v := range s.VolumeNames() {
-		if v == target {
-			server.RespondError(w, fmt.Errorf("target volume %q already exists", target), http.StatusConflict)
-			return nil
-		}
-	}
-	tm := s.ResticManager(target)
-	if err := tm.Init(); err != nil {
-		server.RespondError(w, fmt.Errorf("init target repo: %w", err), http.StatusInternalServerError)
-		return nil
-	}
-	return tm
-}
-
-func writeRegisteredVolume(s *server.Service, w http.ResponseWriter, target string) bool {
-	if err := s.RegisterVolume(target); err != nil {
-		server.RespondError(w, fmt.Errorf("register volume: %w", err), http.StatusInternalServerError)
-		return false
-	}
-	return true
 }
 
 func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
@@ -141,52 +122,9 @@ func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volum
 		return
 	}
 
-	targetManager := initTargetManager(s, w, req.Target)
-	if targetManager == nil {
-		return
-	}
-
-	owned, ownerName, err := owner.IsVolumeOwned(s, volumeName)
+	result, err := CopyVolumeData(s, volumeName, req.Target, req.PreserveHistory, req.SnapshotIDs)
 	if err != nil {
-		server.RespondError(w, fmt.Errorf("check owner: %w", err), http.StatusInternalServerError)
-		return
-	}
-
-	sourceManager := s.ResticManager(volumeName)
-	preserveHistory := true
-	if req.PreserveHistory != nil {
-		preserveHistory = *req.PreserveHistory
-	}
-	switch {
-	case len(req.SnapshotIDs) > 0:
-		if err := sourceManager.CopyTo(targetManager.Repo(), req.SnapshotIDs...); err != nil {
-			server.RespondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
-			return
-		}
-	case preserveHistory:
-		if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
-			server.RespondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
-			return
-		}
-	default:
-		// FIXME: will this default ever be hit? User should be forced to multiselect or take all
-		// Maybe if they try to multiselect but choose nothing??
-		snaps, err := sourceManager.ListSnapshots()
-		if err != nil {
-			server.RespondError(w, fmt.Errorf("list snapshots: %w", err), http.StatusInternalServerError)
-			return
-		}
-		if len(snaps) == 0 {
-			server.RespondError(w, fmt.Errorf("no snapshots to copy"), http.StatusBadRequest)
-			return
-		}
-		if err := sourceManager.CopyTo(targetManager.Repo(), snaps[0].ID); err != nil {
-			server.RespondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if !writeRegisteredVolume(s, w, req.Target) {
+		server.RespondError(w, err, errorStatus(err))
 		return
 	}
 
@@ -200,11 +138,11 @@ func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volum
 	}
 	cr := copyResponse{
 		Status:          fmt.Sprintf("Volume %q copied to %q", volumeName, req.Target),
-		SourceOwned:     owned,
-		PreserveHistory: preserveHistory,
+		SourceOwned:     result.SourceOwned,
+		PreserveHistory: result.PreserveHistory,
 	}
-	if owned {
-		cr.SourceOwner = ownerName
+	if result.SourceOwned {
+		cr.SourceOwner = result.OwnerName
 	}
 	server.RespondJSON(w, cr)
 }
@@ -223,43 +161,12 @@ func RenameVolume(s *server.Service, w http.ResponseWriter, r *http.Request, vol
 		return
 	}
 
-	targetManager := initTargetManager(s, w, req.Target)
-	if targetManager == nil {
-		return
-	}
-
-	owned, ownerName, err := owner.IsVolumeOwned(s, volumeName)
+	err := RenameVolumeData(s, volumeName, req.Target)
 	if err != nil {
-		server.RespondError(w, fmt.Errorf("check owner: %w", err), http.StatusInternalServerError)
-		return
-	}
-	if owned {
-		server.RespondError(w, fmt.Errorf("cannot rename owned volume %q (owned by %q)", volumeName, ownerName), http.StatusConflict)
+		server.RespondError(w, err, errorStatus(err))
 		return
 	}
 
-	sourceManager := s.ResticManager(volumeName)
-	if err := sourceManager.CopyTo(targetManager.Repo()); err != nil {
-		server.RespondError(w, fmt.Errorf("copy snapshots: %w", err), http.StatusInternalServerError)
-		return
-	}
-
-	snapshots, err := sourceManager.ListSnapshots()
-	if err == nil {
-		ids := make([]string, len(snapshots))
-		for i, snap := range snapshots {
-			ids[i] = snap.ID
-		}
-		if err := sourceManager.ForgetSnapshots(ids...); err != nil {
-			log.Error("forget_snapshots_failed", err)
-		}
-	}
-
-	if !writeRegisteredVolume(s, w, req.Target) {
-		return
-	}
-
-	CleanupVolumeData(s, volumeName)
 	s.RefreshStats()
 
 	type renameResponse struct {
