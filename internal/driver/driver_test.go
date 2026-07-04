@@ -12,8 +12,8 @@ import (
 )
 
 func TestVolumeConfigReadWrite(t *testing.T) {
-	d := &Driver{root: t.TempDir()}
-	volPath := filepath.Join(d.root, "volumes", "test-vol")
+	d := &Driver{volumePath: t.TempDir()}
+	volPath := filepath.Join(d.volumePath, "volumes", "test-vol")
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
@@ -34,16 +34,16 @@ func TestVolumeConfigReadWrite(t *testing.T) {
 }
 
 func TestVolumeConfigReadNonExistent(t *testing.T) {
-	d := &Driver{root: t.TempDir()}
-	missing := d.readVolumeConfig(filepath.Join(d.root, "volumes", "nonexistent"))
+	d := &Driver{volumePath: t.TempDir()}
+	missing := d.readVolumeConfig(filepath.Join(d.volumePath, "volumes", "nonexistent"))
 	if missing != nil {
 		t.Error("expected nil for missing config")
 	}
 }
 
 func TestVolumeConfigDefaultFsType(t *testing.T) {
-	d := &Driver{root: t.TempDir()}
-	volPath := filepath.Join(d.root, "volumes", "plain-vol")
+	d := &Driver{volumePath: t.TempDir()}
+	volPath := filepath.Join(d.volumePath, "volumes", "plain-vol")
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestSnapVolumesNilMap(t *testing.T) {
 
 func TestCollectVolumeNames(t *testing.T) {
 	root := t.TempDir()
-	d := &Driver{root: root}
+	d := &Driver{volumePath: root}
 
 	volumesDir := filepath.Join(root, "volumes")
 
@@ -161,7 +161,7 @@ func TestCollectVolumeNames(t *testing.T) {
 
 func TestCollectVolumeNamesEmpty(t *testing.T) {
 	root := t.TempDir()
-	d := &Driver{root: root}
+	d := &Driver{volumePath: root}
 
 	var names []string
 	d.collectVolumeNames(filepath.Join(root, "volumes"), "", &names)
@@ -172,7 +172,7 @@ func TestCollectVolumeNamesEmpty(t *testing.T) {
 
 func TestVolumeNames(t *testing.T) {
 	root := t.TempDir()
-	d := &Driver{root: root}
+	d := &Driver{volumePath: root}
 
 	for _, name := range []string{"vol-a", "vol-b"} {
 		p := filepath.Join(root, "volumes", name)
@@ -191,7 +191,7 @@ func TestVolumeNames(t *testing.T) {
 }
 
 func TestResticManager(t *testing.T) {
-	d := &Driver{resticBase: "/data"}
+	d := &Driver{resticPath: "/data"}
 	rm := d.ResticManager("test-vol")
 	if rm == nil {
 		t.Fatal("expected non-nil restic manager")
@@ -207,7 +207,7 @@ func TestNewDriverDefaults(t *testing.T) {
 		t.Fatal("expected non-nil driver")
 		return
 	}
-	if d.root == "" {
+	if d.volumePath == "" {
 		t.Error("expected non-empty root")
 	}
 	if d.vols == nil {
@@ -220,7 +220,7 @@ func TestNewDriverDefaults(t *testing.T) {
 
 func TestList(t *testing.T) {
 	root := t.TempDir()
-	d := &Driver{root: root}
+	d := &Driver{volumePath: root}
 
 	for _, name := range []string{"vol-a", "vol-b", "group/nested-vol"} {
 		p := filepath.Join(root, "volumes", name)
@@ -259,7 +259,7 @@ func TestList(t *testing.T) {
 }
 
 func TestListEmpty(t *testing.T) {
-	d := &Driver{root: t.TempDir()}
+	d := &Driver{volumePath: t.TempDir()}
 	resp, err := d.List()
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -287,7 +287,7 @@ func TestCapabilities(t *testing.T) {
 
 func TestPath(t *testing.T) {
 	root := t.TempDir()
-	d := &Driver{root: root}
+	d := &Driver{volumePath: root}
 
 	resp, err := d.Path(&volume.PathRequest{Name: "test-vol"})
 	if err != nil {

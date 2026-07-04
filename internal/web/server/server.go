@@ -7,6 +7,7 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
@@ -17,11 +18,10 @@ type StatsCache struct {
 	TotalVolumes int    `json:"total_volumes"`
 }
 
-type Service struct {
-	ResticBase string // TODO: Seems like this can be removed and accessed through config
-	Config     cfg.Config
+type Service struct { //TODO: Rename to BLTService
+	Config cfg.Config
 
-	stores       *metadata.Stores
+	metadata     *metadata.Metadata
 	metadataMu   sync.Mutex
 	statsMu      sync.RWMutex
 	statsCache   *StatsCache
@@ -34,55 +34,55 @@ func (s *Service) Shutdown() {
 }
 
 func New(cfg cfg.Config) *Service {
-	return &Service{ResticBase: cfg.ResticBase, Config: cfg}
+	return &Service{Config: cfg}
 }
 
-func (s *Service) SetStores(stores *metadata.Stores) {
+func (s *Service) SetMetadata(meta *metadata.Metadata) {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
-	s.stores = stores
+	s.metadata = meta
 }
 
 func (s *Service) initBackend() error {
 	s.metadataMu.Lock()
 	defer s.metadataMu.Unlock()
-	if s.stores != nil {
+	if s.metadata != nil {
 		return nil
 	}
-	stores, err := cfg.OpenMetadataBackend(s.Config)
+	md, err := cfg.OpenMetadataBackend(s.Config)
 	if err != nil {
 		return err
 	}
-	s.stores = stores
+	s.metadata = md
 	return nil
 }
 
-func (s *Service) VolumeStore() (*metadata.VolumeStore, error) {
+func (s *Service) VolumeStore() (*store.RegisteredVolumeStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.stores.Volumes, nil
+	return s.metadata.Volumes, nil
 }
 
-func (s *Service) RestorePointStore() (*metadata.RestorePointStore, error) {
+func (s *Service) RestorePointStore() (*store.RestorePointStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.stores.RestorePoints, nil
+	return s.metadata.RestorePoints, nil
 }
 
-func (s *Service) VersionStore() (*metadata.VersionStore, error) {
+func (s *Service) VersionStore() (*store.VersionStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.stores.Versions, nil
+	return s.metadata.Versions, nil
 }
 
-func (s *Service) OwnerStore() (*metadata.OwnerStore, error) {
+func (s *Service) OwnerStore() (*store.OwnerStore, error) {
 	if err := s.initBackend(); err != nil {
 		return nil, err
 	}
-	return s.stores.Owners, nil
+	return s.metadata.Owners, nil
 }
 
 func (s *Service) RegisterVolume(name string) error {
@@ -117,16 +117,12 @@ func (s *Service) FindRestorePointByName(volName string) (string, error) {
 	return rps.FindByName(volName)
 }
 
-func (s *Service) DeleteVolumeData(volumeName string) error {
-	vs, err := s.VolumeStore()
-	if err != nil {
-		return err
-	}
-	return vs.DeleteVolumeData(volumeName)
+func (s *Service) DeleteMetadata(volumeName string) error {
+	return s.metadata.DeleteMetadata(volumeName)
 }
 
 func (s *Service) ResticManager(volName string) *restic.Manager {
-	return restic.NewManager(s.ResticBase + "/restic/" + volName)
+	return restic.NewManager(s.Config.ResticBase + "/restic/" + volName)
 }
 
 func (s *Service) NextVersionTags(volName string, major bool) []string {

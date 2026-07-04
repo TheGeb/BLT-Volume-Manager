@@ -1,4 +1,4 @@
-package metadata
+package store
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
+
+const RestorePointKeyspace = "blt-volume-manager/restore-points/"
 
 type RestorePointStore struct {
 	be backend.KeyValueStore
@@ -30,16 +32,16 @@ func (s *RestorePointStore) Set(volume, snapshotID string) error {
 	if err != nil {
 		return fmt.Errorf("marshal restore point: %w", err)
 	}
-	return s.be.PutObject(RestorePointPrefix+volume+".json", data)
+	return s.be.PutObject(RestorePointKeyspace+volume+".json", data)
 }
 
 func (s *RestorePointStore) FindByName(volName string) (string, error) {
 	if volName == "" {
 		return "", nil
 	}
-	data, err := s.be.ReadObject(RestorePointPrefix + volName + ".json")
+	data, err := s.be.ReadObject(RestorePointKeyspace + volName + ".json")
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, backend.ErrKeyNotFound) {
 			return "", nil
 		}
 		return "", fmt.Errorf("read restore point: %w", err)
@@ -52,5 +54,5 @@ func (s *RestorePointStore) FindByName(volName string) (string, error) {
 }
 
 func (s *RestorePointStore) Delete(volume string) error {
-	return s.be.DeleteObject(RestorePointPrefix + volume + ".json")
+	return s.be.DeleteObject(RestorePointKeyspace + volume + ".json")
 }

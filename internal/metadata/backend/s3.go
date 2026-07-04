@@ -18,7 +18,7 @@ import (
 
 type S3Config struct {
 	S3Bucket       string
-	S3OwnerFolder  string
+	S3OwnerPrefix  string
 	S3VolumePrefix string
 	S3Endpoint     string
 	Region         string
@@ -152,35 +152,15 @@ func (s *s3Client) ListObjects(prefix string) ([]Entry, error) {
 			return nil, err
 		}
 		for _, obj := range page.Contents {
-			objects = append(objects, Entry{Key: obj.Key, LastModified: obj.LastModified})
+			var modCounter *int64
+			if obj.LastModified != nil {
+				modCounter = aws.Int64(obj.LastModified.UnixNano())
+			}
+			objects = append(objects, Entry{Key: obj.Key, ModificationCounter: modCounter})
 		}
 	}
 	s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), nil)
 	return objects, nil
-}
-
-func (s *s3Client) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
-	start := time.Now()
-	var prefixes []string
-	paginator := s3sdk.NewListObjectsV2Paginator(s.s3Client, &s3sdk.ListObjectsV2Input{
-		Bucket:    aws.String(s.cfg.S3Bucket),
-		Prefix:    aws.String(prefix),
-		Delimiter: aws.String(delimiter),
-	})
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.Background())
-		if err != nil {
-			s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), err)
-			return nil, err
-		}
-		for _, cp := range page.CommonPrefixes {
-			if cp.Prefix != nil {
-				prefixes = append(prefixes, *cp.Prefix)
-			}
-		}
-	}
-	s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), nil)
-	return prefixes, nil
 }
 
 func (s *s3Client) DeleteObjectsWithPrefix(prefix string) error {

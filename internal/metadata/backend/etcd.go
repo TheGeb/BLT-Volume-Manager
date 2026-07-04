@@ -3,8 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -89,36 +87,9 @@ func (c *etcdClient) ListObjects(prefix string) ([]Entry, error) {
 	entries := make([]Entry, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		key := string(kv.Key)
-		entries = append(entries, Entry{Key: &key})
+		entries = append(entries, Entry{Key: &key, ModificationCounter: &kv.ModRevision})
 	}
 	return entries, nil
-}
-
-func (c *etcdClient) ListCommonPrefixes(prefix, delimiter string) ([]string, error) {
-	objects, err := c.ListObjects(prefix)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := map[string]bool{}
-	var prefixes []string
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		rest := strings.TrimPrefix(*obj.Key, prefix)
-		idx := strings.Index(rest, delimiter)
-		if idx < 0 {
-			continue
-		}
-		common := prefix + rest[:idx+len(delimiter)]
-		if !seen[common] {
-			seen[common] = true
-			prefixes = append(prefixes, common)
-		}
-	}
-	sort.Strings(prefixes)
-	return prefixes, nil
 }
 
 func (c *etcdClient) DeleteObjectsWithPrefix(prefix string) error {

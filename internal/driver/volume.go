@@ -19,7 +19,7 @@ import (
 
 func (d *Driver) Create(r *volume.CreateRequest) error {
 	name := r.Name
-	volPath := VolumePath(d.root, name)
+	volPath := VolumePath(d.volumePath, name)
 
 	fsType := ""
 	if r.Options != nil {
@@ -95,7 +95,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	}
 	d.mu.Unlock()
 
-	volPath := VolumePath(d.root, name)
+	volPath := VolumePath(d.volumePath, name)
 	cfg := d.readVolumeConfig(volPath)
 	fsType := ""
 	if cfg != nil {
@@ -125,7 +125,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 
 func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	name := r.Name
-	volPath := VolumePath(d.root, name)
+	volPath := VolumePath(d.volumePath, name)
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		return nil, fmt.Errorf("create volume dir: %w", err)
 	}
@@ -172,7 +172,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 				default:
 					log.Infof("restore_point_found", "volume=%s snapshot=%s", name, snapID)
 
-					snapDir := filepath.Join(d.root, SnapshotsDir)
+					snapDir := filepath.Join(d.volumePath, SnapshotsDir)
 					preSnap, snapErr := snapshot.Create(volPath, snapDir, name+snapshot.PreRestoreSuffix)
 					if snapErr != nil {
 						log.Errorf("pre_restore_snapshot_failed", snapErr, "volume=%s", name)
@@ -225,7 +225,7 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) error {
 }
 
 func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
-	volPath := VolumePath(d.root, r.Name)
+	volPath := VolumePath(d.volumePath, r.Name)
 	return &volume.PathResponse{Mountpoint: volPath}, nil
 }
 
@@ -236,7 +236,7 @@ type VolumeStatus struct {
 }
 
 func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
-	volPath := VolumePath(d.root, r.Name)
+	volPath := VolumePath(d.volumePath, r.Name)
 	d.mu.Lock()
 	vi, ok := d.vols[r.Name]
 	d.mu.Unlock()
@@ -262,7 +262,7 @@ func (d *Driver) List() (*volume.ListResponse, error) {
 	names := d.VolumeNames()
 	vols := make([]*volume.Volume, 0, len(names))
 	for _, name := range names {
-		p := VolumePath(d.root, name)
+		p := VolumePath(d.volumePath, name)
 		vols = append(vols, &volume.Volume{Name: name, Mountpoint: p})
 	}
 	return &volume.ListResponse{Volumes: vols}, nil
@@ -291,7 +291,7 @@ func (d *Driver) SnapVolumes() []SnapVolume {
 
 func (d *Driver) VolumeNames() []string {
 	var names []string
-	d.collectVolumeNames(filepath.Join(d.root, VolumesDir), "", &names)
+	d.collectVolumeNames(filepath.Join(d.volumePath, VolumesDir), "", &names)
 	return names
 }
 

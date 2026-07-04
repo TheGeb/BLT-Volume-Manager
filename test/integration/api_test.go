@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
@@ -261,7 +261,7 @@ func TestAPI_S3StoreThroughGarage(t *testing.T) {
 		t.Fatalf("create direct store: %v", err)
 	}
 
-	objects, err := directStore.ListObjects(metadata.OwnerPrefix + "persist-vol/")
+	objects, err := directStore.ListObjects(store.OwnerKeyspace + "persist-vol/")
 	if err != nil {
 		t.Fatalf("list owner objects: %v", err)
 	}

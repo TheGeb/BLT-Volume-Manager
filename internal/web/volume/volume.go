@@ -14,7 +14,7 @@ func CleanupVolumeData(s *server.Service, volumeName string) {
 	if volumeName == "" {
 		return
 	}
-	if err := s.DeleteVolumeData(volumeName); err != nil {
+	if err := s.DeleteMetadata(volumeName); err != nil {
 		log.Error("cleanup_volume_data_failed", err)
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
@@ -91,7 +91,7 @@ func TestS3OwnersWithGarage(t *testing.T) {
 		t.Fatalf("create s3 store: %v", err)
 	}
 
-	ownerStore := metadata.NewOwnerStore(be)
+	ownerStore := store.NewOwnerStore(be)
 	key := "blt-volume-manager/owners/test-vol/proposal.json"
 	data := []byte(`{"name":"test","expiry_time":9999999999}`)
 	if err := be.PutObject(key, data); err != nil {

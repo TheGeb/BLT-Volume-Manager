@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
@@ -58,46 +57,6 @@ func (m *Manager) UntagSnapshot(snapshotID, tag string) error {
 		return errors.New("snapshot ID and tag are required")
 	}
 	return m.runner.TagRemove(context.Background(), snapshotID, tag)
-}
-
-func (m *Manager) RestoreIfExists(path, preferred string) error { // FIXME: currently unused?
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
-	defer cancel()
-
-	var tagFilter string
-	if preferred == BackupTagHot || preferred == BackupTagCold {
-		tagFilter = preferred
-	}
-	out, err := m.runner.SnapshotsLast(ctx, tagFilter)
-	if err != nil {
-		if len(out) == 0 {
-			return nil
-		}
-		return err
-	}
-	if len(out) == 0 {
-		return nil
-	}
-
-	var snaps []Snapshot
-	if err := json.Unmarshal(out, &snaps); err != nil {
-		return fmt.Errorf("parse snapshot list: %w", err)
-	}
-	if len(snaps) == 0 {
-		if preferred == BackupTagHot || preferred == BackupTagCold {
-			return m.runner.Restore(ctx, "latest", path, preferred)
-		}
-		return m.runner.Restore(ctx, "latest", path)
-	}
-	id := snaps[0].ShortID
-	if id == "" {
-		id = snaps[0].ID
-	}
-	if id == "" {
-		return m.runner.Restore(ctx, "latest", path)
-	}
-
-	return m.runner.Restore(ctx, id, path)
 }
 
 func (m *Manager) RestoreSnapshot(snapshotID, target string) error {

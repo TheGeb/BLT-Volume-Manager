@@ -1,4 +1,4 @@
-package metadata
+package store
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
+const VersionKeyspace = "blt-volume-manager/versions/"
+
 type VersionStore struct {
 	be backend.KeyValueStore
 }
@@ -16,10 +18,15 @@ func NewVersionStore(be backend.KeyValueStore) *VersionStore {
 	return &VersionStore{be: be}
 }
 
+type VersionCounter struct {
+	Major int `json:"major"`
+	Minor int `json:"minor"`
+}
+
 func (s *VersionStore) NextTags(name string, major bool) ([]string, error) {
 	v, err := s.ReadCounter(name)
 	if err != nil {
-		if !errors.Is(err, ErrKeyNotFound) {
+		if !errors.Is(err, backend.ErrKeyNotFound) {
 			return nil, err
 		}
 		v = &VersionCounter{}
@@ -44,14 +51,14 @@ func (s *VersionStore) WriteCounter(vol string, v VersionCounter) error {
 	if err != nil {
 		return fmt.Errorf("marshal version counter: %w", err)
 	}
-	return s.be.PutObject(VersionPrefix+vol+".json", data)
+	return s.be.PutObject(VersionKeyspace+vol+".json", data)
 }
 
 func (s *VersionStore) ReadCounter(vol string) (*VersionCounter, error) {
-	data, err := s.be.ReadObject(VersionPrefix + vol + ".json")
+	data, err := s.be.ReadObject(VersionKeyspace + vol + ".json")
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
-			return nil, ErrKeyNotFound
+		if errors.Is(err, backend.ErrKeyNotFound) {
+			return nil, backend.ErrKeyNotFound
 		}
 		return nil, err
 	}

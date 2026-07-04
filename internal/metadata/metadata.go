@@ -1,11 +1,11 @@
 package metadata
 
 import (
-	"errors"
 	"os"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
 var ErrKeyNotFound = backend.ErrKeyNotFound
@@ -16,26 +16,46 @@ const (
 )
 
 const (
-	OwnerPrefix             = "blt-volume-manager/owners/"
-	RegisteredVolumesPrefix = "blt-volume-manager/registered-volumes/"
-	RestorePointPrefix      = "blt-volume-manager/restore-points/"
-	VersionPrefix           = "blt-volume-manager/versions/"
-)
-
-const (
 	DefaultOwnerMaxHoldMins    = 10
 	DefaultOwnerTTL            = 24 * time.Hour
 	DefaultOwnerAcquireTimeout = 5 * time.Second
 )
 
-type VersionCounter struct {
-	Major int `json:"major"`
-	Minor int `json:"minor"`
+type Metadata struct {
+	Volumes       *store.RegisteredVolumeStore
+	RestorePoints *store.RestorePointStore
+	Versions      *store.VersionStore
+	Owners        *store.OwnerStore
+	backend       backend.KeyValueStore
 }
 
-var ErrRestorePointNotFound = errors.New("restore point not found")
+func NewMetadata(be backend.KeyValueStore) *Metadata {
+	return &Metadata{
+		Volumes:       store.NewRegisteredVolumeStore(be),
+		RestorePoints: store.NewRestorePointStore(be),
+		Versions:      store.NewVersionStore(be),
+		Owners:        store.NewOwnerStore(be),
+		backend:       be,
+	}
+}
 
-func Hostname() string {
+func (m *Metadata) DeleteMetadata(volumeName string) error {
+	if err := m.Volumes.Delete(volumeName); err != nil {
+		return err
+	}
+
+	if err := m.Owners.DeleteForVolume(volumeName); err != nil {
+		return err
+	}
+
+	if err := m.RestorePoints.Delete(volumeName); err != nil {
+		return err
+	}
+
+	return m.backend.DeleteObjectsWithPrefix("restic/" + volumeName + "/")
+}
+
+func Hostname() string { //FIXME: Awkward placement, where should this live?
 	h, _ := os.Hostname()
 	if h == "" {
 		return "unknown"

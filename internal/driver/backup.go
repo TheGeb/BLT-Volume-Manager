@@ -45,7 +45,7 @@ func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) er
 		return rm.Backup(volPath, restic.WithTags(restic.BackupTagCold, versionTags...)...)
 	}
 
-	snapDir := filepath.Join(d.root, SnapshotsDir)
+	snapDir := filepath.Join(d.volumePath, SnapshotsDir)
 	info, err := snapshot.Create(volPath, snapDir, name)
 	if err != nil {
 		log.Errorf("snapshot_create_failed", err, "volume=%s falling back to direct backup", name)
@@ -80,7 +80,7 @@ func (d *Driver) monitorOrphanedSnapshots(ctx context.Context) {
 }
 
 func (d *Driver) retryOrphanedSnapshots() {
-	snapDir := filepath.Join(d.root, SnapshotsDir)
+	snapDir := filepath.Join(d.volumePath, SnapshotsDir)
 	snaps, err := snapshot.ListOrphaned(snapDir)
 	if err != nil {
 		log.Errorf("list_orphaned_snapshots_failed", err, "error=%v", err)

@@ -1,9 +1,11 @@
-package metadata
+package metadata_test
 
 import (
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
 type MockKeyValueStore struct {
@@ -31,10 +33,6 @@ func (m *MockKeyValueStore) ListObjects(prefix string) ([]backend.Entry, error) 
 	return m.Objects, m.ObjectsErr
 }
 
-func (m *MockKeyValueStore) ListCommonPrefixes(string, string) ([]string, error) {
-	return nil, nil
-}
-
 func (m *MockKeyValueStore) DeleteObjectsWithPrefix(string) error {
 	return nil
 }
@@ -42,7 +40,7 @@ func (m *MockKeyValueStore) DeleteObjectsWithPrefix(string) error {
 func sPtr(s string) *string { return &s }
 
 func TestListRegisteredVolumes(t *testing.T) {
-	st := NewVolumeStore(&MockKeyValueStore{
+	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
 		ListFunc: func(prefix string) ([]backend.Entry, error) {
 			return nil, nil
 		},
@@ -57,12 +55,12 @@ func TestListRegisteredVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesWithVolumes(t *testing.T) {
-	st := NewVolumeStore(&MockKeyValueStore{
+	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
 		ListFunc: func(prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
-				{Key: sPtr(RegisteredVolumesPrefix + "vol-a.json")},
-				{Key: sPtr(RegisteredVolumesPrefix + "vol-b.json")},
-				{Key: sPtr(RegisteredVolumesPrefix + "deep/nested-vol.json")},
+				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-a.json")},
+				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-b.json")},
+				{Key: sPtr(store.RegisteredVolumeKeyspace + "deep/nested-vol.json")},
 			}, nil
 		},
 	})
@@ -82,11 +80,11 @@ func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
-	st := NewVolumeStore(&MockKeyValueStore{
+	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
 		ListFunc: func(prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
 				{Key: nil},
-				{Key: sPtr(RegisteredVolumesPrefix + "valid.json")},
+				{Key: sPtr(store.RegisteredVolumeKeyspace + "valid.json")},
 			}, nil
 		},
 	})
@@ -100,10 +98,10 @@ func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
-	st := NewVolumeStore(&MockKeyValueStore{
+	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
 		ListFunc: func(prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
-				{Key: sPtr(RegisteredVolumesPrefix + ".json")},
+				{Key: sPtr(store.RegisteredVolumeKeyspace + ".json")},
 			}, nil
 		},
 	})
@@ -117,7 +115,7 @@ func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
 }
 
 func TestHostname(t *testing.T) {
-	h := Hostname()
+	h := metadata.Hostname()
 	if h == "" {
 		t.Error("expected non-empty hostname")
 	}

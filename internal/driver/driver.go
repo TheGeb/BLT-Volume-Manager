@@ -11,6 +11,7 @@ import (
 	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/btrfs"
 	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/zfs"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
@@ -28,25 +29,24 @@ type VolumeInfo struct {
 }
 
 type Driver struct {
-	root              string // TODO: Rename to something like volumePath?
-	resticBase        string // TODO: Rename to something like resticPath?
+	volumePath        string
+	resticPath        string
 	ownerMaxMins      int
 	vols              map[string]*VolumeInfo
 	mu                sync.Mutex
-	ownerStore        *metadata.OwnerStore
-	versionStore      *metadata.VersionStore
-	restorePointStore *metadata.RestorePointStore
+	ownerStore        *store.OwnerStore
+	versionStore      *store.VersionStore
+	restorePointStore *store.RestorePointStore
 }
 
 func New(c appcfg.Config, ctx context.Context) *Driver {
 	root := c.DataDir
 
-	var stores *metadata.Stores
+	var md *metadata.Metadata
 	if c.MetadataBackend != "" || c.S3Bucket != "" {
 		var err error
-		stores, err = appcfg.OpenMetadataBackend(c)
+		md, err = appcfg.OpenMetadataBackend(c)
 		if err != nil {
-			// TODO: Throw error?
 			log.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
 		}
 	}
@@ -54,15 +54,15 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 	snapshot.InitRoot(root)
 
 	drv := &Driver{
-		root:       root,
-		resticBase: c.ResticBase,
+		volumePath: root,
+		resticPath: c.ResticBase,
 		vols:       make(map[string]*VolumeInfo),
 	}
-	if stores != nil {
+	if md != nil {
 		drv.ownerMaxMins = c.OwnerMaxMins
-		drv.ownerStore = stores.Owners
-		drv.versionStore = stores.Versions
-		drv.restorePointStore = stores.RestorePoints
+		drv.ownerStore = md.Owners
+		drv.versionStore = md.Versions
+		drv.restorePointStore = md.RestorePoints
 	}
 
 	go drv.monitorOrphanedSnapshots(ctx)
@@ -70,7 +70,7 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 }
 
 func (d *Driver) ResticManager(volName string) *restic.Manager {
-	return restic.NewManager(d.resticBase + "/restic/" + volName)
+	return restic.NewManager(d.resticPath + "/restic/" + volName)
 }
 
 func (d *Driver) nextVersionTags(name string, major bool) []string {

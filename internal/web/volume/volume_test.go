@@ -9,6 +9,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
@@ -23,20 +24,19 @@ func (m *mockKeyValueStore) DeleteObject(string) error         { return nil }
 func (m *mockKeyValueStore) ListObjects(string) ([]backend.Entry, error) {
 	return m.objects, m.objectsErr
 }
-func (m *mockKeyValueStore) ListCommonPrefixes(string, string) ([]string, error) { return nil, nil }
 func (m *mockKeyValueStore) DeleteObjectsWithPrefix(string) error                { return nil }
 
-func mockStores(objects []backend.Entry, objectsErr error) *metadata.Stores {
+func mockStores(objects []backend.Entry, objectsErr error) *metadata.Metadata {
 	be := &mockKeyValueStore{objects: objects, objectsErr: objectsErr}
-	return &metadata.Stores{
-		Volumes: metadata.NewVolumeStore(be),
+	return &metadata.Metadata{
+		Volumes: store.NewRegisteredVolumeStore(be),
 	}
 }
 
 func volumeObjects(names ...string) []backend.Entry {
 	var objs []backend.Entry
 	for _, n := range names {
-		key := metadata.RegisteredVolumesPrefix + n + ".json"
+		key := store.RegisteredVolumeKeyspace + n + ".json"
 		objs = append(objs, backend.Entry{Key: &key})
 	}
 	return objs
@@ -46,7 +46,7 @@ func TestListVolumes(t *testing.T) {
 	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetStores(mockStores(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
+	s.SetMetadata(mockStores(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -81,7 +81,7 @@ func TestListVolumesEmpty(t *testing.T) {
 	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetStores(mockStores(nil, nil))
+	s.SetMetadata(mockStores(nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestListVolumesMethodNotAllowed(t *testing.T) {
 	s := &server.Service{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetStores(mockStores(volumeObjects("vol-a"), nil))
+	s.SetMetadata(mockStores(volumeObjects("vol-a"), nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/volumes", nil)
 	rec := httptest.NewRecorder()

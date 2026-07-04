@@ -39,7 +39,7 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 func registerHealth(s *server.Service, inner *http.ServeMux) {
 	inner.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: More robust health check - actually serving files (and can access backends? Or is that out of scope)
-		if s.ResticBase == "" {
+		if s.Config.ResticBase == "" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}

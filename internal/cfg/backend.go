@@ -9,25 +9,25 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
-func OpenMetadataBackend(cfg Config) (*metadata.Stores, error) {
-	be, err := openBackend(cfg)
+func OpenMetadataBackend(cfg Config) (*metadata.Metadata, error) {
+	backend, err := openBackend(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return metadata.NewStores(be), nil
+	return metadata.NewMetadata(backend), nil
 }
 
 func openBackend(cfg Config) (backend.KeyValueStore, error) {
-	beType := cfg.MetadataBackend
-	if beType == "" {
+	backendType := cfg.MetadataBackend
+	if backendType == "" {
 		if cfg.S3Bucket != "" {
-			beType = metadata.BackendS3
+			backendType = metadata.BackendS3
 		} else {
 			return nil, fmt.Errorf("no metadata backend configured: set BLT_METADATA_BACKEND, S3_BUCKET, or METADATA_S3_BUCKET")
 		}
 	}
 
-	switch beType {
+	switch backendType {
 	case metadata.BackendS3:
 		if cfg.S3Bucket == "" {
 			return nil, fmt.Errorf("S3Bucket required for s3 metadata backend")
@@ -49,6 +49,6 @@ func openBackend(cfg Config) (backend.KeyValueStore, error) {
 			RequestTimeout: 10 * time.Second,
 		})
 	default:
-		return nil, fmt.Errorf("unknown metadata backend %q (supported: s3, etcd)", beType)
+		return nil, fmt.Errorf("unknown metadata backend %q (supported: s3, etcd)", backendType)
 	}
 }
