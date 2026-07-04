@@ -50,7 +50,7 @@ jobs:
           path: coverage.out
 
       - name: Arch dependency tests
-        run: go test -run 'TestNo(WebDriver|DriverWeb)Dependency' ./test -count=1
+        run: go test -run 'TestNo(WebDriver|DriverWeb)Dependency' ./test/arch -count=1
 
   ui-lint:
     runs-on: ubuntu-latest
