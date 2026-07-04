@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
@@ -65,7 +66,6 @@ func (s *OwnerStore) FindForVolume(volumeName string) (*VolumeOwner, error) {
 		return nil, fmt.Errorf("list owner objects: %w", err)
 	}
 
-	SortOwnersByExpiry(objects)
 	objects = RemoveStaleObjects(s.be, objects, DefaultOwnerTTL)
 
 	key, owner, expiry := determineWinner(objects)
@@ -97,7 +97,6 @@ func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
 
 	result := make(map[string]VolumeOwner, len(grouped))
 	for vol, objs := range grouped {
-		SortOwnersByExpiry(objs)
 		key, owner, expiry := determineWinner(objs)
 		if key != "" {
 			result[vol] = VolumeOwner{Volume: vol, Owner: owner, Expiry: expiry}
@@ -148,30 +147,7 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 		return "", fmt.Errorf("list proposals: %w", err)
 	}
 
-	SortOwnersByExpiry(objects)
-
-	deleted := make(map[string]bool)
-	for _, obj := range objects {
-		if obj.Key == nil {
-			continue
-		}
-		k := *obj.Key
-		if k == myKey || !strings.Contains(k, owner) {
-			continue
-		}
-		_ = store.DeleteObject(k)
-		deleted[k] = true
-	}
-
-	filtered := make([]backend.Entry, 0, len(objects))
-	for _, obj := range objects {
-		if obj.Key != nil && !deleted[*obj.Key] {
-			filtered = append(filtered, obj)
-		}
-	}
-	SortOwnersByExpiry(filtered)
-
-	key, _, _ := determineWinner(filtered)
+	key, _, _ := determineWinner(objects)
 	if key != myKey {
 		return "", fmt.Errorf("another owner proposal was earlier")
 	}
@@ -188,16 +164,6 @@ func (o *OwnerEntry) RemainingSeconds() int64 {
 
 func OwnerPrefix(volumeName string) string {
 	return OwnerKeyspace + volumeName + "/"
-}
-
-func SortOwnersByExpiry(objects []backend.Entry) {
-	sort.Slice(objects, func(i, j int) bool {
-		ti, tj := objects[i].ModificationCounter, objects[j].ModificationCounter
-		if ti != nil && tj != nil && *ti != *tj {
-			return *ti < *tj
-		}
-		return *objects[i].Key < *objects[j].Key
-	})
 }
 
 func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
@@ -229,6 +195,37 @@ func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
 }
 
 func determineWinner(objects []backend.Entry) (firstKey string, firstOwner string, firstExpiry int64) {
+	sort.Slice(objects, func(i, j int) bool {
+		ti, tj := objects[i].ModificationCounter, objects[j].ModificationCounter
+		if ti != nil && tj != nil && *ti != *tj {
+			return *ti < *tj
+		}
+		if ti == nil && tj != nil {
+			return false
+		}
+		if ti != nil && tj == nil {
+			return true
+		}
+
+		_, _, ei, erri := ParseOwnerKey(*objects[i].Key)
+		_, _, ej, errj := ParseOwnerKey(*objects[j].Key)
+		if erri == nil && errj == nil && ei != ej {
+			return ei < ej
+		}
+
+		return *objects[i].Key < *objects[j].Key
+	})
+
+	for i := 1; i < len(objects); i++ {
+		if objects[i].ModificationCounter != nil && objects[i-1].ModificationCounter != nil &&
+			*objects[i].ModificationCounter == *objects[i-1].ModificationCounter {
+			log.Warnf("duplicate_modification_counter", "count=%d entries=%s %s",
+				*objects[i].ModificationCounter,
+				*objects[i-1].Key,
+				*objects[i].Key)
+		}
+	}
+
 	now := time.Now().Unix()
 	for _, obj := range objects {
 		if obj.Key == nil {
