@@ -49,7 +49,11 @@ func Gzip(next http.Handler) http.Handler {
 		w.Header().Del("Content-Length")
 		w.Header().Set("Content-Encoding", "gzip")
 		gz := gzip.NewWriter(w)
-		defer gz.Close()
+		defer func() {
+			if err := gz.Close(); err != nil {
+				log.Error("close_gzip_writer_failed", err)
+			}
+		}()
 		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, gw: gz}, r)
 	})
 }
