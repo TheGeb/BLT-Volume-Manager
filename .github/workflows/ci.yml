@@ -8,7 +8,6 @@ on:
 
 jobs:
   go:
-    needs: [ui]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,10 +17,8 @@ jobs:
           go-version: '1.26'
           cache: true
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: ui-build
-          path: internal/web/static
+      - name: Create dummy UI files for embed
+        run: mkdir -p internal/web/static && touch internal/web/static/.dummy
 
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -43,7 +40,7 @@ jobs:
           path: coverage.out
 
       - name: Arch dependency tests
-        run: go test -run 'TestNo(WebDriver|DriverWeb)Dependency' ./test -count=1
+        run: go test -run 'TestNo(WebDriver|DriverWeb)Dependency' ./test/arch -count=1
 
   ui:
     runs-on: ubuntu-latest

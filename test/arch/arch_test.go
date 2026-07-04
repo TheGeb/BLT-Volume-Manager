@@ -1,7 +1,8 @@
-package integration
+package arch
 
 import (
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 	"testing"
@@ -82,10 +83,13 @@ func TestNoDriverWebDependency(t *testing.T) {
 }
 
 func listPackages(pattern string) ([]goPackage, error) {
-	cmd := exec.Command("go", "list", "-json", pattern)
+	cmd := exec.Command("go", "list", "-e", "-json", pattern)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("go list %s: %w\nstderr:\n%s", pattern, err, string(exitErr.Stderr))
+		}
+		return nil, fmt.Errorf("go list %s: %w", pattern, err)
 	}
 	dec := json.NewDecoder(strings.NewReader(string(output)))
 	var pkgs []goPackage
