@@ -11,6 +11,7 @@ linters:
     - misspell
     - mirror
     - nilnil
+    - staticcheck
     - unconvert
     - usestdlibvars
   settings:
