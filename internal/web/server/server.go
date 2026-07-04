@@ -18,7 +18,7 @@ type StatsCache struct {
 	TotalVolumes int    `json:"total_volumes"`
 }
 
-type Service struct { //TODO: Rename to BLTService
+type Service struct { // TODO: Rename to BLTService
 	Config cfg.Config
 
 	metadata     *metadata.Metadata

@@ -55,7 +55,7 @@ func (m *Metadata) DeleteMetadata(volumeName string) error {
 	return m.backend.DeleteObjectsWithPrefix("restic/" + volumeName + "/")
 }
 
-func Hostname() string { //FIXME: Awkward placement, where should this live?
+func Hostname() string { // FIXME: Awkward placement, where should this live?
 	h, _ := os.Hostname()
 	if h == "" {
 		return "unknown"

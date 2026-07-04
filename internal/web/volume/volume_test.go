@@ -24,7 +24,7 @@ func (m *mockKeyValueStore) DeleteObject(string) error         { return nil }
 func (m *mockKeyValueStore) ListObjects(string) ([]backend.Entry, error) {
 	return m.objects, m.objectsErr
 }
-func (m *mockKeyValueStore) DeleteObjectsWithPrefix(string) error                { return nil }
+func (m *mockKeyValueStore) DeleteObjectsWithPrefix(string) error { return nil }
 
 func mockStores(objects []backend.Entry, objectsErr error) *metadata.Metadata {
 	be := &mockKeyValueStore{objects: objects, objectsErr: objectsErr}
