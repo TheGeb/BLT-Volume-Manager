@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -12,73 +11,6 @@ import (
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
-
-// mockBackend implements backend.KeyValueStore with in-memory storage.
-type mockBackend struct {
-	mu      sync.Mutex
-	objects map[string][]byte
-	clock   int64 // monotonic counter used as ModificationCounter
-}
-
-func newMockBackend() *mockBackend {
-	return &mockBackend{objects: make(map[string][]byte)}
-}
-
-func (m *mockBackend) PutObject(key string, data []byte) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.clock++
-	m.objects[key] = data
-	return nil
-}
-
-func (m *mockBackend) ReadObject(key string) ([]byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	data, ok := m.objects[key]
-	if !ok {
-		return nil, backend.ErrKeyNotFound
-	}
-	return data, nil
-}
-
-func (m *mockBackend) DeleteObject(key string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.objects, key)
-	return nil
-}
-
-type mockEntry struct {
-	key                 string
-	modificationCounter int64
-}
-
-func (m *mockBackend) ListObjects(prefix string) ([]backend.Entry, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.listObjectsLocked(prefix)
-}
-
-func (m *mockBackend) listObjectsLocked(prefix string) ([]backend.Entry, error) {
-	// Build entries from a snapshot — we can't recover clock per object
-	// from the map alone, so we store an ordered list separately.
-	// Instead, let's reconstruct from the internal ordering.
-	// For a real test, we'll use a slice-based backend.
-	// FIXME: this approach loses ordering. Let's use a slice backend instead.
-	return nil, errors.New("use orderedBackend instead")
-}
-
-func (m *mockBackend) DeleteObjectsWithPrefix(prefix string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for key := range m.objects {
-		if strings.HasPrefix(key, prefix) {
-			delete(m.objects, key)
-		}
-	}
-	return nil
-}
 
 // orderedBackend tracks insertion order for deterministic ListObjects.
 type orderedBackend struct {

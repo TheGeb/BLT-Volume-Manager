@@ -19,7 +19,7 @@ import (
 
 func logReq(obj any) {
 	b, _ := json.Marshal(obj)
-	log.Debugf("driver_request", string(b))
+	log.Debugf("driver_request", "%s", string(b))
 }
 
 func logResp(obj any, err error) {
@@ -35,7 +35,7 @@ func logResp(obj any, err error) {
 		msg += fmt.Sprintf("error=%v", err)
 	}
 	if msg != "" {
-		log.Debugf("driver_response", msg)
+		log.Debugf("driver_response", "%s", msg)
 	}
 }
 

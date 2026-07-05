@@ -137,12 +137,13 @@ func decodeOwner(s string) string {
 func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry int64) (myKey string, err error) {
 	creation := time.Now().Unix()
 	var durStr string
-	if expiry == 0 {
+	switch {
+	case expiry == 0:
 		durStr = "0"
-	} else if expiry > creation {
+	case expiry > creation:
 		d := time.Duration(expiry-creation) * time.Second
 		durStr = formatDuration(d)
-	} else {
+	default:
 		return "", fmt.Errorf("expiry must be in the future or 0 for permanent")
 	}
 	encodedOwner := encodeOwner(owner)
