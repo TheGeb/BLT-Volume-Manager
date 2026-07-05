@@ -43,18 +43,19 @@ func init() {
 }
 
 type Event struct {
-	Event      string
-	Method     string
-	Path       string
-	Status     int
-	DurationMs int64
-	Error      error
-	Message    string
-	Op         string
-	Bucket     string
-	Key        string
-	Volume     string
-	Snapshot   string
+	Event            string
+	Method           string
+	Path             string
+	Status           int
+	DurationMs       int64
+	Error            error
+	Message          string
+	DeveloperMessage string
+	Op               string
+	Bucket           string
+	Key              string
+	Volume           string
+	Snapshot         string
 }
 
 func LogEvent(level int, e Event) {
@@ -73,7 +74,7 @@ func LogEvent(level int, e Event) {
 	default:
 		slogLevel = slog.LevelInfo
 	}
-	attrs := make([]slog.Attr, 0, 11)
+	attrs := make([]slog.Attr, 0, 12)
 	if e.Method != "" {
 		attrs = append(attrs, slog.String("method", e.Method))
 	}
@@ -91,6 +92,9 @@ func LogEvent(level int, e Event) {
 	}
 	if e.Message != "" {
 		attrs = append(attrs, slog.String("message", e.Message))
+	}
+	if e.DeveloperMessage != "" {
+		attrs = append(attrs, slog.String("developer_message", e.DeveloperMessage))
 	}
 	if e.Op != "" {
 		attrs = append(attrs, slog.String("op", e.Op))
@@ -195,6 +199,58 @@ func Errorf(event string, err error, format string, args ...any) {
 		msg = fmt.Sprintf(format, args...)
 	}
 	slog.Error(event, "message", msg, "error", err)
+}
+
+func InfoDev(event string, devMsg string) {
+	slog.Info(event, "developer_message", devMsg)
+}
+
+func DebugDev(event string, devMsg string) {
+	slog.Debug(event, "developer_message", devMsg)
+}
+
+func WarnDev(event string, devMsg string) {
+	slog.Warn(event, "developer_message", devMsg)
+}
+
+func ErrorDev(event string, err error, devMsg string) {
+	if err != nil {
+		slog.Error(event, "error", err, "developer_message", devMsg)
+	} else {
+		slog.Error(event, "developer_message", devMsg)
+	}
+}
+
+func InfofDev(event string, devMsg string, format string, args ...any) {
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	}
+	slog.Info(event, "message", msg, "developer_message", devMsg)
+}
+
+func DebugfDev(event string, devMsg string, format string, args ...any) {
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	}
+	slog.Debug(event, "message", msg, "developer_message", devMsg)
+}
+
+func WarnfDev(event string, devMsg string, format string, args ...any) {
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	}
+	slog.Warn(event, "message", msg, "developer_message", devMsg)
+}
+
+func ErrorfDev(event string, err error, devMsg string, format string, args ...any) {
+	msg := format
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	}
+	slog.Error(event, "message", msg, "error", err, "developer_message", devMsg)
 }
 
 func S3Call(op, bucket, key string, dur time.Duration, err error) {

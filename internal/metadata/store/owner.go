@@ -23,9 +23,10 @@ type OwnerEntry struct {
 }
 
 type VolumeOwner struct {
-	Volume string
-	Owner  string
-	Expiry int64
+	Volume   string
+	Owner    string
+	Creation int64
+	Expiry   int64
 }
 
 type OwnerStore struct {
@@ -42,7 +43,7 @@ func (s *OwnerStore) LockVolume(volumeName, ownerName string, expiry int64) (str
 }
 
 func (s *OwnerStore) LockIsValid(key string) (bool, error) {
-	_, _, expiry, err := ParseOwnerKey(key)
+	_, _, _, expiry, err := ParseOwnerKey(key)
 	if err != nil {
 		return false, fmt.Errorf("parse lock key: %w", err)
 	}
@@ -68,11 +69,11 @@ func (s *OwnerStore) FindForVolume(volumeName string) (*VolumeOwner, error) {
 
 	objects = RemoveStaleObjects(s.be, objects, DefaultOwnerTTL)
 
-	key, owner, expiry := determineWinner(objects)
+	key, owner, creation, expiry := determineOwner(objects)
 	if key == "" {
 		return &VolumeOwner{Volume: volumeName}, nil
 	}
-	return &VolumeOwner{Volume: volumeName, Owner: owner, Expiry: expiry}, nil
+	return &VolumeOwner{Volume: volumeName, Owner: owner, Creation: creation, Expiry: expiry}, nil
 }
 
 func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
@@ -88,7 +89,7 @@ func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
 		if obj.Key == nil {
 			continue
 		}
-		vol, _, _, err := ParseOwnerKey(*obj.Key)
+		vol, _, _, _, err := ParseOwnerKey(*obj.Key)
 		if err != nil || vol == "" {
 			continue
 		}
@@ -97,9 +98,9 @@ func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
 
 	result := make(map[string]VolumeOwner, len(grouped))
 	for vol, objs := range grouped {
-		key, owner, expiry := determineWinner(objs)
+		key, owner, creation, expiry := determineOwner(objs)
 		if key != "" {
-			result[vol] = VolumeOwner{Volume: vol, Owner: owner, Expiry: expiry}
+			result[vol] = VolumeOwner{Volume: vol, Owner: owner, Creation: creation, Expiry: expiry}
 		}
 	}
 	return result, nil
@@ -125,20 +126,39 @@ func (s *OwnerStore) AcquireForVolume(volumeName, ownerName string, durationMins
 	return expiry, nil
 }
 
+func encodeOwner(s string) string {
+	return strings.ReplaceAll(s, "-", "%2D")
+}
+
+func decodeOwner(s string) string {
+	return strings.ReplaceAll(s, "%2D", "-")
+}
+
 func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry int64) (myKey string, err error) {
-	myKey = fmt.Sprintf("%s%s-%d.json", folder, owner, expiry)
+	creation := time.Now().Unix()
+	var durStr string
+	if expiry == 0 {
+		durStr = "0"
+	} else if expiry > creation {
+		d := time.Duration(expiry-creation) * time.Second
+		durStr = formatDuration(d)
+	} else {
+		return "", fmt.Errorf("expiry must be in the future or 0 for permanent")
+	}
+	encodedOwner := encodeOwner(owner)
+	newKey := fmt.Sprintf("%s%s-%d-%s.json", folder, encodedOwner, creation, durStr)
 	proposal := OwnerEntry{Name: owner, ExpiryTime: expiry}
 	data, err := json.Marshal(proposal)
 	if err != nil {
 		return "", fmt.Errorf("marshal proposal: %w", err)
 	}
 
-	if err := store.PutObject(myKey, data); err != nil {
+	if err := store.PutObject(newKey, data); err != nil {
 		return "", fmt.Errorf("create proposal: %w", err)
 	}
 	defer func() {
 		if err != nil {
-			_ = store.DeleteObject(myKey)
+			_ = store.DeleteObject(newKey)
 		}
 	}()
 
@@ -147,13 +167,16 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 		return "", fmt.Errorf("list proposals: %w", err)
 	}
 
-	key, _, _ := determineWinner(objects)
-	if key != myKey {
+	// TODO: Delete any expired locks, or any old locks with your own hostname (Should that be here or at some other point, like a background cleanup task?)
+	winner, _, _, _ := determineOwner(objects)
+	if winner != newKey {
 		return "", fmt.Errorf("another owner proposal was earlier")
 	}
 
+	myKey = newKey
 	return myKey, nil
 }
+
 
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
@@ -166,35 +189,89 @@ func OwnerPrefix(volumeName string) string {
 	return OwnerKeyspace + volumeName + "/"
 }
 
-func ParseOwnerKey(key string) (volume, owner string, expiry int64, err error) {
+func parseDuration(s string) (time.Duration, error) {
+	if len(s) == 0 {
+		return 0, fmt.Errorf("empty duration string")
+	}
+	unit := s[len(s)-1]
+	numStr := s[:len(s)-1]
+	num, err := strconv.ParseInt(numStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse duration number: %w", err)
+	}
+	switch unit {
+	case 's':
+		return time.Duration(num) * time.Second, nil
+	case 'm':
+		return time.Duration(num) * time.Minute, nil
+	case 'h':
+		return time.Duration(num) * time.Hour, nil
+	default:
+		return 0, fmt.Errorf("unknown duration unit %c, expected s, m, or h", unit)
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+	totalSeconds := int64(d.Seconds())
+	if totalSeconds%3600 == 0 {
+		return fmt.Sprintf("%dh", totalSeconds/3600)
+	}
+	if totalSeconds%60 == 0 {
+		return fmt.Sprintf("%dm", totalSeconds/60)
+	}
+	return fmt.Sprintf("%ds", totalSeconds)
+}
+
+func ParseOwnerKey(key string) (volume, owner string, creation int64, expiry int64, err error) {
 	if !strings.HasPrefix(key, OwnerKeyspace) {
-		return "", "", 0, fmt.Errorf("key does not start with owner prefix")
+		return "", "", 0, 0, fmt.Errorf("key does not start with owner prefix")
 	}
 	s := strings.TrimPrefix(key, OwnerKeyspace)
 	idx := strings.LastIndexByte(s, '/')
 	if idx < 0 {
-		return "", "", 0, fmt.Errorf("no volume/owner separator in owner key: %q", key)
+		return "", "", 0, 0, fmt.Errorf("no volume/owner separator in owner key: %q", key)
 	}
 	volume = s[:idx]
 	rest := s[idx+1:]
 	if !strings.HasSuffix(rest, ".json") {
-		return "", "", 0, fmt.Errorf("owner key missing .json suffix: %q", key)
+		return "", "", 0, 0, fmt.Errorf("owner key missing .json suffix: %q", key)
 	}
 	rest = rest[:len(rest)-5]
+
+	// Format: <owner>-<creation>-<duration>
 	lastDash := strings.LastIndexByte(rest, '-')
 	if lastDash < 0 {
-		return "", "", 0, fmt.Errorf("no expiry separator in owner key: %q", key)
+		return "", "", 0, 0, fmt.Errorf("no dash separator in owner key: %q", key)
 	}
-	owner = rest[:lastDash]
-	expiryStr := rest[lastDash+1:]
-	expiry, err = strconv.ParseInt(expiryStr, 10, 64)
+	prevDash := strings.LastIndexByte(rest[:lastDash], '-')
+	if prevDash < 0 {
+		return "", "", 0, 0, fmt.Errorf("missing creation timestamp in owner key: %q", key)
+	}
+
+	owner = decodeOwner(rest[:prevDash])
+	creation, err = strconv.ParseInt(rest[prevDash+1:lastDash], 10, 64)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("parse expiry from owner key: %w", err)
+		return "", "", 0, 0, fmt.Errorf("parse creation from owner key: %w", err)
 	}
-	return volume, owner, expiry, nil
+	durationStr := rest[lastDash+1:]
+
+	if durationStr == "0" {
+		expiry = 0
+	} else {
+		d, durErr := parseDuration(durationStr)
+		if durErr != nil {
+			return "", "", 0, 0, fmt.Errorf("parse duration from owner key: %w", durErr)
+		}
+		expiry = creation + int64(d.Seconds())
+	}
+
+	return volume, owner, creation, expiry, nil
 }
 
-func determineWinner(objects []backend.Entry) (firstKey string, firstOwner string, firstExpiry int64) {
+func determineOwner(objects []backend.Entry) (firstKey string, firstOwner string, firstCreation int64, firstExpiry int64) {
 	sort.Slice(objects, func(i, j int) bool {
 		ti, tj := objects[i].ModificationCounter, objects[j].ModificationCounter
 		if ti != nil && tj != nil && *ti != *tj {
@@ -207,10 +284,11 @@ func determineWinner(objects []backend.Entry) (firstKey string, firstOwner strin
 			return true
 		}
 
-		_, _, ei, erri := ParseOwnerKey(*objects[i].Key)
-		_, _, ej, errj := ParseOwnerKey(*objects[j].Key)
-		if erri == nil && errj == nil && ei != ej {
-			return ei < ej
+		//If modification timestamps are equal, sort by creation time (earliest wins)
+		_, _, ci, _, erri := ParseOwnerKey(*objects[i].Key)
+		_, _, cj, _, errj := ParseOwnerKey(*objects[j].Key)
+		if erri == nil && errj == nil && ci != cj {
+			return ci < cj
 		}
 
 		return *objects[i].Key < *objects[j].Key
@@ -219,7 +297,9 @@ func determineWinner(objects []backend.Entry) (firstKey string, firstOwner strin
 	for i := 1; i < len(objects); i++ {
 		if objects[i].ModificationCounter != nil && objects[i-1].ModificationCounter != nil &&
 			*objects[i].ModificationCounter == *objects[i-1].ModificationCounter {
-			log.Warnf("duplicate_modification_counter", "count=%d entries=%s %s",
+			log.WarnfDev("duplicate_modification_counter",
+				"Duplicate modification counters can be caused by S3 backends with 1 second timestamp resolution, which is not suitable for locks",
+				"count=%d entries=%s %s",
 				*objects[i].ModificationCounter,
 				*objects[i-1].Key,
 				*objects[i].Key)
@@ -231,16 +311,16 @@ func determineWinner(objects []backend.Entry) (firstKey string, firstOwner strin
 		if obj.Key == nil {
 			continue
 		}
-		_, owner, expiry, err := ParseOwnerKey(*obj.Key)
+		_, owner, creation, expiry, err := ParseOwnerKey(*obj.Key)
 		if err != nil {
 			continue
 		}
 		if expiry > 0 && expiry <= now {
 			continue
 		}
-		return *obj.Key, owner, expiry
+		return *obj.Key, owner, creation, expiry
 	}
-	return "", "", 0
+	return "", "", 0, 0
 }
 
 func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, ttl time.Duration) []backend.Entry {
@@ -250,7 +330,7 @@ func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, tt
 		if obj.Key == nil {
 			continue
 		}
-		_, _, expiry, err := ParseOwnerKey(*obj.Key)
+		_, _, _, expiry, err := ParseOwnerKey(*obj.Key)
 		isPermanent := err == nil && expiry == 0
 		if err == nil && expiry > now.Unix() {
 			kept = append(kept, obj)
