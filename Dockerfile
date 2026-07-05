@@ -16,10 +16,24 @@ RUN apk add --no-cache \
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Cache npm dependencies separately from source code
+COPY web/ui/package.json web/ui/package-lock.json ./web/ui/
+RUN npm ci --prefix web/ui
+
 COPY . .
 
-RUN make ui && \
-    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT make build-release
+RUN cd web/ui && npm run build && mkdir -p /src/internal/web/static && \
+    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT \
+    go build -ldflags "-s -w \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$COMMIT \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -o blt-volume-manager-plugin ./cmd/driver && \
+    go build -ldflags "-s -w \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$COMMIT \
+      -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -o blt-volume-manager-web ./cmd/web
 
 FROM scratch AS plugin
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
