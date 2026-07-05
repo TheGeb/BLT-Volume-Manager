@@ -4,14 +4,14 @@ set -euo pipefail
 # Build and push multi-arch Docker images for both the plugin and web targets.
 #
 # Usage:
-#   IMAGE=myrepo/blt-volume-manager VERSION=v1.2.3 ./docker-build-push.sh
+#   IMAGE=myrepo/BLT-Volume-Manager VERSION=v1.2.3 ./docker-build-push.sh
 #
 # Defaults:
-#   IMAGE   = ghcr.io/TheGeb/docker-s3-volume-plugin
+#   IMAGE   = ghcr.io/TheGeb/BLT-Volume-Manager
 #   VERSION = $(git describe --tags --always --dirty)
 
 REPO="${GITHUB_REPOSITORY,,}"
-IMAGE="${IMAGE:-ghcr.io/${REPO:-TheGeb/docker-s3-volume-plugin}}"
+IMAGE="${IMAGE:-ghcr.io/${REPO:-TheGeb/BLT-Volume-Manager}}"
 VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo latest)}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 

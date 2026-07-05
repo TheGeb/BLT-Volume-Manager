@@ -109,6 +109,11 @@ build-web: tidy format ui
 
 build: build-driver build-web
 
+# Use in Docker/release builds where golangci-lint isn't available
+build-release:
+	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver
+	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-web ./cmd/web
+
 # === Docker ===
 
 docker-web:

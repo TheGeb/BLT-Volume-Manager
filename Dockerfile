@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 
 RUN make ui && \
-    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT make build
+    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT make build-release
 
 FROM scratch AS plugin
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
