@@ -18,7 +18,7 @@ import (
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
-func setupPluginTest(t *testing.T) (string, *GarageServer) {
+func setupPluginTest(t *testing.T, backendType string) string {
 	t.Helper()
 
 	garage := StartGarage(t)
@@ -26,13 +26,20 @@ func setupPluginTest(t *testing.T) (string, *GarageServer) {
 	dataDir := t.TempDir()
 	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
-	drv := driver.New(cfg.Config{
+	conf := cfg.Config{
 		DataDir:    dataDir,
 		ResticBase: resticBase,
 		S3Bucket:   garage.BucketName,
 		S3Endpoint: garage.Endpoint,
 		S3Region:   "us-east-1",
-	}, context.Background())
+	}
+	if backendType == "etcd" {
+		etcd := StartEtcd(t)
+		conf.MetadataBackend = "etcd"
+		conf.EtcdEndpoints = []string{etcd.Endpoint}
+	}
+
+	drv := driver.New(conf, context.Background())
 	h := volume.NewHandler(drv)
 
 	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
@@ -43,7 +50,7 @@ func setupPluginTest(t *testing.T) (string, *GarageServer) {
 	t.Cleanup(func() { l.Close(); os.Remove(socketPath) })
 	go h.Serve(l)
 
-	return socketPath, garage
+	return socketPath
 }
 
 func pluginDo(t *testing.T, socketPath, endpoint string, req, resp any) {
@@ -109,18 +116,14 @@ func pluginOK(t *testing.T, socketPath, endpoint string, req any) map[string]any
 	return m
 }
 
-func TestPlugin_CreateVolume(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginCreateVolume(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "test-vol"})
 	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("create: %s", err)
 	}
 }
 
-func TestPlugin_CreateDuplicate(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginCreateDuplicate(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
 	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
 	if err, ok := m["Err"].(string); ok && err != "" {
@@ -128,9 +131,7 @@ func TestPlugin_CreateDuplicate(t *testing.T) {
 	}
 }
 
-func TestPlugin_ListVolumes(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginListVolumes(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
 	vols, _ := m["Volumes"].([]any)
 	initialCount := len(vols)
@@ -145,9 +146,7 @@ func TestPlugin_ListVolumes(t *testing.T) {
 	}
 }
 
-func TestPlugin_GetVolume(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginGetVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "get-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "get-vol"})
@@ -164,20 +163,15 @@ func TestPlugin_GetVolume(t *testing.T) {
 	}
 }
 
-func TestPlugin_PathVolume(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginPathVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "path-vol"})
-
 	m := pluginOK(t, socket, "VolumeDriver.Path", volume.PathRequest{Name: "path-vol"})
 	if mp, _ := m["Mountpoint"].(string); mp == "" {
 		t.Fatal("expected mountpoint in path response")
 	}
 }
 
-func TestPlugin_MountUnmount(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginMountUnmount(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "mount-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: "mount-vol", ID: "mount-1"})
@@ -189,9 +183,7 @@ func TestPlugin_MountUnmount(t *testing.T) {
 	pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: "mount-vol", ID: "mount-1"})
 }
 
-func TestPlugin_RemoveVolume(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginRemoveVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "remove-vol"})
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "remove-vol"})
 
@@ -204,10 +196,7 @@ func TestPlugin_RemoveVolume(t *testing.T) {
 	}
 }
 
-func TestPlugin_FullLifecycle(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
-
+func testPluginFullLifecycle(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "lifecycle-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: "lifecycle-vol", ID: "lifecycle-1"})
@@ -231,9 +220,7 @@ func TestPlugin_FullLifecycle(t *testing.T) {
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "lifecycle-vol"})
 }
 
-func TestPlugin_Capabilities(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
+func testPluginCapabilities(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.Capabilities", nil)
 	caps, ok := m["Capabilities"].(map[string]any)
 	if !ok {
@@ -244,10 +231,7 @@ func TestPlugin_Capabilities(t *testing.T) {
 	}
 }
 
-func TestPlugin_EdgeCases(t *testing.T) {
-	t.Parallel()
-	socket, _ := setupPluginTest(t)
-
+func testPluginEdgeCases(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})
 	if err, ok := m["Err"].(string); ok && err != "" {
 		t.Fatalf("remove non-existent: %s", err)
@@ -273,10 +257,28 @@ func TestPlugin_EdgeCases(t *testing.T) {
 	createdVol := "edge-lock-vol"
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: createdVol})
 	pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: createdVol, ID: "edge-1"})
-
 	pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: createdVol, ID: "edge-2"})
-
 	pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: createdVol, ID: "edge-1"})
 	pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: createdVol, ID: "edge-2"})
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: createdVol})
+}
+
+func TestPlugin(t *testing.T) {
+	for _, backendType := range []string{"s3", "etcd"} {
+		backendType := backendType
+		t.Run(backendType, func(t *testing.T) {
+			socket := setupPluginTest(t, backendType)
+
+			t.Run("CreateVolume", func(t *testing.T) { t.Parallel(); testPluginCreateVolume(t, socket) })
+			t.Run("CreateDuplicate", func(t *testing.T) { t.Parallel(); testPluginCreateDuplicate(t, socket) })
+			t.Run("ListVolumes", func(t *testing.T) { t.Parallel(); testPluginListVolumes(t, socket) })
+			t.Run("GetVolume", func(t *testing.T) { t.Parallel(); testPluginGetVolume(t, socket) })
+			t.Run("PathVolume", func(t *testing.T) { t.Parallel(); testPluginPathVolume(t, socket) })
+			t.Run("MountUnmount", func(t *testing.T) { t.Parallel(); testPluginMountUnmount(t, socket) })
+			t.Run("RemoveVolume", func(t *testing.T) { t.Parallel(); testPluginRemoveVolume(t, socket) })
+			t.Run("FullLifecycle", func(t *testing.T) { t.Parallel(); testPluginFullLifecycle(t, socket) })
+			t.Run("Capabilities", func(t *testing.T) { t.Parallel(); testPluginCapabilities(t, socket) })
+			t.Run("EdgeCases", func(t *testing.T) { t.Parallel(); testPluginEdgeCases(t, socket) })
+		})
+	}
 }

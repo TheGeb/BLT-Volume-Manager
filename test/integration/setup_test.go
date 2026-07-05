@@ -10,12 +10,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -23,16 +21,18 @@ import (
 )
 
 const (
-	garageImage          = "dxflrs/garage:v2.3.0"
-	garageBuiltID        = "garage-test:local"
-	garageSharedBuildDir = ".docker-build-integration"
+	garageImage = "dxflrs/garage:v2.3.0"
+	etcdImage   = "quay.io/coreos/etcd:v3.5.27"
 )
 
 var (
-	sharedContainerID string
-	sharedEndpoint    string
-	sharedAccessKey   string
-	sharedSecretKey   string
+	sharedContainerID     string
+	sharedEndpoint        string
+	sharedAccessKey       string
+	sharedSecretKey       string
+	garageConfigDir       string
+	sharedEtcdContainerID string
+	sharedEtcdEndpoint    string
 )
 
 func TestMain(m *testing.M) {
@@ -46,6 +46,11 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	if err := startSharedEtcd(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start shared etcd: %v\n", err)
+		os.Exit(1)
+	}
+
 	os.Setenv("AWS_ACCESS_KEY_ID", sharedAccessKey)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", sharedSecretKey)
 	os.Setenv("RESTIC_PASSWORD", "test-password")
@@ -53,6 +58,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("BLT_DEV_MODE", "1")
 
 	code := m.Run()
+	stopSharedEtcd()
 	stopSharedGarage()
 	os.Exit(code)
 }
@@ -86,12 +92,13 @@ func startSharedGarage() error {
 	sharedAccessKey = randomHex(20)
 	sharedSecretKey = randomHex(40)
 
-	if err := os.MkdirAll(garageSharedBuildDir, app.DefaultDirPerm); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+	configDir, err := os.MkdirTemp("", "garage-config-")
+	if err != nil {
+		return fmt.Errorf("mkdir temp: %w", err)
 	}
 
 	rpcSecret := randomHex(64)
-	config := fmt.Sprintf(`
+	configStr := fmt.Sprintf(`
 metadata_dir = "/tmp/garage/meta"
 data_dir = "/tmp/garage/data"
 db_engine = "sqlite"
@@ -112,31 +119,27 @@ root_domain = ".web.garage.localhost"
 api_bind_addr = "0.0.0.0:3903"
 `, rpcSecret)
 
-	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "config.toml"), []byte(config), app.DefaultFilePerm); err != nil {
+	configPath := configDir + "/config.toml"
+	if err := os.WriteFile(configPath, []byte(configStr), 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
-	}
-	dockerfile := "FROM " + garageImage + "\nCOPY config.toml /etc/garage.toml\n"
-	if err := os.WriteFile(filepath.Join(garageSharedBuildDir, "Dockerfile"), []byte(dockerfile), app.DefaultFilePerm); err != nil {
-		return fmt.Errorf("write dockerfile: %w", err)
-	}
-
-	if out, err := exec.Command("docker", "build", "-t", garageBuiltID, garageSharedBuildDir).CombinedOutput(); err != nil {
-		return fmt.Errorf("build garage image: %w\n%s", err, out)
 	}
 
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "3900",
+		"-v", configPath+":/etc/garage.toml",
 		"-e", "GARAGE_DEFAULT_ACCESS_KEY="+sharedAccessKey,
 		"-e", "GARAGE_DEFAULT_SECRET_KEY="+sharedSecretKey,
 		"-e", "GARAGE_DEFAULT_BUCKET=shared-garage-default",
-		garageBuiltID,
+		garageImage,
 		"/garage", "server", "--single-node", "--default-bucket",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		os.RemoveAll(configDir)
 		return fmt.Errorf("start garage container: %w\n%s", err, out)
 	}
 	sharedContainerID = strings.TrimSpace(string(out))
+	garageConfigDir = configDir
 
 	var hostPort string
 	for i := 0; i < 60; i++ {
@@ -152,6 +155,7 @@ api_bind_addr = "0.0.0.0:3903"
 	if hostPort == "" {
 		logs, _ := exec.Command("docker", "logs", sharedContainerID).CombinedOutput()
 		_ = exec.Command("docker", "rm", "-f", sharedContainerID).Run()
+		os.RemoveAll(configDir)
 		return fmt.Errorf("garage container did not publish port 3900\nlogs:\n%s", logs)
 	}
 
@@ -160,15 +164,77 @@ api_bind_addr = "0.0.0.0:3903"
 
 	if err := waitForEndpoint(sharedEndpoint, 60*time.Second); err != nil {
 		_ = exec.Command("docker", "rm", "-f", sharedContainerID).Run()
+		os.RemoveAll(configDir)
 		return fmt.Errorf("garage not ready: %w", err)
 	}
 
 	return nil
 }
 
+type EtcdServer struct {
+	Endpoint string
+}
+
+func StartEtcd(t *testing.T) *EtcdServer {
+	t.Helper()
+	return &EtcdServer{
+		Endpoint: sharedEtcdEndpoint,
+	}
+}
+
+func startSharedEtcd() error {
+	cmd := exec.Command("docker", "run", "-d",
+		"-p", "2379",
+		etcdImage,
+		"etcd",
+		"--advertise-client-urls", "http://0.0.0.0:2379",
+		"--listen-client-urls", "http://0.0.0.0:2379",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("start etcd container: %w\n%s", err, out)
+	}
+	sharedEtcdContainerID = strings.TrimSpace(string(out))
+
+	var hostPort string
+	for i := 0; i < 60; i++ {
+		portOut, err := exec.Command("docker", "port", sharedEtcdContainerID, "2379").CombinedOutput()
+		if err == nil {
+			hostPort = strings.TrimSpace(string(portOut))
+			if hostPort != "" {
+				break
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if hostPort == "" {
+		logs, _ := exec.Command("docker", "logs", sharedEtcdContainerID).CombinedOutput()
+		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
+		return fmt.Errorf("etcd container did not publish port 2379\nlogs:\n%s", logs)
+	}
+
+	parts := strings.Split(hostPort, ":")
+	sharedEtcdEndpoint = fmt.Sprintf("http://localhost:%s", parts[len(parts)-1])
+
+	if err := waitForEndpoint(sharedEtcdEndpoint+"/health", 60*time.Second); err != nil {
+		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
+		return fmt.Errorf("etcd not ready: %w", err)
+	}
+
+	return nil
+}
+
+func stopSharedEtcd() {
+	if sharedEtcdContainerID != "" {
+		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
+	}
+}
+
 func stopSharedGarage() {
 	_ = exec.Command("docker", "rm", "-f", sharedContainerID).Run()
-	_ = os.RemoveAll(garageSharedBuildDir)
+	if garageConfigDir != "" {
+		_ = os.RemoveAll(garageConfigDir)
+	}
 }
 
 func createBucket(t *testing.T, bucket string) {
