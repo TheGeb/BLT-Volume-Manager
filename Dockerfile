@@ -1,4 +1,9 @@
+ARG VERSION=dev
+ARG COMMIT=unknown
+
 FROM golang:1.26-alpine AS build
+ARG VERSION
+ARG COMMIT
 WORKDIR /src
 
 RUN apk add --no-cache \
@@ -14,7 +19,7 @@ RUN go mod download
 COPY . .
 
 RUN make ui && \
-    CGO_ENABLED=0 GOOS=linux make build
+    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT make build
 
 FROM scratch AS plugin
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager

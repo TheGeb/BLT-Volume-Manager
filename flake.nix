@@ -7,14 +7,16 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
+    let
+      version = builtins.replaceStrings ["\n"] [""] (builtins.readFile ./VERSION);
+    in
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
         build-module = { pname, subPackages, meta-description }:
           pkgs.buildGoModule {
-            inherit pname;
-            version = "0.1.0";
+            inherit pname version;
             src = ./.;
 
             inherit subPackages;
@@ -27,9 +29,9 @@
             ldflags = [
               "-s"
               "-w"
-              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Version=0.1.0"
-              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Commit=nix"
-              "-X github.com/TheGeb/docker-s3-volume-plugin/internal/app.Date=unknown"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=v${version}"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=${self.shortRev or "unknown"}"
+              "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=${self.lastModifiedDate or "unknown"}"
             ];
             CGO_ENABLED = 0;
 

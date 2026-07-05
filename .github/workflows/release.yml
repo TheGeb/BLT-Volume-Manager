@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (overrides VERSION file)'
+        required: false
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION="${{ inputs.version || '' }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="v$(cat VERSION)"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: tag_check
+        run: |
+          if git rev-parse "${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
+            echo "skipped=true" >> $GITHUB_OUTPUT
+          else
+            echo "skipped=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        if: steps.tag_check.outputs.skipped == 'false'
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        if: steps.tag_check.outputs.skipped == 'false'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/ui/package-lock.json
+
+      - name: Build UI
+        if: steps.tag_check.outputs.skipped == 'false'
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../../internal/web/static
+        working-directory: web/ui
+
+      - name: Login to GitHub Container Registry
+        if: steps.tag_check.outputs.skipped == 'false'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: steps.tag_check.outputs.skipped == 'false'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push plugin image
+        if: steps.tag_check.outputs.skipped == 'false'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          target: plugin
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            COMMIT=${{ github.sha }}
+
+      - name: Build and push web image
+        if: steps.tag_check.outputs.skipped == 'false'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          target: web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}-web
+            ghcr.io/${{ github.repository }}:latest-web
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            COMMIT=${{ github.sha }}
+
+      - name: Build binaries
+        if: steps.tag_check.outputs.skipped == 'false'
+        run: |
+          for name in driver web; do
+            binary="blt-volume-manager-${name}"
+            pkg="./cmd/${name}"
+            for arch in amd64 arm64; do
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch \
+                go build -ldflags "-s -w \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=${{ steps.version.outputs.VERSION }} \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=${GITHUB_SHA} \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                -o "${binary}-linux-${arch}" "${pkg}"
+            done
+          done
+
+      - name: Create git tag
+        if: steps.tag_check.outputs.skipped == 'false'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag "${{ steps.version.outputs.VERSION }}" ${{ github.sha }}
+          git push origin "${{ steps.version.outputs.VERSION }}"
+
+      - name: Create Release
+        if: steps.tag_check.outputs.skipped == 'false'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          files: |
+            blt-volume-manager-plugin-linux-amd64
+            blt-volume-manager-plugin-linux-arm64
+            blt-volume-manager-web-linux-amd64
+            blt-volume-manager-web-linux-arm64
