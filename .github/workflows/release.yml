@@ -30,10 +30,6 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Lowercase registry
-        id: registry
-        run: echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-
       - name: Check if tag exists
         id: tag_check
         run: |
@@ -81,15 +77,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
           COMMIT: ${{ github.sha }}
-          REGISTRY: ghcr.io/${{ steps.registry.outputs.REPO }}
         run: docker buildx bake -f docker-bake.hcl --push
-
-      - name: Refresh latest tag
-        if: steps.tag_check.outputs.skipped == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          REGISTRY: ghcr.io/${{ steps.registry.outputs.REPO }}
-        run: docker buildx imagetools create -t ${REGISTRY}:latest ${REGISTRY}:${VERSION}
 
       - name: Build binaries
         if: steps.tag_check.outputs.skipped == 'false'

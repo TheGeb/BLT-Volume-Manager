@@ -6,10 +6,6 @@ variable "COMMIT" {
   default = "unknown"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/thegeb/blt-volume-manager"
-}
-
 group "default" {
   targets = ["plugin", "web"]
 }
@@ -18,8 +14,8 @@ target "plugin" {
   target = "plugin"
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
-    "${REGISTRY}:${VERSION}",
-    "${REGISTRY}:latest"
+    "ghcr.io/thegeb/blt-volume-manager-plugin:${VERSION}",
+    "ghcr.io/thegeb/blt-volume-manager-plugin:latest"
   ]
   args = {
     VERSION = VERSION
@@ -35,8 +31,8 @@ target "web" {
   target = "web"
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
-    "${REGISTRY}:${VERSION}-web",
-    "${REGISTRY}:latest-web"
+    "ghcr.io/thegeb/blt-volume-manager-web:${VERSION}",
+    "ghcr.io/thegeb/blt-volume-manager-web:latest"
   ]
   args = {
     VERSION = VERSION
