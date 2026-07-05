@@ -1,9 +1,10 @@
 ARG VERSION=dev
 ARG COMMIT=unknown
 
-FROM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 ARG VERSION
 ARG COMMIT
+ARG TARGETARCH
 WORKDIR /src
 
 RUN apk add --no-cache \
@@ -26,13 +27,15 @@ WORKDIR /src/web/ui
 RUN npm run build
 
 WORKDIR /src
-RUN mkdir -p internal/web/static && \
-    CGO_ENABLED=0 GOOS=linux \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p internal/web/static && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -ldflags "-s -w \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$COMMIT \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o blt-volume-manager-plugin ./cmd/driver && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -ldflags "-s -w \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$COMMIT \
