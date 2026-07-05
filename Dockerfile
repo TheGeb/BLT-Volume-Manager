@@ -22,8 +22,12 @@ RUN npm ci --prefix web/ui
 
 COPY . .
 
-RUN cd web/ui && npm run build && mkdir -p /src/internal/web/static && \
-    CGO_ENABLED=0 GOOS=linux VERSION=$VERSION COMMIT=$COMMIT \
+WORKDIR /src/web/ui
+RUN npm run build
+
+WORKDIR /src
+RUN mkdir -p internal/web/static && \
+    CGO_ENABLED=0 GOOS=linux \
     go build -ldflags "-s -w \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=$COMMIT \
