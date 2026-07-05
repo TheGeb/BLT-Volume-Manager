@@ -30,6 +30,10 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Lowercase registry
+        id: registry
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Check if tag exists
         id: tag_check
         run: |
@@ -81,8 +85,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.registry.outputs.REPO }}:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ steps.registry.outputs.REPO }}:latest
           build-args: |
             VERSION=${{ steps.version.outputs.VERSION }}
             COMMIT=${{ github.sha }}
@@ -96,8 +100,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}-web
-            ghcr.io/${{ github.repository }}:latest-web
+            ghcr.io/${{ steps.registry.outputs.REPO }}:${{ steps.version.outputs.VERSION }}-web
+            ghcr.io/${{ steps.registry.outputs.REPO }}:latest-web
           build-args: |
             VERSION=${{ steps.version.outputs.VERSION }}
             COMMIT=${{ github.sha }}

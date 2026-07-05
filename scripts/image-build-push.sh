@@ -10,7 +10,8 @@ set -euo pipefail
 #   IMAGE   = ghcr.io/TheGeb/docker-s3-volume-plugin
 #   VERSION = $(git describe --tags --always --dirty)
 
-IMAGE="${IMAGE:-ghcr.io/${GITHUB_REPOSITORY:-TheGeb/docker-s3-volume-plugin}}"
+REPO="${GITHUB_REPOSITORY,,}"
+IMAGE="${IMAGE:-ghcr.io/${REPO:-TheGeb/docker-s3-volume-plugin}}"
 VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo latest)}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
