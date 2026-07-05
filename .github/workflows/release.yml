@@ -84,6 +84,13 @@ jobs:
           REGISTRY: ghcr.io/${{ steps.registry.outputs.REPO }}
         run: docker buildx bake -f docker-bake.hcl --push
 
+      - name: Refresh latest tag
+        if: steps.tag_check.outputs.skipped == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          REGISTRY: ghcr.io/${{ steps.registry.outputs.REPO }}
+        run: docker buildx imagetools create -t ${REGISTRY}:latest ${REGISTRY}:${VERSION}
+
       - name: Build binaries
         if: steps.tag_check.outputs.skipped == 'false'
         run: |
