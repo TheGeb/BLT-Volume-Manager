@@ -14,21 +14,54 @@ Restore selection (hot vs cold)
 - When calling `Create` you can pass an option `restore=hot|cold|latest` to control which snapshot to restore on creation.
 - The plugin currently restores `latest` by default if `restore` is not provided.
 
+Configuration
+
+Copy the following into a `.env` file and adjust for your setup:
+
+```env
+# --- Required ---
+# Restic repository URL (S3 or local path)
+RESTIC_REPOSITORY=s3:http://your-s3-endpoint:3900/your-bucket
+
+# Restic repository password
+RESTIC_PASSWORD=changeme
+
+# --- S3 Owner (optional cross-host ownership) ---
+# S3 endpoint for the owner bucket (auto-derived from RESTIC_REPOSITORY if unset)
+# S3_ENDPOINT=http://your-s3-endpoint:3900
+
+# S3 region for signing
+# S3_REGION=us-east-1
+
+# Dedicated S3 bucket for owner locks (defaults to the restic bucket if unset)
+# OWNER_LOCK_S3_BUCKET=your-owner-bucket
+
+# Maximum owner hold duration in minutes (default: 10)
+# OWNER_MAX_MINS=10
+
+# Force path-style S3 addressing (set to 1 or true for MinIO, Garage, etc.)
+# S3_FORCE_PATH_STYLE=1
+
+# --- AWS Credentials ---
+# AWS_ACCESS_KEY_ID=your-access-key
+# AWS_SECRET_ACCESS_KEY=your-secret-key
+# AWS_DEFAULT_REGION=us-east-1
+
+# --- Optional ---
+# Enable dummy/test volume creation via the web UI
+# BLT_TEST_MODE=1
+
+# Log level: debug, info, warn, error (default: info)
+# LOG_LEVEL=info
+```
+
 S3 owner (optional)
 
 - To enable an S3-based cross-host owner, provide `OWNER_LOCK_S3_BUCKET` environment variable.
 - Owner keys are stored under `blt-volume-manager/owners/<volume>/` within the configured bucket.
+- Credentials follow standard AWS SDK environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, etc.).
 
-Environment variables used by the S3 owner:
-
-- `S3_ENDPOINT` — optional custom S3 endpoint (e.g., https://play.min.io).
-- `S3_REGION` — region for signing (default `us-east-1`).
-- `S3_FORCE_PATH_STYLE` — set to `1` or `true` to force path-style addressing for S3 providers that require it.
-- `OWNER_LOCK_MAX_MINS` — maximum owner hold duration in minutes for the S3 owner (default `10`).
-
-Credentials follow standard AWS SDK environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, etc.).
-
-Notes & next steps
+Next steps
 
 - Ensure `restic` is installed in the runtime image and environment variables `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) are set for S3.
 - Optionally set `RESTIC_AUTO_INIT=1` or `RESTIC_INIT_IF_MISSING=1` to automatically initialize the repository when it does not exist.
