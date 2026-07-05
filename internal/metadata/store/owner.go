@@ -177,7 +177,6 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 	return myKey, nil
 }
 
-
 func (o *OwnerEntry) RemainingSeconds() int64 {
 	if o.ExpiryTime == 0 {
 		return math.MaxInt64
@@ -284,7 +283,7 @@ func determineOwner(objects []backend.Entry) (firstKey string, firstOwner string
 			return true
 		}
 
-		//If modification timestamps are equal, sort by creation time (earliest wins)
+		// If modification timestamps are equal, sort by creation time (earliest wins)
 		_, _, ci, _, erri := ParseOwnerKey(*objects[i].Key)
 		_, _, cj, _, errj := ParseOwnerKey(*objects[j].Key)
 		if erri == nil && errj == nil && ci != cj {

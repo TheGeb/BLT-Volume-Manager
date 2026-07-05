@@ -17,8 +17,32 @@ import (
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
-func (d *Driver) Create(r *volume.CreateRequest) error {
+func logReq(obj any) {
+	b, _ := json.Marshal(obj)
+	log.Debugf("driver_request", string(b))
+}
+
+func logResp(obj any, err error) {
+	msg := ""
+	if obj != nil {
+		b, _ := json.Marshal(obj)
+		msg = string(b)
+	}
+	if err != nil {
+		if msg != "" {
+			msg += " "
+		}
+		msg += fmt.Sprintf("error=%v", err)
+	}
+	if msg != "" {
+		log.Debugf("driver_response", msg)
+	}
+}
+
+func (d *Driver) Create(r *volume.CreateRequest) (err error) {
 	name := r.Name
+	logReq(r)
+	defer func() { logResp(nil, err) }()
 	volPath := VolumePath(d.volumePath, name)
 
 	fsType := ""
@@ -85,8 +109,10 @@ func (d *Driver) initFsType(opts map[string]string, name, volPath string) string
 	return ""
 }
 
-func (d *Driver) Remove(r *volume.RemoveRequest) error {
+func (d *Driver) Remove(r *volume.RemoveRequest) (err error) {
 	name := r.Name
+	logReq(r)
+	defer func() { logResp(nil, err) }()
 	d.mu.Lock()
 	vi, ok := d.vols[name]
 	var lockKey string
@@ -123,8 +149,10 @@ func (d *Driver) Remove(r *volume.RemoveRequest) error {
 	return nil
 }
 
-func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
+func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err error) {
 	name := r.Name
+	logReq(r)
+	defer func() { logResp(res, err) }()
 	volPath := VolumePath(d.volumePath, name)
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
 		return nil, fmt.Errorf("create volume dir: %w", err)
@@ -204,8 +232,10 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	return &volume.MountResponse{Mountpoint: volPath}, nil
 }
 
-func (d *Driver) Unmount(r *volume.UnmountRequest) error {
+func (d *Driver) Unmount(r *volume.UnmountRequest) (err error) {
 	name := r.Name
+	logReq(r)
+	defer func() { logResp(nil, err) }()
 	d.mu.Lock()
 	vi, ok := d.vols[name]
 	if ok {
@@ -224,7 +254,9 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) error {
 	return nil
 }
 
-func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
+func (d *Driver) Path(r *volume.PathRequest) (res *volume.PathResponse, err error) {
+	logReq(r)
+	defer func() { logResp(res, err) }()
 	volPath := VolumePath(d.volumePath, r.Name)
 	return &volume.PathResponse{Mountpoint: volPath}, nil
 }
@@ -235,7 +267,9 @@ type VolumeStatus struct {
 	FsType   string `json:"fs_type,omitempty"`
 }
 
-func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
+func (d *Driver) Get(r *volume.GetRequest) (res *volume.GetResponse, err error) {
+	logReq(r)
+	defer func() { logResp(res, err) }()
 	volPath := VolumePath(d.volumePath, r.Name)
 	d.mu.Lock()
 	vi, ok := d.vols[r.Name]
@@ -258,7 +292,8 @@ func (d *Driver) Get(r *volume.GetRequest) (*volume.GetResponse, error) {
 	return &volume.GetResponse{Volume: &volume.Volume{Name: r.Name, Mountpoint: volPath, Status: statusMap}}, nil
 }
 
-func (d *Driver) List() (*volume.ListResponse, error) {
+func (d *Driver) List() (res *volume.ListResponse, err error) {
+	defer func() { logResp(res, err) }()
 	names := d.VolumeNames()
 	vols := make([]*volume.Volume, 0, len(names))
 	for _, name := range names {
@@ -268,7 +303,8 @@ func (d *Driver) List() (*volume.ListResponse, error) {
 	return &volume.ListResponse{Volumes: vols}, nil
 }
 
-func (d *Driver) Capabilities() *volume.CapabilitiesResponse {
+func (d *Driver) Capabilities() (res *volume.CapabilitiesResponse) {
+	defer func() { logResp(res, nil) }()
 	return &volume.CapabilitiesResponse{Capabilities: volume.Capability{Scope: "local"}}
 }
 

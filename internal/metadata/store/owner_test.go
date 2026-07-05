@@ -166,52 +166,52 @@ func int64Ptr(n int64) *int64 { return &n }
 
 func TestEncodeDecodeOwner(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		encoded  string
-		decoded  string
+		name    string
+		input   string
+		encoded string
+		decoded string
 	}{
 		{
-			name:     "no dash",
-			input:    "myhost",
-			encoded:  "myhost",
-			decoded:  "myhost",
+			name:    "no dash",
+			input:   "myhost",
+			encoded: "myhost",
+			decoded: "myhost",
 		},
 		{
-			name:     "single dash",
-			input:    "myHost-12345",
-			encoded:  "myHost%2D12345",
-			decoded:  "myHost-12345",
+			name:    "single dash",
+			input:   "myHost-12345",
+			encoded: "myHost%2D12345",
+			decoded: "myHost-12345",
 		},
 		{
-			name:     "multiple dashes",
-			input:    "a-b-c",
-			encoded:  "a%2Db%2Dc",
-			decoded:  "a-b-c",
+			name:    "multiple dashes",
+			input:   "a-b-c",
+			encoded: "a%2Db%2Dc",
+			decoded: "a-b-c",
 		},
 		{
-			name:     "leading dash",
-			input:    "-host",
-			encoded:  "%2Dhost",
-			decoded:  "-host",
+			name:    "leading dash",
+			input:   "-host",
+			encoded: "%2Dhost",
+			decoded: "-host",
 		},
 		{
-			name:     "trailing dash",
-			input:    "host-",
-			encoded:  "host%2D",
-			decoded:  "host-",
+			name:    "trailing dash",
+			input:   "host-",
+			encoded: "host%2D",
+			decoded: "host-",
 		},
 		{
-			name:     "empty string",
-			input:    "",
-			encoded:  "",
-			decoded:  "",
+			name:    "empty string",
+			input:   "",
+			encoded: "",
+			decoded: "",
 		},
 		{
-			name:     "no encoding needed for numbers",
-			input:    "server42",
-			encoded:  "server42",
-			decoded:  "server42",
+			name:    "no encoding needed for numbers",
+			input:   "server42",
+			encoded: "server42",
+			decoded: "server42",
 		},
 	}
 
