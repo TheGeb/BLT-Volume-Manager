@@ -7,11 +7,11 @@ ARG COMMIT
 WORKDIR /src
 
 RUN apk add --no-cache \
-    git=2.52.0-r0 \
-    ca-certificates=20260413-r0 \
-    nodejs=24.14.1-r0 \
-    npm=11.11.0-r0 \
-    make=4.4.1-r3
+    git=2.54.0-r0 \
+    ca-certificates=20260611-r0 \
+    nodejs=24.17.0-r0 \
+    npm=11.12.1-r0 \
+    make=4.4.1-r4
 
 COPY go.mod go.sum ./
 RUN go mod download
