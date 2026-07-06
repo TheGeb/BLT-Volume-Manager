@@ -82,6 +82,8 @@ func DoErr(t *testing.T, baseURL, method, path string, body any, wantCode int) m
 func setupAPITest(t *testing.T, backendType string) (*httptest.Server, *GarageServer) {
 	t.Helper()
 
+	setupLogCapture(t)
+
 	etcd := StartEtcd(t)
 	garage := StartGarage(t)
 

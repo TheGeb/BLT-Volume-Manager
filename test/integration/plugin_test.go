@@ -21,6 +21,8 @@ import (
 func setupPluginTest(t *testing.T, backendType string) string {
 	t.Helper()
 
+	setupLogCapture(t)
+
 	garage := StartGarage(t)
 
 	dataDir := t.TempDir()
