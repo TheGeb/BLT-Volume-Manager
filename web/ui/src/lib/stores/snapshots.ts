@@ -249,7 +249,7 @@ export function onTimeOfDayFilter(from?: number, to?: number) {
 
 
 
-async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<SnapshotsResponse | void>, action: string) {
+async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<SnapshotsResponse | undefined>, action: string) {
   restorePointLoading.update(r => ({ ...r, [id]: true }));
   try {
     const result = await apiFn();
@@ -270,11 +270,11 @@ async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<
 }
 
 export async function onSetRestorePoint(id: string, vol: string) {
-  await withRestorePointOp(id, vol, () => api.setRestorePoint(vol, id), 'set');
+  await withRestorePointOp(id, vol, () => api.setRestorePoint(vol, id).then(() => undefined), 'set');
 }
 
 export async function onDeleteRestorePoint(id: string, vol: string) {
-  await withRestorePointOp(id, vol, () => api.deleteRestorePoint(vol), 'delete');
+  await withRestorePointOp(id, vol, () => api.deleteRestorePoint(vol).then(() => undefined), 'delete');
 }
 
 export const selectedForDeletion = writable<Set<string>>(new Set());

@@ -195,9 +195,6 @@ func startSharedEtcd() error {
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "2379",
 		etcdImage,
-		"etcd",
-		"--advertise-client-urls", "http://0.0.0.0:2379",
-		"--listen-client-urls", "http://0.0.0.0:2379",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -217,9 +214,10 @@ func startSharedEtcd() error {
 		time.Sleep(500 * time.Millisecond)
 	}
 	if hostPort == "" {
+		inspect, _ := exec.Command("docker", "inspect", sharedEtcdContainerID).CombinedOutput()
 		logs, _ := exec.Command("docker", "logs", sharedEtcdContainerID).CombinedOutput()
 		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
-		return fmt.Errorf("etcd container did not publish port 2379\nlogs:\n%s", logs)
+		return fmt.Errorf("etcd container did not publish port 2379\ninspect:\n%s\nlogs:\n%s", inspect, logs)
 	}
 
 	parts := strings.Split(hostPort, ":")
