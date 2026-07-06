@@ -147,7 +147,7 @@ api_bind_addr = "0.0.0.0:3903"
 	sharedContainerID = strings.TrimSpace(string(out))
 
 	var hostPort string
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 120; i++ {
 		portOut, err := exec.Command("docker", "port", sharedContainerID, "3900").CombinedOutput()
 		if err == nil {
 			hostPort = strings.TrimSpace(string(portOut))
@@ -192,6 +192,10 @@ func StartEtcd(t *testing.T) *EtcdServer {
 }
 
 func startSharedEtcd() error {
+	if out, err := exec.Command("docker", "pull", etcdImage).CombinedOutput(); err != nil {
+		return fmt.Errorf("pull etcd image: %w\n%s", err, out)
+	}
+
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "2379",
 		etcdImage,
@@ -203,7 +207,7 @@ func startSharedEtcd() error {
 	sharedEtcdContainerID = strings.TrimSpace(string(out))
 
 	var hostPort string
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 120; i++ {
 		portOut, err := exec.Command("docker", "port", sharedEtcdContainerID, "2379").CombinedOutput()
 		if err == nil {
 			hostPort = strings.TrimSpace(string(portOut))
