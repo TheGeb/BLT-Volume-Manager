@@ -25,7 +25,7 @@ const (
 	garageImage          = "dxflrs/garage:v2.3.0"
 	garageBuiltID        = "garage-test:local"
 	garageSharedBuildDir = ".docker-build-integration"
-	etcdImage            = "quay.io/coreos/etcd:v3.5.27"
+	etcdImage            = "gcr.io/etcd-development/etcd:v3.5.17"
 )
 
 var (
