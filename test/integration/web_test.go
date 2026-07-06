@@ -402,6 +402,34 @@ func testAPIVolumeOwnersList(t *testing.T, ts *httptest.Server) {
 	}
 }
 
+func testAPIRestorePoint(t *testing.T, ts *httptest.Server) {
+	volName := "test-group/rp-vol"
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+
+	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snaps, _ := m["snapshots"].([]any)
+	if len(snaps) == 0 {
+		t.Fatal("expected snapshots")
+	}
+	snapID := snaps[0].(map[string]any)["id"].(string)
+
+	apiOK(t, ts, "PUT", "/api/volume/"+volName+"/restore-point", map[string]string{
+		"snapshot_id": snapID,
+	})
+
+	m = apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	if m["restorePointID"] != snapID {
+		t.Fatalf("expected restorePointID %q, got %q", snapID, m["restorePointID"])
+	}
+
+	apiOK(t, ts, "DELETE", "/api/volume/"+volName+"/restore-point", nil)
+
+	m = apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	if m["restorePointID"] != "" {
+		t.Fatalf("expected empty restorePointID after delete, got %q", m["restorePointID"])
+	}
+}
+
 func testAPISnapshotSizes(t *testing.T, ts *httptest.Server) {
 	volName := "test-group/sizes-vol"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -426,28 +454,6 @@ func testAPISnapshotSizes(t *testing.T, ts *httptest.Server) {
 		if !ok || size <= 0 {
 			t.Fatalf("expected positive size for %s, got %v", id, m[id])
 		}
-	}
-}
-
-func testAPISnapshotTag(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/tag-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
-
-	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
-	snaps, _ := m["snapshots"].([]any)
-	if len(snaps) == 0 {
-		t.Fatal("expected snapshots")
-	}
-	snapID := snaps[0].(map[string]any)["id"].(string)
-
-	m = apiOK(t, ts, "POST", "/api/snapshot/"+snapID+"/tag?tag=test-tag&volume="+volName, nil)
-	if m["status"] != "tag added" {
-		t.Fatalf("add tag failed: %v", m)
-	}
-
-	m = apiOK(t, ts, "DELETE", "/api/snapshot/"+snapID+"/tag?tag=test-tag&volume="+volName, nil)
-	if m["status"] != "tag removed" {
-		t.Fatalf("remove tag failed: %v", m)
 	}
 }
 
@@ -499,8 +505,8 @@ func TestAPI(t *testing.T) {
 			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewFallbackHash(t, ts) })
 			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewDiffFallbackHash(t, ts) })
 			t.Run("Health", func(t *testing.T) { t.Parallel(); testAPIHealth(t, ts) })
+			t.Run("RestorePoint", func(t *testing.T) { t.Parallel(); testAPIRestorePoint(t, ts) })
 			t.Run("SnapshotSizes", func(t *testing.T) { t.Parallel(); testAPISnapshotSizes(t, ts) })
-			t.Run("SnapshotTag", func(t *testing.T) { t.Parallel(); testAPISnapshotTag(t, ts) })
 			t.Run("VolumeCopy", func(t *testing.T) { t.Parallel(); testAPIVolumeCopy(t, ts) })
 			t.Run("VolumeRename", func(t *testing.T) { t.Parallel(); testAPIVolumeRename(t, ts) })
 			t.Run("DevMode", func(t *testing.T) { t.Parallel(); testAPIDevMode(t, ts) })

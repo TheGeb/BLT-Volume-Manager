@@ -10,7 +10,7 @@
     sizes, currentSnapshot,
     viewerOpen, snapsLoading, restorePointLoading,
     sizeLoading, displayedSnapshots, diffTargetId, restorePointID,
-    selectedForDeletion, onAddTag, onRemoveTag,
+    selectedForDeletion, onSetRestorePoint, onDeleteRestorePoint,
     toggleForDeletion, openBulkDeleteModal, handleSizeLoaded,
     pageSize, currentPage, hasMore, totalCount, goToPage, setPageSize,
     sortNewestFirst, onToggleSort
@@ -100,8 +100,8 @@
       restorePointID={$restorePointID}
       selectedForDeletion={$selectedForDeletion}
       onOpenViewer={handleOpenViewer}
-      onAddTag={onAddTag}
-      onRemoveTag={onRemoveTag}
+      onSetRestorePoint={onSetRestorePoint}
+      onDeleteRestorePoint={onDeleteRestorePoint}
       onToggleDeletion={toggleForDeletion}
       onDeleteSelected={openBulkDeleteModal}
       onSizeLoaded={handleSizeLoaded}

@@ -27,20 +27,6 @@ func withFallback[T any](rm *restic.Manager, rawID, fallbackHash string, fn func
 	return result, err
 }
 
-func SetSnapshotTag(s *server.Service, rm *restic.Manager, volume, snapshotID, tag string) error {
-	if tag == "restore-point" {
-		return s.SetRestorePoint(volume, snapshotID)
-	}
-	return rm.TagSnapshot(snapshotID, tag)
-}
-
-func DeleteSnapshotTag(s *server.Service, rm *restic.Manager, volume, snapshotID, tag string) error {
-	if tag == "restore-point" {
-		return s.DeleteRestorePoint(volume)
-	}
-	return rm.UntagSnapshot(snapshotID, tag)
-}
-
 type WithVolume struct { // FIXME: Naming is a bit awkward
 	restic.Snapshot
 	Volume string `json:"volume"`

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -92,7 +93,7 @@ func startSharedGarage() error {
 	sharedAccessKey = randomHex(20)
 	sharedSecretKey = randomHex(40)
 
-	configDir, err := os.MkdirTemp("", "garage-config-")
+	configDir, err := os.MkdirTemp(".", "garage-config-")
 	if err != nil {
 		return fmt.Errorf("mkdir temp: %w", err)
 	}
@@ -124,9 +125,15 @@ api_bind_addr = "0.0.0.0:3903"
 		return fmt.Errorf("write config: %w", err)
 	}
 
+	absConfigPath, err := filepath.Abs(configPath)
+	if err != nil {
+		os.RemoveAll(configDir)
+		return fmt.Errorf("abs config path: %w", err)
+	}
+
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "3900",
-		"-v", configPath+":/etc/garage.toml",
+		"-v", absConfigPath+":/etc/garage.toml",
 		"-e", "GARAGE_DEFAULT_ACCESS_KEY="+sharedAccessKey,
 		"-e", "GARAGE_DEFAULT_SECRET_KEY="+sharedSecretKey,
 		"-e", "GARAGE_DEFAULT_BUCKET=shared-garage-default",

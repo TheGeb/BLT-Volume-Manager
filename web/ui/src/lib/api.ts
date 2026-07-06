@@ -171,24 +171,6 @@ export async function fetchDiff(snapshotA: string, snapshotB: string, volume: st
   return resp.json() as Promise<DiffResult>;
 }
 
-export async function addTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {
-	const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
-	const resp = await fetch(url, { method: 'POST' });
-	if (!resp.ok) throw new Error('Failed to add tag');
-	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
-	return { snapshots, restorePointID: data.restorePointID ?? '' };
-}
-
-export async function removeTag(snapshotId: string, tag: string, volume: string): Promise<SnapshotsResponse> {
-	const url = `/api/snapshot/${encodeURIComponent(snapshotId)}/tag?tag=${encodeURIComponent(tag)}&volume=${encodeURIComponent(volume)}`;
-	const resp = await fetch(url, { method: 'DELETE' });
-	if (!resp.ok) throw new Error('Failed to remove tag');
-	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
-	return { snapshots, restorePointID: data.restorePointID ?? '' };
-}
-
 export async function deleteSnapshots(volume: string, ids: string[]): Promise<BatchDeleteResponse> {
   const resp = await fetch('/api/snapshots/delete-batch', {
     method: 'POST',
@@ -196,6 +178,26 @@ export async function deleteSnapshots(volume: string, ids: string[]): Promise<Ba
     body: JSON.stringify({ volume, ids }),
   });
   return parseResponse<BatchDeleteResponse>(resp);
+}
+
+export async function setRestorePoint(volume: string, snapshotId: string): Promise<void> {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/restore-point`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snapshot_id: snapshotId }),
+  });
+  if (!resp.ok) {
+    const d = await resp.json() as { error?: string };
+    throw new Error(d.error ?? 'failed to set restore point');
+  }
+}
+
+export async function deleteRestorePoint(volume: string): Promise<void> {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/restore-point`, { method: 'DELETE' });
+  if (!resp.ok) {
+    const d = await resp.json() as { error?: string };
+    throw new Error(d.error ?? 'failed to delete restore point');
+  }
 }
 
 export async function deleteVolume(volume: string): Promise<void> {

@@ -13,8 +13,8 @@
   export let restorePointLoading: Record<string, boolean> = {};
   export let sizeLoading: Record<string, boolean> = {};
   export let onOpenViewer: (sn: Snapshot) => void = () => {};
-  export let onAddTag: (id: string, tag: string, vol: string) => void = () => {};
-  export let onRemoveTag: (id: string, tag: string, vol: string) => void = () => {};
+  export let onSetRestorePoint: (id: string, vol: string) => void = () => {};
+  export let onDeleteRestorePoint: (id: string, vol: string) => void = () => {};
   export let onSizeLoaded: (id: string) => void = () => {};
   export let restorePointID = '';
   export let selectedForDeletion: Set<string> = new Set();
@@ -47,7 +47,7 @@
 
   function handleRPClick(sn: Snapshot) {
     const isRP = sn.id === restorePointID || sn.short_id === restorePointID;
-    isRP ? onRemoveTag(sn.id, 'restore-point', selectedVolume) : onAddTag(sn.id, 'restore-point', selectedVolume);
+    isRP ? onDeleteRestorePoint(sn.id, selectedVolume) : onSetRestorePoint(sn.id, selectedVolume);
   }
 </script>
 

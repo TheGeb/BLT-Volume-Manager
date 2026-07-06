@@ -249,15 +249,19 @@ export function onTimeOfDayFilter(from?: number, to?: number) {
 
 
 
-async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<SnapshotsResponse>, action: string) {
+async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<SnapshotsResponse | void>, action: string) {
   restorePointLoading.update(r => ({ ...r, [id]: true }));
   try {
     const result = await apiFn();
-    snapshots.set(result.snapshots);
-    restorePointID.set(result.restorePointID ?? '');
+    if (result) {
+      snapshots.set(result.snapshots);
+      restorePointID.set(result.restorePointID ?? '');
+    } else {
+      await loadSnapshots(vol);
+    }
     reconcileViewerSnapshots();
   } catch (e) {
-    showToast(`Failed to ${action} tag: ${String(e)}`, true);
+    showToast(`Failed to ${action} restore point: ${String(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -265,12 +269,12 @@ async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<
   }
 }
 
-export async function onAddTag(id: string, tag: string, vol: string) {
-  await withRestorePointOp(id, vol, () => api.addTag(id, tag, vol), 'add');
+export async function onSetRestorePoint(id: string, vol: string) {
+  await withRestorePointOp(id, vol, () => api.setRestorePoint(vol, id), 'set');
 }
 
-export async function onRemoveTag(id: string, tag: string, vol: string) {
-  await withRestorePointOp(id, vol, () => api.removeTag(id, tag, vol), 'remove');
+export async function onDeleteRestorePoint(id: string, vol: string) {
+  await withRestorePointOp(id, vol, () => api.deleteRestorePoint(vol), 'delete');
 }
 
 export const selectedForDeletion = writable<Set<string>>(new Set());

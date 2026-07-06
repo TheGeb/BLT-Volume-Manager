@@ -68,6 +68,16 @@ func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasSuffix(rawPath, "/restore-point") {
+		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/restore-point"))
+		if err != nil || !validVolumeName(volumeName) {
+			http.NotFound(w, r)
+			return
+		}
+		RestorePointRouter(s, w, r, volumeName)
+		return
+	}
+
 	path, err := url.PathUnescape(rawPath)
 	if err != nil || !validVolumeName(path) {
 		http.NotFound(w, r)

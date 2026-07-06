@@ -6,15 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
-)
-
-const (
-	snapshotOpTag     = "tag"
-	snapshotOpRestore = "restore"
-	snapshotOpDelete  = "delete"
 )
 
 func SnapshotRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
@@ -29,27 +22,7 @@ func SnapshotRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(trimmed, "/")
-	if len(parts) != 2 || (parts[1] != snapshotOpTag && parts[1] != snapshotOpRestore && parts[1] != snapshotOpDelete) {
-		http.NotFound(w, r)
-		return
-	}
-
-	snapshotID := parts[0]
-	volName, ok := server.RequireVolumeParam(w, r)
-	if !ok {
-		return
-	}
-	rm := s.ResticManager(volName)
-
-	switch parts[1] {
-	case snapshotOpDelete:
-		deleteSnapshot(s, w, r, rm, snapshotID)
-	case snapshotOpRestore:
-		restoreSnapshot(s, w, r, rm, snapshotID)
-	case snapshotOpTag:
-		tagSnapshot(s, w, r, rm, snapshotID)
-	}
+	http.NotFound(w, r)
 }
 
 func SnapshotFileRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
@@ -172,17 +145,6 @@ func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request
 	server.RespondJSON(w, hosts)
 }
 
-func deleteSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
-	if !server.RequireMethod(w, r, http.MethodDelete) {
-		return
-	}
-	if err := rm.ForgetSnapshots(snapshotID); err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	server.RespondJSON(w, server.StatusResponse{Status: "snapshot deleted"})
-}
-
 func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
@@ -210,74 +172,6 @@ func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Requ
 			resp.Deleted++
 		}
 	}
-	server.RespondJSON(w, resp)
-}
-
-func restoreSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
-	if !server.RequireMethod(w, r, http.MethodPost) {
-		return
-	}
-	target := r.URL.Query().Get("path")
-	if target == "" {
-		http.Error(w, "missing path query parameter", http.StatusBadRequest)
-		return
-	}
-	s.AddWork()
-	go func() {
-		defer s.DoneWork()
-		if err := rm.RestoreSnapshot(snapshotID, target); err != nil {
-			log.Errorf("restore_failed", err, "snapshot=%s target=%s", snapshotID, target)
-		} else {
-			log.Info("restore_ok")
-		}
-	}()
-	server.RespondJSON(w, server.StatusResponse{Status: "restore started – see server logs for results"})
-}
-
-func tagSnapshot(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID string) {
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		http.Error(w, "missing tag", http.StatusBadRequest)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodPost:
-		addTag(s, w, r, rm, snapshotID, tag)
-	case http.MethodDelete:
-		removeTag(s, w, r, rm, snapshotID, tag)
-	default:
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
-	}
-}
-
-func addTag(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
-	volName := r.URL.Query().Get("volume")
-	if err := SetSnapshotTag(s, rm, volName, snapshotID, tag); err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	resp, err := BuildSnapshotListResponse(s, volName, nil, nil, 0, 0)
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	resp.Status = "tag added"
-	server.RespondJSON(w, resp)
-}
-
-func removeTag(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, snapshotID, tag string) {
-	volName := r.URL.Query().Get("volume")
-	if err := DeleteSnapshotTag(s, rm, volName, snapshotID, tag); err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	resp, err := BuildSnapshotListResponse(s, volName, nil, nil, 0, 0)
-	if err != nil {
-		server.RespondError(w, err, http.StatusInternalServerError)
-		return
-	}
-	resp.Status = "tag removed"
 	server.RespondJSON(w, resp)
 }
 
