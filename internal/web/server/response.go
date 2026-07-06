@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -44,7 +45,11 @@ func RespondError(w http.ResponseWriter, err error, status int) {
 	msg := "unknown error"
 	if err != nil {
 		msg = err.Error()
-		log.Error("request_error", err)
+		if status >= 500 {
+			log.Error("request_error", err)
+		} else {
+			slog.Warn("request_error", "error", err)
+		}
 	}
 	if encodeErr := json.NewEncoder(w).Encode(ErrorResponse{Error: msg}); encodeErr != nil {
 		log.Error("encode_error_response_failed", encodeErr)

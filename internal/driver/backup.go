@@ -41,6 +41,11 @@ func (d *Driver) startHotSchedule(ctx context.Context, name, volPath string) {
 func (d *Driver) coldBackup(name, volPath, fsType string, rm *restic.Manager) error {
 	versionTags := d.nextVersionTags(name, false)
 
+	if _, err := os.Stat(volPath); os.IsNotExist(err) {
+		log.Warnf("cold_backup_skipped", "volume=%s path=%s does not exist", name, volPath)
+		return nil
+	}
+
 	if fsType == "" {
 		return rm.Backup(volPath, restic.WithTags(restic.BackupTagCold, versionTags...)...)
 	}

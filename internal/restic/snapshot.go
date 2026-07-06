@@ -21,9 +21,6 @@ func (m *Manager) ListSnapshotsWithOpts(opts *ListSnapshotsOpts) ([]Snapshot, er
 
 	out, err := m.runner.Snapshots(ctx, opts)
 	if err != nil {
-		if isRepositoryMissing(string(out)) {
-			return nil, nil
-		}
 		return nil, err
 	}
 

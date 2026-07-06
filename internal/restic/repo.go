@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -70,12 +69,9 @@ func (m *Manager) repositoryExists() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.RepoExists(ctx)
+	_, err := m.runner.RepoExists(ctx)
 	if err != nil {
-		if isRepositoryMissing(string(out)) {
-			return false, nil
-		}
-		return false, fmt.Errorf("restic snapshots failed: %w: %s", err, strings.TrimSpace(string(out)))
+		return false, nil
 	}
 	return true, nil
 }
@@ -111,7 +107,3 @@ func (m *Manager) Unlock() error {
 	return m.runner.Unlock(ctx)
 }
 
-func isRepositoryMissing(output string) bool {
-	out := strings.ToLower(output)
-	return strings.Contains(out, "not found") || strings.Contains(out, "does not exist") || strings.Contains(out, "not initialized")
-}

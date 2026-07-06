@@ -17,9 +17,6 @@ func (m *Manager) SnapshotHosts(latest int) ([]string, error) {
 
 	out, err := m.runner.HostSnapshots(ctx)
 	if err != nil {
-		if isRepositoryMissing(string(out)) {
-			return nil, nil
-		}
 		return nil, err
 	}
 

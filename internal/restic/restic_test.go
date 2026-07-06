@@ -51,30 +51,6 @@ func TestCommonPathPrefix(t *testing.T) {
 	}
 }
 
-func TestIsRepositoryMissing(t *testing.T) {
-	tests := []struct {
-		output   string
-		expected bool
-	}{
-		{"repository not found", true},
-		{"Fatal: repository does not exist", true},
-		{"is not initialized yet", true},
-		{"snapshot count: 5", false},
-		{"repository abc123 opened successfully", false},
-		{"", false},
-		{"NOT FOUND", true},
-		{"Does Not Exist", true},
-		{"Not Initialized", true},
-	}
-
-	for _, tt := range tests {
-		got := isRepositoryMissing(tt.output)
-		if got != tt.expected {
-			t.Errorf("isRepositoryMissing(%q) = %v, want %v", tt.output, got, tt.expected)
-		}
-	}
-}
-
 func TestGenerateHash(t *testing.T) {
 	m := NewManager("/tmp/repo")
 

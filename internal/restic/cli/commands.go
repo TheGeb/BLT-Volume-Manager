@@ -118,7 +118,8 @@ func (r *Runner) Repair(ctx context.Context) error {
 }
 
 func (r *Runner) Init(ctx context.Context) error {
-	return r.run(ctx, "init")
+	_, err := r.combinedCapture(ctx, "init")
+	return err
 }
 
 func (r *Runner) Copy(ctx context.Context, destRepo string, snapshotIDs ...string) error {

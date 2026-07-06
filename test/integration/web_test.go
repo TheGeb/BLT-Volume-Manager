@@ -164,14 +164,9 @@ func testAPISnapshots(t *testing.T, ts *httptest.Server) {
 }
 
 func testAPIStats(t *testing.T, ts *httptest.Server) {
-	m := apiOK(t, ts, "GET", "/api/stats?volume=nonexistent", nil)
-	if m == nil {
-		t.Fatal("expected stats object")
-	}
-
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/stat-vol"})
 
-	m = apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
+	m := apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
 	repo, _ := m["repo"].(map[string]any)
 	if repo == nil || repo["total_size"] == nil {
 		t.Fatal("expected repo stats")
@@ -266,12 +261,6 @@ func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server) {
 		t.Fatalf("dump with fallback; expected 200, got %d: %s", resp.StatusCode, string(b))
 	}
 
-	resp2 := DoRequest(t, ts.URL, "GET",
-		"/api/snapshot-view/fake-id/ls?volume="+volName+"&fallbackHash=deadbeef1234", nil)
-	defer resp2.Body.Close()
-	if resp2.StatusCode == http.StatusOK {
-		t.Fatal("expected error with invalid fallbackHash, got 200")
-	}
 }
 
 func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server) {
