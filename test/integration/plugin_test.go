@@ -269,16 +269,16 @@ func TestPlugin(t *testing.T) {
 		t.Run(backendType, func(t *testing.T) {
 			socket := setupPluginTest(t, backendType)
 
-			t.Run("CreateVolume", func(t *testing.T) { t.Parallel(); testPluginCreateVolume(t, socket) })
-			t.Run("CreateDuplicate", func(t *testing.T) { t.Parallel(); testPluginCreateDuplicate(t, socket) })
-			t.Run("ListVolumes", func(t *testing.T) { t.Parallel(); testPluginListVolumes(t, socket) })
-			t.Run("GetVolume", func(t *testing.T) { t.Parallel(); testPluginGetVolume(t, socket) })
-			t.Run("PathVolume", func(t *testing.T) { t.Parallel(); testPluginPathVolume(t, socket) })
-			t.Run("MountUnmount", func(t *testing.T) { t.Parallel(); testPluginMountUnmount(t, socket) })
-			t.Run("RemoveVolume", func(t *testing.T) { t.Parallel(); testPluginRemoveVolume(t, socket) })
-			t.Run("FullLifecycle", func(t *testing.T) { t.Parallel(); testPluginFullLifecycle(t, socket) })
-			t.Run("Capabilities", func(t *testing.T) { t.Parallel(); testPluginCapabilities(t, socket) })
-			t.Run("EdgeCases", func(t *testing.T) { t.Parallel(); testPluginEdgeCases(t, socket) })
+			t.Run("CreateVolume", func(t *testing.T) { testPluginCreateVolume(t, socket) })
+			t.Run("CreateDuplicate", func(t *testing.T) { testPluginCreateDuplicate(t, socket) })
+			t.Run("ListVolumes", func(t *testing.T) { testPluginListVolumes(t, socket) })
+			t.Run("GetVolume", func(t *testing.T) { testPluginGetVolume(t, socket) })
+			t.Run("PathVolume", func(t *testing.T) { testPluginPathVolume(t, socket) })
+			t.Run("MountUnmount", func(t *testing.T) { testPluginMountUnmount(t, socket) })
+			t.Run("RemoveVolume", func(t *testing.T) { testPluginRemoveVolume(t, socket) })
+			t.Run("FullLifecycle", func(t *testing.T) { testPluginFullLifecycle(t, socket) })
+			t.Run("Capabilities", func(t *testing.T) { testPluginCapabilities(t, socket) })
+			t.Run("EdgeCases", func(t *testing.T) { testPluginEdgeCases(t, socket) })
 		})
 	}
 }

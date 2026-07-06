@@ -68,6 +68,9 @@ jobs:
       - name: Create dummy UI files for embed
         run: mkdir -p internal/web/static && touch internal/web/static/.dummy
 
+      - name: Install restic
+        run: sudo apt-get update && sudo apt-get install -y restic
+
       - name: Integration tests
         run: go test -race -tags integration -v -count=1 ./test/integration/
 

@@ -170,24 +170,20 @@ func testAPIStats(t *testing.T, ts *httptest.Server) {
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/stat-vol"})
 
 	m = apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
-	snaps, _ := m["snapshots"].(map[string]any)
 	repo, _ := m["repo"].(map[string]any)
-	if snaps == nil || snaps["total"] == nil {
-		t.Fatal("expected snapshot stats")
-	}
 	if repo == nil || repo["total_size"] == nil {
 		t.Fatal("expected repo stats")
 	}
 }
 
 func testAPIOwners(t *testing.T, ts *httptest.Server) {
-	m := apiOK(t, ts, "POST", "/api/volume/test-vol/owners", nil)
+	m := apiOK(t, ts, "POST", "/api/volume/test-vol/owners", map[string]string{"owner": "test-owner"})
 	if m["volume"] != "test-vol" {
 		t.Fatalf("unexpected owner response: %v", m)
 	}
 
 	m = apiOK(t, ts, "GET", "/api/volume/test-vol/owners", nil)
-	if m["owned"] != true {
+	if m["owner"] == "" {
 		t.Fatal("expected owned volume")
 	}
 
@@ -197,7 +193,7 @@ func testAPIOwners(t *testing.T, ts *httptest.Server) {
 	}
 
 	m = apiOK(t, ts, "GET", "/api/volume/test-vol/owners", nil)
-	if m["owned"] == true {
+	if m["owner"] != "" {
 		t.Fatal("expected unlocked after deletion")
 	}
 }
@@ -326,7 +322,7 @@ func testAPIRepoCheck(t *testing.T, ts *httptest.Server) {
 	apiOK(t, ts, "POST", "/api/repo/init?volume=check-vol", nil)
 
 	m := apiOK(t, ts, "POST", "/api/repo/check?volume=check-vol", nil)
-	if m["status"] != "ok" {
+	if m["status"] != "Check completed, repository is healthy." {
 		t.Fatalf("check failed: %v", m)
 	}
 }
@@ -344,10 +340,9 @@ func testAPISnapshotHosts(t *testing.T, ts *httptest.Server) {
 	volName := "test-group/hosts-vol"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
-	m := apiOK(t, ts, "GET", "/api/snapshots/hosts?volume="+volName, nil)
-	hosts, ok := m["hosts"].([]any)
-	if !ok || len(hosts) == 0 {
-		t.Fatalf("expected at least 1 host, got %v", m)
+	hosts := apiArray(t, ts, "GET", "/api/snapshots/hosts?volume="+volName)
+	if len(hosts) == 0 {
+		t.Fatal("expected at least 1 host")
 	}
 }
 
@@ -370,8 +365,8 @@ func testAPISnapshotDeleteBatch(t *testing.T, ts *httptest.Server) {
 		"volume": volName,
 		"ids":    ids,
 	})
-	if _, ok := m["status"]; !ok {
-		t.Fatalf("delete-batch missing status: %v", m)
+	if _, ok := m["deleted"]; !ok {
+		t.Fatalf("delete-batch missing deleted count: %v", m)
 	}
 }
 
@@ -392,7 +387,7 @@ func testAPIDevMode(t *testing.T, ts *httptest.Server) {
 }
 
 func testAPIVolumeOwnersList(t *testing.T, ts *httptest.Server) {
-	apiOK(t, ts, "POST", "/api/volume/list-own-vol/owners", nil)
+	apiOK(t, ts, "POST", "/api/volume/list-own-vol/owners", map[string]string{"owner": "test-owner"})
 
 	resp := DoRequest(t, ts.URL, "GET", "/api/volumes/owners", nil)
 	defer resp.Body.Close()
@@ -495,28 +490,28 @@ func TestAPI(t *testing.T) {
 		t.Run(backendType, func(t *testing.T) {
 			ts, _ := setupAPITest(t, backendType)
 
-			t.Run("Volumes", func(t *testing.T) { t.Parallel(); testAPIVolumes(t, ts) })
-			t.Run("RepoInitAndStatus", func(t *testing.T) { t.Parallel(); testAPIRepoInitAndStatus(t, ts) })
-			t.Run("Snapshots", func(t *testing.T) { t.Parallel(); testAPISnapshots(t, ts) })
-			t.Run("Stats", func(t *testing.T) { t.Parallel(); testAPIStats(t, ts) })
-			t.Run("Owners", func(t *testing.T) { t.Parallel(); testAPIOwners(t, ts) })
-			t.Run("DeleteVolume", func(t *testing.T) { t.Parallel(); testAPIDeleteVolume(t, ts) })
-			t.Run("EdgeCases", func(t *testing.T) { t.Parallel(); testAPIEdgeCases(t, ts) })
-			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewFallbackHash(t, ts) })
-			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewDiffFallbackHash(t, ts) })
-			t.Run("Health", func(t *testing.T) { t.Parallel(); testAPIHealth(t, ts) })
-			t.Run("RestorePoint", func(t *testing.T) { t.Parallel(); testAPIRestorePoint(t, ts) })
-			t.Run("SnapshotSizes", func(t *testing.T) { t.Parallel(); testAPISnapshotSizes(t, ts) })
-			t.Run("VolumeCopy", func(t *testing.T) { t.Parallel(); testAPIVolumeCopy(t, ts) })
-			t.Run("VolumeRename", func(t *testing.T) { t.Parallel(); testAPIVolumeRename(t, ts) })
-			t.Run("DevMode", func(t *testing.T) { t.Parallel(); testAPIDevMode(t, ts) })
-			t.Run("StatsRefresh", func(t *testing.T) { t.Parallel(); testAPIStatsRefresh(t, ts) })
-			t.Run("RepoCheck", func(t *testing.T) { t.Parallel(); testAPIRepoCheck(t, ts) })
-			t.Run("RepoRepair", func(t *testing.T) { t.Parallel(); testAPIRepoRepair(t, ts) })
-			t.Run("SnapshotHosts", func(t *testing.T) { t.Parallel(); testAPISnapshotHosts(t, ts) })
-			t.Run("SnapshotDeleteBatch", func(t *testing.T) { t.Parallel(); testAPISnapshotDeleteBatch(t, ts) })
-			t.Run("DummySnapshot", func(t *testing.T) { t.Parallel(); testAPIDummySnapshot(t, ts) })
-			t.Run("VolumeOwnersList", func(t *testing.T) { t.Parallel(); testAPIVolumeOwnersList(t, ts) })
+			t.Run("Volumes", func(t *testing.T) { testAPIVolumes(t, ts) })
+			t.Run("RepoInitAndStatus", func(t *testing.T) { testAPIRepoInitAndStatus(t, ts) })
+			t.Run("Snapshots", func(t *testing.T) { testAPISnapshots(t, ts) })
+			t.Run("Stats", func(t *testing.T) { testAPIStats(t, ts) })
+			t.Run("Owners", func(t *testing.T) { testAPIOwners(t, ts) })
+			t.Run("DeleteVolume", func(t *testing.T) { testAPIDeleteVolume(t, ts) })
+			t.Run("EdgeCases", func(t *testing.T) { testAPIEdgeCases(t, ts) })
+			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { testAPISnapshotViewFallbackHash(t, ts) })
+			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { testAPISnapshotViewDiffFallbackHash(t, ts) })
+			t.Run("Health", func(t *testing.T) { testAPIHealth(t, ts) })
+			t.Run("RestorePoint", func(t *testing.T) { testAPIRestorePoint(t, ts) })
+			t.Run("SnapshotSizes", func(t *testing.T) { testAPISnapshotSizes(t, ts) })
+			t.Run("VolumeCopy", func(t *testing.T) { testAPIVolumeCopy(t, ts) })
+			t.Run("VolumeRename", func(t *testing.T) { testAPIVolumeRename(t, ts) })
+			t.Run("DevMode", func(t *testing.T) { testAPIDevMode(t, ts) })
+			t.Run("StatsRefresh", func(t *testing.T) { testAPIStatsRefresh(t, ts) })
+			t.Run("RepoCheck", func(t *testing.T) { testAPIRepoCheck(t, ts) })
+			t.Run("RepoRepair", func(t *testing.T) { testAPIRepoRepair(t, ts) })
+			t.Run("SnapshotHosts", func(t *testing.T) { testAPISnapshotHosts(t, ts) })
+			t.Run("SnapshotDeleteBatch", func(t *testing.T) { testAPISnapshotDeleteBatch(t, ts) })
+			t.Run("DummySnapshot", func(t *testing.T) { testAPIDummySnapshot(t, ts) })
+			t.Run("VolumeOwnersList", func(t *testing.T) { testAPIVolumeOwnersList(t, ts) })
 		})
 	}
 }

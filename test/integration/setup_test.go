@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -57,6 +56,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("AWS_ACCESS_KEY_ID", sharedAccessKey)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", sharedSecretKey)
 	os.Setenv("RESTIC_PASSWORD", "test-password")
+	os.Setenv("RESTIC_FROM_PASSWORD", "test-password")
 	os.Setenv("S3_FORCE_PATH_STYLE", "true")
 	os.Setenv("BLT_DEV_MODE", "1")
 
@@ -199,7 +199,10 @@ func startSharedEtcd() error {
 
 	cmd := exec.Command("docker", "run", "-d",
 		"-p", "2379",
+		"--entrypoint", "etcd",
 		etcdImage,
+		"--listen-client-urls", "http://0.0.0.0:2379",
+		"--advertise-client-urls", "http://0.0.0.0:2379",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -229,9 +232,10 @@ func startSharedEtcd() error {
 	etcdPort := parts[len(parts)-1]
 	sharedEtcdEndpoint = fmt.Sprintf("http://localhost:%s", etcdPort)
 
-	if err := waitForPort("localhost", etcdPort, 60*time.Second); err != nil {
+	if err := waitForEtcdReady(sharedEtcdContainerID, 60*time.Second); err != nil {
+		logs, _ := exec.Command("docker", "logs", sharedEtcdContainerID).CombinedOutput()
 		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
-		return fmt.Errorf("etcd not ready: %w", err)
+		return fmt.Errorf("etcd not ready: %w\nlogs:\n%s", err, logs)
 	}
 
 	return nil
@@ -304,17 +308,19 @@ func deleteBucket(t *testing.T, bucket string) {
 	}
 }
 
-func waitForPort(host, port string, timeout time.Duration) error {
+func waitForEtcdReady(containerID string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), time.Second)
-		if err == nil {
-			conn.Close()
+		out, err := exec.Command("docker", "exec", containerID,
+			"etcdctl", "endpoint", "health",
+			"--endpoints=http://localhost:2379",
+		).CombinedOutput()
+		if err == nil && strings.Contains(string(out), "healthy") {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("port %s not reachable within %v", net.JoinHostPort(host, port), timeout)
+	return fmt.Errorf("etcd not healthy within %v", timeout)
 }
 
 func waitForEndpoint(endpoint string, timeout time.Duration) error {
