@@ -8,8 +8,9 @@
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Test binary and setup files
 *.test
+.docker-build-integration/
 
 # Code coverage profiles and other test artifacts
 *.out
