@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -225,9 +226,10 @@ func startSharedEtcd() error {
 	}
 
 	parts := strings.Split(hostPort, ":")
-	sharedEtcdEndpoint = fmt.Sprintf("http://localhost:%s", parts[len(parts)-1])
+	etcdPort := parts[len(parts)-1]
+	sharedEtcdEndpoint = fmt.Sprintf("http://localhost:%s", etcdPort)
 
-	if err := waitForEndpoint(sharedEtcdEndpoint+"/health", 60*time.Second); err != nil {
+	if err := waitForPort("localhost", etcdPort, 60*time.Second); err != nil {
 		_ = exec.Command("docker", "rm", "-f", sharedEtcdContainerID).Run()
 		return fmt.Errorf("etcd not ready: %w", err)
 	}
@@ -300,6 +302,19 @@ func deleteBucket(t *testing.T, bucket string) {
 	if err != nil {
 		t.Logf("delete bucket %s: %v", bucket, err)
 	}
+}
+
+func waitForPort(host, port string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), time.Second)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("port %s not reachable within %v", net.JoinHostPort(host, port), timeout)
 }
 
 func waitForEndpoint(endpoint string, timeout time.Duration) error {
