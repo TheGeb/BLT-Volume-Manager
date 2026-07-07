@@ -260,7 +260,6 @@ func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("dump with fallback; expected 200, got %d: %s", resp.StatusCode, string(b))
 	}
-
 }
 
 func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server) {

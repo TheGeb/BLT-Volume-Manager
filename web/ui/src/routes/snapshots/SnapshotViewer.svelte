@@ -292,7 +292,7 @@
     if (!diffOtherId) return;
     const otherSnap = compareSnaps.find(s => s.id === diffOtherId || s.short_id === diffOtherId);
     if (!otherSnap) return;
-    onSwapDiff(otherSnap, snapshot.id, snapshot.fallbackHash);
+    onSwapDiff(otherSnap, snapshot.id);
   }
 
   async function viewFile(path: string) {

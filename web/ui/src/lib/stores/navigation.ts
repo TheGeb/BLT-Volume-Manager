@@ -34,7 +34,7 @@ export async function loadAll(volume: string) {
   }
 }
 
-export async function navigateTo(volume: string, params?: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; diffId?: string }) {
+export async function navigateTo(volume: string, params?: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; snapshotHash?: string; diffId?: string; diffHash?: string }) {
   selectedVolume.set(volume);
   sizes.set({});
   deleteVolModal.set(false);
@@ -67,7 +67,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; tag?: 
       const snap = findSnapshotByVersion(get(snapshots), params.tag);
       if (snap) currentSnapshot.set(snap);
     } else if (params?.snapshotId) {
-      const snap = findSnapshot(get(snapshots), params.snapshotId);
+      const snap = findSnapshot(get(snapshots), params.snapshotId, params.snapshotHash);
       if (snap) currentSnapshot.set(snap);
     }
 
@@ -75,7 +75,7 @@ export async function navigateTo(volume: string, params?: { tab?: string; tag?: 
       const diffSnap = findSnapshotByVersion(get(snapshots), params.diffTag);
       if (diffSnap) diffTargetId.set(diffSnap.id);
     } else if (params?.diffId) {
-      const diffSnap = findSnapshot(get(snapshots), params.diffId);
+      const diffSnap = findSnapshot(get(snapshots), params.diffId, params.diffHash);
       if (diffSnap) diffTargetId.set(diffSnap.id);
     }
   }
@@ -187,6 +187,7 @@ function buildUrl(): string {
       p.set('tag', vtag);
     } else {
       p.set('snapshot', snap.short_id);
+      if (snap.fallbackHash) p.set('hash', snap.fallbackHash);
     }
     const dtId = get(diffTargetId);
     if (dtId) {
@@ -197,6 +198,7 @@ function buildUrl(): string {
           p.set('diffTag', dtVtag);
         } else {
           p.set('diff', dtSnap.short_id);
+          if (dtSnap.fallbackHash) p.set('diffHash', dtSnap.fallbackHash);
         }
       }
     }

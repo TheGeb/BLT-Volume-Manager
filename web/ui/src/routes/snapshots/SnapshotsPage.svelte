@@ -53,8 +53,7 @@
             initialDiffTarget={$diffTargetId}
             onDiffChange={setDiffTarget}
             onOpenDiffPicker={() => pickerDialogOpen = true}
-            onSwapDiff={(snap, newDiffId, newSnapshotHash) => {
-              if (newSnapshotHash) snap.fallbackHash = newSnapshotHash;
+            onSwapDiff={(snap, newDiffId) => {
               currentSnapshot.set(snap);
               diffTargetId.set(newDiffId);
               syncUrl();

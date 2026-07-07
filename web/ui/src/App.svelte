@@ -86,17 +86,25 @@
     }
 
     if (volFromUrl && $volumes.includes(volFromUrl)) {
-      const navOpts: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; diffId?: string } = {};
+      const navOpts: { tab?: string; tag?: string; diffTag?: string; snapshotId?: string; snapshotHash?: string; diffId?: string; diffHash?: string } = {};
       const tab = tabFromUrl ?? params.get('tab');
       if (tab) navOpts.tab = tab;
       const tag = params.get('tag');
       const diffTag = params.get('diffTag');
       const snapshotId = params.get('snapshot');
+      const snapshotHash = params.get('hash');
       const diffId = params.get('diff');
+      const diffHash = params.get('diffHash');
       if (tag) navOpts.tag = tag;
-      else if (snapshotId) navOpts.snapshotId = snapshotId;
+      else if (snapshotId) {
+        navOpts.snapshotId = snapshotId;
+        if (snapshotHash) navOpts.snapshotHash = snapshotHash;
+      }
       if (diffTag) navOpts.diffTag = diffTag;
-      else if (diffId) navOpts.diffId = diffId;
+      else if (diffId) {
+        navOpts.diffId = diffId;
+        if (diffHash) navOpts.diffHash = diffHash;
+      }
       await navigateTo(volFromUrl, navOpts);
     }
     loading.set(false);
