@@ -82,8 +82,6 @@ func DoErr(t *testing.T, baseURL, method, path string, body any, wantCode int) m
 func setupAPITest(t *testing.T, backendType string) (*httptest.Server, *GarageServer) {
 	t.Helper()
 
-	setupLogCapture(t)
-
 	etcd := StartEtcd(t)
 	garage := StartGarage(t)
 
@@ -174,22 +172,23 @@ func testAPIStats(t *testing.T, ts *httptest.Server) {
 }
 
 func testAPIOwners(t *testing.T, ts *httptest.Server) {
-	m := apiOK(t, ts, "POST", "/api/volume/test-vol/owners", map[string]string{"owner": "test-owner"})
-	if m["volume"] != "test-vol" {
+	volName := "test-group/own-vol"
+	m := apiOK(t, ts, "POST", "/api/volume/"+volName+"/owners", map[string]string{"owner": "test-owner"})
+	if m["volume"] != volName {
 		t.Fatalf("unexpected owner response: %v", m)
 	}
 
-	m = apiOK(t, ts, "GET", "/api/volume/test-vol/owners", nil)
+	m = apiOK(t, ts, "GET", "/api/volume/"+volName+"/owners", nil)
 	if m["owner"] == "" {
 		t.Fatal("expected owned volume")
 	}
 
-	m = apiOK(t, ts, "DELETE", "/api/volume/test-vol/owners", nil)
+	m = apiOK(t, ts, "DELETE", "/api/volume/"+volName+"/owners", nil)
 	if m["status"] != "owners deleted" {
 		t.Fatalf("delete owners: %v", m)
 	}
 
-	m = apiOK(t, ts, "GET", "/api/volume/test-vol/owners", nil)
+	m = apiOK(t, ts, "GET", "/api/volume/"+volName+"/owners", nil)
 	if m["owner"] != "" {
 		t.Fatal("expected unlocked after deletion")
 	}
@@ -259,6 +258,82 @@ func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server) {
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("dump with fallback; expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
+func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server) {
+	volName := "test-group/fb-comp-vol"
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+
+	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snapshots, _ := m["snapshots"].([]any)
+	if len(snapshots) < 1 {
+		t.Fatal("expected at least 1 snapshot")
+	}
+
+	hashes := make(map[string]string)
+	for i, s := range snapshots {
+		snap := s.(map[string]any)
+		id, _ := snap["id"].(string)
+		fh, _ := snap["fallbackHash"].(string)
+		if fh == "" {
+			t.Fatalf("snapshot %d (%s) has no fallbackHash", i, id)
+		}
+		if existing, dup := hashes[fh]; dup {
+			t.Fatalf("duplicate fallbackHash %q for %s and %s", fh, existing, id)
+		}
+		hashes[fh] = id
+	}
+
+	first := snapshots[0].(map[string]any)
+	realID := first["id"].(string)
+	fh := first["fallbackHash"].(string)
+
+	// Dump via direct ID
+	resp := DoRequest(t, ts.URL, "GET",
+		"/api/snapshot-view/"+realID+"/dump?volume="+volName+"&path=/readme.txt", nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("direct dump: expected 200, got %d", resp.StatusCode)
+	}
+	directContent, _ := io.ReadAll(resp.Body)
+
+	// Dump via fake ID + fallbackHash — must match
+	resp2 := DoRequest(t, ts.URL, "GET",
+		"/api/snapshot-view/fake-id/dump?volume="+volName+"&path=/readme.txt&fallbackHash="+fh, nil)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("fallback dump: expected 200, got %d: %s", resp2.StatusCode, string(b))
+	}
+	fallbackContent, _ := io.ReadAll(resp2.Body)
+	if string(directContent) != string(fallbackContent) {
+		t.Fatalf("content mismatch:\ndirect:  %q\nfallback: %q", string(directContent), string(fallbackContent))
+	}
+
+	// Invalid fallbackHash returns 400
+	resp3 := DoRequest(t, ts.URL, "GET",
+		"/api/snapshot-view/fake-id/ls?volume="+volName+"&fallbackHash=deadbeef", nil)
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp3.Body)
+		t.Fatalf("bad fallbackHash: expected 400, got %d: %s", resp3.StatusCode, string(b))
+	}
+
+	// ls returns same file set via fallback hash
+	nodesFallback := apiArray(t, ts, "GET",
+		"/api/snapshot-view/fake-id/ls?volume="+volName+"&fallbackHash="+fh)
+	nodesDirect := apiArray(t, ts, "GET",
+		"/api/snapshot-view/"+realID+"/ls?volume="+volName)
+	if len(nodesFallback) != len(nodesDirect) {
+		t.Fatalf("ls node count: fallback=%d direct=%d", len(nodesFallback), len(nodesDirect))
+	}
+	for j, nf := range nodesFallback {
+		nfMap := nf.(map[string]any)
+		ndMap := nodesDirect[j].(map[string]any)
+		if nfMap["name"] != ndMap["name"] {
+			t.Fatalf("node %d name mismatch: fallback=%q direct=%q", j, nfMap["name"], ndMap["name"])
+		}
 	}
 }
 
@@ -475,33 +550,36 @@ func testAPIStatsRefresh(t *testing.T, ts *httptest.Server) {
 }
 
 func TestAPI(t *testing.T) {
+	setupLogCapture(t)
+
 	for _, backendType := range []string{"s3", "etcd"} {
 		backendType := backendType
 		t.Run(backendType, func(t *testing.T) {
 			ts, _ := setupAPITest(t, backendType)
 
-			t.Run("Volumes", func(t *testing.T) { testAPIVolumes(t, ts) })
-			t.Run("RepoInitAndStatus", func(t *testing.T) { testAPIRepoInitAndStatus(t, ts) })
-			t.Run("Snapshots", func(t *testing.T) { testAPISnapshots(t, ts) })
-			t.Run("Stats", func(t *testing.T) { testAPIStats(t, ts) })
-			t.Run("Owners", func(t *testing.T) { testAPIOwners(t, ts) })
-			t.Run("DeleteVolume", func(t *testing.T) { testAPIDeleteVolume(t, ts) })
-			t.Run("EdgeCases", func(t *testing.T) { testAPIEdgeCases(t, ts) })
-			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { testAPISnapshotViewFallbackHash(t, ts) })
-			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { testAPISnapshotViewDiffFallbackHash(t, ts) })
-			t.Run("Health", func(t *testing.T) { testAPIHealth(t, ts) })
-			t.Run("RestorePoint", func(t *testing.T) { testAPIRestorePoint(t, ts) })
-			t.Run("SnapshotSizes", func(t *testing.T) { testAPISnapshotSizes(t, ts) })
-			t.Run("VolumeCopy", func(t *testing.T) { testAPIVolumeCopy(t, ts) })
-			t.Run("VolumeRename", func(t *testing.T) { testAPIVolumeRename(t, ts) })
-			t.Run("DevMode", func(t *testing.T) { testAPIDevMode(t, ts) })
-			t.Run("StatsRefresh", func(t *testing.T) { testAPIStatsRefresh(t, ts) })
-			t.Run("RepoCheck", func(t *testing.T) { testAPIRepoCheck(t, ts) })
-			t.Run("RepoRepair", func(t *testing.T) { testAPIRepoRepair(t, ts) })
-			t.Run("SnapshotHosts", func(t *testing.T) { testAPISnapshotHosts(t, ts) })
-			t.Run("SnapshotDeleteBatch", func(t *testing.T) { testAPISnapshotDeleteBatch(t, ts) })
-			t.Run("DummySnapshot", func(t *testing.T) { testAPIDummySnapshot(t, ts) })
-			t.Run("VolumeOwnersList", func(t *testing.T) { testAPIVolumeOwnersList(t, ts) })
+			t.Run("Volumes", func(t *testing.T) { t.Parallel(); testAPIVolumes(t, ts) })
+			t.Run("RepoInitAndStatus", func(t *testing.T) { t.Parallel(); testAPIRepoInitAndStatus(t, ts) })
+			t.Run("Snapshots", func(t *testing.T) { t.Parallel(); testAPISnapshots(t, ts) })
+			t.Run("Stats", func(t *testing.T) { t.Parallel(); testAPIStats(t, ts) })
+			t.Run("Owners", func(t *testing.T) { t.Parallel(); testAPIOwners(t, ts) })
+			t.Run("DeleteVolume", func(t *testing.T) { t.Parallel(); testAPIDeleteVolume(t, ts) })
+			t.Run("EdgeCases", func(t *testing.T) { t.Parallel(); testAPIEdgeCases(t, ts) })
+			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewFallbackHash(t, ts) })
+			t.Run("FallbackHashComprehensive", func(t *testing.T) { t.Parallel(); testAPIFallbackHashComprehensive(t, ts) })
+			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewDiffFallbackHash(t, ts) })
+			t.Run("Health", func(t *testing.T) { t.Parallel(); testAPIHealth(t, ts) })
+			t.Run("RestorePoint", func(t *testing.T) { t.Parallel(); testAPIRestorePoint(t, ts) })
+			t.Run("SnapshotSizes", func(t *testing.T) { t.Parallel(); testAPISnapshotSizes(t, ts) })
+			t.Run("VolumeCopy", func(t *testing.T) { t.Parallel(); testAPIVolumeCopy(t, ts) })
+			t.Run("VolumeRename", func(t *testing.T) { t.Parallel(); testAPIVolumeRename(t, ts) })
+			t.Run("DevMode", func(t *testing.T) { t.Parallel(); testAPIDevMode(t, ts) })
+			t.Run("StatsRefresh", func(t *testing.T) { t.Parallel(); testAPIStatsRefresh(t, ts) })
+			t.Run("RepoCheck", func(t *testing.T) { t.Parallel(); testAPIRepoCheck(t, ts) })
+			t.Run("RepoRepair", func(t *testing.T) { t.Parallel(); testAPIRepoRepair(t, ts) })
+			t.Run("SnapshotHosts", func(t *testing.T) { t.Parallel(); testAPISnapshotHosts(t, ts) })
+			t.Run("SnapshotDeleteBatch", func(t *testing.T) { t.Parallel(); testAPISnapshotDeleteBatch(t, ts) })
+			t.Run("DummySnapshot", func(t *testing.T) { t.Parallel(); testAPIDummySnapshot(t, ts) })
+			t.Run("VolumeOwnersList", func(t *testing.T) { t.Parallel(); testAPIVolumeOwnersList(t, ts) })
 		})
 	}
 }

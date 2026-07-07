@@ -170,14 +170,20 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 		d.vols[name] = vi
 	}
 	vi.attached++
+	needsLock := vi.LockKey == ""
 	d.mu.Unlock()
 
 	rm := d.ResticManager(name)
 
-	lockKey, err := d.ownerStore.LockVolume(name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
-	if err != nil {
-		log.Errorf("mount_owner_lock_failed", err, "volume=%s", name)
-	} else {
+	if needsLock {
+		lockKey, lockErr := d.ownerStore.LockVolume(name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
+		if lockErr != nil {
+			d.mu.Lock()
+			vi.attached--
+			d.mu.Unlock()
+			log.Errorf("mount_owner_lock_failed", lockErr, "volume=%s", name)
+			return nil, fmt.Errorf("mount owner lock: %w", lockErr)
+		}
 		vi.LockKey = lockKey
 
 		if vt := d.nextVersionTags(name, true); vt != nil {
