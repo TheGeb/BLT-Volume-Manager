@@ -33,7 +33,7 @@
               "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=${self.shortRev or "unknown"}"
               "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=${self.lastModifiedDate or "unknown"}"
             ];
-            CGO_ENABLED = 0;
+            env.CGO_ENABLED = "0";
 
             nativeBuildInputs = [ pkgs.gnumake pkgs.nodejs ];
 
@@ -66,6 +66,11 @@
           shellHook = ''
             echo "Run 'make dev ARGS=\"--http-addr :8081\"' to build and run the driver"
           '';
+        };
+
+        checks = {
+          inherit (self.packages.${system}) blt-volume-manager blt-volume-manager-web;
+          default = self.packages.${system}.default;
         };
       }
     ) // {

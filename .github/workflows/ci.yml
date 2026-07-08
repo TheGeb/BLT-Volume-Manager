@@ -122,6 +122,18 @@ jobs:
           name: ui-build
           path: internal/web/static
 
+  nix-flake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: cachix/install-nix-action@3715db1a8f91191e83e0653fb84f246d32bee2f8 # v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate flake and build packages
+        run: nix flake check --log-format raw
+
   hadolint:
     runs-on: ubuntu-latest
     steps:
