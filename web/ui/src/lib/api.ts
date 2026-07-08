@@ -288,3 +288,18 @@ export async function fetchDevMode(): Promise<boolean> {
   const data = await resp.json() as { enabled?: boolean };
   return data.enabled ?? false;
 }
+
+export interface VersionInfo {
+  version: string;
+  commit: string;
+  date: string;
+  metadata_backend: string;
+  s3_endpoint: string;
+  s3_bucket: string;
+  etcd_endpoints: string[];
+}
+
+export async function fetchVersion(): Promise<VersionInfo> {
+  const resp = await fetch('/api/version');
+  return resp.json() as Promise<VersionInfo>;
+}

@@ -24,6 +24,8 @@
     confirmDeleteSnapshot
   } from '$lib/stores/snapshots';
   import { themeDark, loading, activeTab, devMode, toggleTheme, loadDevMode, currentAccent, setAccentColor, accentColors } from '$lib/stores/repo';
+  import { fetchVersion } from '$lib/api';
+  import type { VersionInfo } from '$lib/api';
   import {
     creatingTest, testStatus,
     onSelectVolume, confirmDeleteVolume, handleCreateTestVolume,
@@ -34,6 +36,29 @@
   let refreshing = false;
   let showColorPicker = false;
   let colorPickerEl: HTMLDivElement;
+  let showInfoModal = false;
+  let versionInfo: VersionInfo | null = null;
+  let versionLoading = false;
+
+  async function loadVersionInfo() {
+    if (versionInfo) return;
+    versionLoading = true;
+    try {
+      versionInfo = await fetchVersion();
+    } catch {
+      versionInfo = {
+        version: 'unknown',
+        commit: 'unknown',
+        date: 'unknown',
+        metadata_backend: 'unknown',
+        s3_endpoint: '',
+        s3_bucket: '',
+        etcd_endpoints: [],
+      };
+    } finally {
+      versionLoading = false;
+    }
+  }
 
   function handleWindowClick(e: MouseEvent) {
     if (showColorPicker && colorPickerEl && !colorPickerEl.contains(e.target as Node)) {
@@ -252,6 +277,30 @@
     box-shadow: inset 0 0 0 3px var(--surface);
   }
 
+  .info-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 0.9rem;
+  }
+
+  .info-label {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .info-value {
+    color: var(--text);
+  }
+
+  .info-value code {
+    font-size: 0.8rem;
+    background: var(--surface-strong);
+    padding: 2px 6px;
+    border-radius: 4px;
+    word-break: break-all;
+  }
+
 </style>
 
 <svelte:window on:click={handleWindowClick}/>
@@ -296,6 +345,11 @@
       <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
         <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor">
           <path d="M337.5-463Q311-498 289-537q-5 14-6.5 28.5T281-480q0 83 58 141t141 58q14 0 28.5-2t28.5-6q-39-22-74-48.5T396-396q-32-32-58.5-67ZM567-364.5Q630-328 702-308q-40 51-98 79.5T481-200q-117 0-198.5-81.5T201-480q0-65 28.5-123t79.5-98q20 72 56.5 135T453-452q51 51 114 87.5ZM743-380q-20-5-39.5-11T665-405q8-18 11.5-36.5T680-480q0-83-58.5-141.5T480-680q-20 0-38.5 3.5T405-665q-8-19-13.5-38T381-742q24-9 49-13.5t51-4.5q117 0 198.5 81.5T761-480q0 26-4.5 51T743-380ZM440-840v-120h80v120h-80Zm0 840v-120h80V0h-80Zm323-706-57-57 85-84 57 56-85 85ZM169-113l-57-56 85-85 57 57-85 84Zm671-327v-80h120v80H840ZM0-440v-80h120v80H0Zm791 328-85-85 57-57 84 85-56 57ZM197-706l-84-85 56-57 85 85-57 57Zm199 310Z"/>
+        </svg>
+      </button>
+      <button class="button-icon" title="About" on:click={() => { showInfoModal = true; loadVersionInfo(); }}>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor">
+          <path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
         </svg>
       </button>
     </div>
@@ -441,5 +495,46 @@
       onclick={confirmRenameVolume}>
       {$copyRenameLoading ? 'Renaming...' : 'Rename'}
     </Button.Root>
+  </div>
+</Modal>
+
+<Modal show={showInfoModal} onClose={() => showInfoModal = false}>
+  <h3 style="margin:0 0 16px;">About BLT Volume Manager</h3>
+  {#if versionLoading}
+    <p style="color:var(--muted);font-size:0.9rem;">Loading...</p>
+  {:else if versionInfo}
+    <div class="info-grid">
+      <div class="info-label">Version</div>
+      <div class="info-value">{versionInfo.version}</div>
+      <div class="info-label">Commit</div>
+      <div class="info-value"><code>{versionInfo.commit}</code></div>
+      <div class="info-label">Built</div>
+      <div class="info-value">{versionInfo.date}</div>
+      <div class="info-label">Metadata</div>
+      <div class="info-value">{versionInfo.metadata_backend}</div>
+      {#if versionInfo.metadata_backend === 's3'}
+        {#if versionInfo.s3_endpoint}
+          <div class="info-label">S3 Endpoint</div>
+          <div class="info-value"><code>{versionInfo.s3_endpoint}</code></div>
+        {/if}
+        {#if versionInfo.s3_bucket}
+          <div class="info-label">S3 Bucket</div>
+          <div class="info-value"><code>{versionInfo.s3_bucket}</code></div>
+        {/if}
+      {/if}
+      {#if versionInfo.metadata_backend === 'etcd' && versionInfo.etcd_endpoints?.length}
+        <div class="info-label">etcd Endpoints</div>
+        <div class="info-value">
+          {#each versionInfo.etcd_endpoints as ep, i}
+            <code>{ep}</code>{#if i < versionInfo.etcd_endpoints.length - 1}, {/if}
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {:else}
+    <p style="color:var(--muted);font-size:0.9rem;">Failed to load version info.</p>
+  {/if}
+  <div class="modal-footer" style="margin-top:16px;">
+    <Button.Root class="button button-secondary" onclick={() => showInfoModal = false}>Close</Button.Root>
   </div>
 </Modal>

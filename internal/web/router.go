@@ -20,6 +20,7 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 	inner := http.NewServeMux()
 
 	registerHealth(s, inner)
+	registerVersionRoute(s, inner)
 	registerRepoRoutes(s, inner)
 	registerSnapshotRoutes(s, inner)
 	registerVolumeRoutes(s, inner)

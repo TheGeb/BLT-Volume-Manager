@@ -128,9 +128,9 @@ api_bind_addr = "0.0.0.0:3903"
 		Cmd: []string{"/garage", "server", "--single-node", "--default-bucket"},
 		Files: []testcontainers.ContainerFile{
 			{
-				Reader:        strings.NewReader(configStr),
+				Reader:            strings.NewReader(configStr),
 				ContainerFilePath: "/etc/garage.toml",
-				FileMode:      0o644,
+				FileMode:          0o644,
 			},
 		},
 		WaitingFor: wait.ForHTTP("/").

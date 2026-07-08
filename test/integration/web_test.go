@@ -384,7 +384,6 @@ func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server, volN
 	if _, ok := mPartial["change_sets"]; !ok {
 		t.Fatal("expected change_sets in partial fallback diff response")
 	}
-
 }
 
 func testAPIHealth(t *testing.T, ts *httptest.Server) {
