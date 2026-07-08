@@ -17,6 +17,8 @@
         build-module = { pname, subPackages, meta-description }:
           pkgs.buildGoModule {
             inherit pname version;
+            vendorHash = null;
+            proxyVendor = true;
             src = ./.;
 
             inherit subPackages;
@@ -29,7 +31,6 @@
               mkdir -p internal/web/static
             '';
 
-            vendorHash = "sha256-kcrWUcjfR5O1k73qhVba8EQXR6xMyDCeYCaA9A5mGZg=";
             ldflags = [
               "-s"
               "-w"
