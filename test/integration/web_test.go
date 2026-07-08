@@ -130,11 +130,11 @@ func testAPIVolumes(t *testing.T, ts *httptest.Server) {
 
 	found := false
 	for _, v := range vols {
-		vm, ok := v.(map[string]any)
+		name, ok := v.(string)
 		if !ok {
 			continue
 		}
-		if vm["Name"] == volName {
+		if name == volName {
 			found = true
 			break
 		}
