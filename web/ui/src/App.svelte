@@ -525,7 +525,7 @@
       {#if versionInfo.metadata_backend === 'etcd' && versionInfo.etcd_endpoints?.length}
         <div class="info-label">etcd Endpoints</div>
         <div class="info-value">
-          {#each versionInfo.etcd_endpoints as ep, i}
+          {#each versionInfo.etcd_endpoints as ep, i (ep)}
             <code>{ep}</code>{#if i < versionInfo.etcd_endpoints.length - 1}, {/if}
           {/each}
         </div>
