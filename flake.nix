@@ -23,7 +23,10 @@
 
             preBuild = ''
               export HOME=/tmp
-              ${pkgs.gnumake}/bin/make ui
+              cd web/ui && npm install
+              patchShebangs web/ui/node_modules/.bin
+              cd web/ui && npm run build
+              mkdir -p internal/web/static
             '';
 
             vendorHash = "sha256-kcrWUcjfR5O1k73qhVba8EQXR6xMyDCeYCaA9A5mGZg=";
