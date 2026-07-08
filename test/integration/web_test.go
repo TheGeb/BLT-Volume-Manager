@@ -146,25 +146,29 @@ func testAPIRepoInitAndStatus(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshots(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/snap-vol"
-	body := map[string]string{"name": volName}
-	m := apiOK(t, ts, "POST", "/api/dummy-volume", body)
-	if m["status"] != "ok" {
-		t.Fatalf("create test volume: %v", m)
+func testAPISnapshots(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/snap-vol"
+		m := apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+		if m["status"] != "ok" {
+			t.Fatalf("create test volume: %v", m)
+		}
 	}
 
-	m = apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snaps, _ := m["snapshots"].([]any)
 	if len(snaps) == 0 {
 		t.Fatal("expected at least 1 snapshot")
 	}
 }
 
-func testAPIStats(t *testing.T, ts *httptest.Server) {
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/stat-vol"})
+func testAPIStats(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/stat-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
-	m := apiOK(t, ts, "GET", "/api/stats?volume=test-group/stat-vol", nil)
+	m := apiOK(t, ts, "GET", "/api/stats?volume="+volName, nil)
 	repo, _ := m["repo"].(map[string]any)
 	if repo == nil || repo["total_size"] == nil {
 		t.Fatal("expected repo stats")
@@ -223,9 +227,11 @@ func testAPIEdgeCases(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/fallback-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/fallback-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snapshots, _ := m["snapshots"].([]any)
@@ -261,9 +267,11 @@ func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/fb-comp-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/fb-comp-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snapshots, _ := m["snapshots"].([]any)
@@ -337,10 +345,12 @@ func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/diff-fallback-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/diff-fallback-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snapshots, _ := m["snapshots"].([]any)
@@ -401,9 +411,11 @@ func testAPIRepoRepair(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotHosts(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/hosts-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+func testAPISnapshotHosts(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/hosts-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
 	hosts := apiArray(t, ts, "GET", "/api/snapshots/hosts?volume="+volName)
 	if len(hosts) == 0 {
@@ -490,9 +502,11 @@ func testAPIRestorePoint(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotSizes(t *testing.T, ts *httptest.Server) {
-	volName := "test-group/sizes-vol"
-	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+func testAPISnapshotSizes(t *testing.T, ts *httptest.Server, volName string) {
+	if volName == "" {
+		volName = "test-group/sizes-vol"
+		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+	}
 
 	m := apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
 	snaps, _ := m["snapshots"].([]any)
@@ -557,26 +571,31 @@ func TestAPI(t *testing.T) {
 		t.Run(backendType, func(t *testing.T) {
 			ts, _ := setupAPITest(t, backendType)
 
-			t.Run("Volumes", func(t *testing.T) { t.Parallel(); testAPIVolumes(t, ts) })
+			t.Run("Volumes", func(t *testing.T) { testAPIVolumes(t, ts) })
+
+			sharedVol := "_shared"
+			apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": sharedVol})
+			apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": sharedVol})
+
 			t.Run("RepoInitAndStatus", func(t *testing.T) { t.Parallel(); testAPIRepoInitAndStatus(t, ts) })
-			t.Run("Snapshots", func(t *testing.T) { t.Parallel(); testAPISnapshots(t, ts) })
-			t.Run("Stats", func(t *testing.T) { t.Parallel(); testAPIStats(t, ts) })
+			t.Run("Snapshots", func(t *testing.T) { t.Parallel(); testAPISnapshots(t, ts, sharedVol) })
+			t.Run("Stats", func(t *testing.T) { t.Parallel(); testAPIStats(t, ts, sharedVol) })
 			t.Run("Owners", func(t *testing.T) { t.Parallel(); testAPIOwners(t, ts) })
 			t.Run("DeleteVolume", func(t *testing.T) { t.Parallel(); testAPIDeleteVolume(t, ts) })
 			t.Run("EdgeCases", func(t *testing.T) { t.Parallel(); testAPIEdgeCases(t, ts) })
-			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewFallbackHash(t, ts) })
-			t.Run("FallbackHashComprehensive", func(t *testing.T) { t.Parallel(); testAPIFallbackHashComprehensive(t, ts) })
-			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewDiffFallbackHash(t, ts) })
+			t.Run("SnapshotViewFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewFallbackHash(t, ts, sharedVol) })
+			t.Run("FallbackHashComprehensive", func(t *testing.T) { t.Parallel(); testAPIFallbackHashComprehensive(t, ts, sharedVol) })
+			t.Run("SnapshotViewDiffFallbackHash", func(t *testing.T) { t.Parallel(); testAPISnapshotViewDiffFallbackHash(t, ts, sharedVol) })
 			t.Run("Health", func(t *testing.T) { t.Parallel(); testAPIHealth(t, ts) })
 			t.Run("RestorePoint", func(t *testing.T) { t.Parallel(); testAPIRestorePoint(t, ts) })
-			t.Run("SnapshotSizes", func(t *testing.T) { t.Parallel(); testAPISnapshotSizes(t, ts) })
+			t.Run("SnapshotSizes", func(t *testing.T) { t.Parallel(); testAPISnapshotSizes(t, ts, sharedVol) })
 			t.Run("VolumeCopy", func(t *testing.T) { t.Parallel(); testAPIVolumeCopy(t, ts) })
 			t.Run("VolumeRename", func(t *testing.T) { t.Parallel(); testAPIVolumeRename(t, ts) })
 			t.Run("DevMode", func(t *testing.T) { t.Parallel(); testAPIDevMode(t, ts) })
 			t.Run("StatsRefresh", func(t *testing.T) { t.Parallel(); testAPIStatsRefresh(t, ts) })
 			t.Run("RepoCheck", func(t *testing.T) { t.Parallel(); testAPIRepoCheck(t, ts) })
 			t.Run("RepoRepair", func(t *testing.T) { t.Parallel(); testAPIRepoRepair(t, ts) })
-			t.Run("SnapshotHosts", func(t *testing.T) { t.Parallel(); testAPISnapshotHosts(t, ts) })
+			t.Run("SnapshotHosts", func(t *testing.T) { t.Parallel(); testAPISnapshotHosts(t, ts, sharedVol) })
 			t.Run("SnapshotDeleteBatch", func(t *testing.T) { t.Parallel(); testAPISnapshotDeleteBatch(t, ts) })
 			t.Run("DummySnapshot", func(t *testing.T) { t.Parallel(); testAPIDummySnapshot(t, ts) })
 			t.Run("VolumeOwnersList", func(t *testing.T) { t.Parallel(); testAPIVolumeOwnersList(t, ts) })
