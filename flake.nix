@@ -22,6 +22,7 @@
             inherit subPackages;
 
             preBuild = ''
+              export HOME=/tmp
               ${pkgs.gnumake}/bin/make ui
             '';
 
