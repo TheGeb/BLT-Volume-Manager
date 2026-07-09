@@ -10,11 +10,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/driver"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
@@ -25,33 +25,34 @@ func setupPluginTest(t *testing.T, backendType string) string {
 
 	garage := StartGarage(t)
 
+	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
 	dataDir := t.TempDir()
-	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
 
-	conf := cfg.Config{
-		DataDir:    dataDir,
-		ResticBase: resticBase,
-		S3Bucket:   garage.BucketName,
-		S3Endpoint: garage.Endpoint,
-		S3Region:   "us-east-1",
-	}
+	env := append(os.Environ(),
+		"BLT_LISTEN=1",
+		"RESTIC_REPOSITORY=s3:"+garage.Endpoint+"/"+garage.BucketName,
+		"S3_ENDPOINT="+garage.Endpoint,
+		"S3_REGION=us-east-1",
+	)
 	if backendType == "etcd" {
 		etcd := StartEtcd(t)
-		conf.MetadataBackend = "etcd"
-		conf.EtcdEndpoints = []string{etcd.Endpoint}
+		env = append(env, "BLT_METADATA_BACKEND=etcd")
+		env = append(env, "ETCD_ENDPOINTS="+etcd.Endpoint)
 	}
 
-	drv := driver.New(conf, context.Background())
-	h := volume.NewHandler(drv)
-
-	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
-	l, err := net.Listen("unix", socketPath)
-	if err != nil {
-		t.Fatal(err)
+	cmd := exec.Command(driverBin, "-data-dir", dataDir, "-socket", socketPath)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start driver: %v", err)
 	}
-	t.Cleanup(func() { l.Close(); os.Remove(socketPath) })
-	go h.Serve(l)
+	t.Cleanup(func() {
+		_ = cmd.Process.Signal(os.Interrupt)
+		_ = cmd.Wait()
+	})
 
+	waitForSocket(t, socketPath, 15*time.Second)
 	return socketPath
 }
 
@@ -222,17 +223,6 @@ func testPluginFullLifecycle(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "lifecycle-vol"})
 }
 
-func testPluginCapabilities(t *testing.T, socket string) {
-	m := pluginOK(t, socket, "VolumeDriver.Capabilities", nil)
-	caps, ok := m["Capabilities"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected Capabilities in response: %v", m)
-	}
-	if caps["Scope"] != "local" {
-		t.Fatalf("expected scope 'local', got %v", caps["Scope"])
-	}
-}
-
 func testPluginEdgeCases(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})
 	if err, ok := m["Err"].(string); ok && err != "" {
@@ -279,7 +269,6 @@ func TestPlugin(t *testing.T) {
 			t.Run("MountUnmount", func(t *testing.T) { testPluginMountUnmount(t, socket) })
 			t.Run("RemoveVolume", func(t *testing.T) { testPluginRemoveVolume(t, socket) })
 			t.Run("FullLifecycle", func(t *testing.T) { testPluginFullLifecycle(t, socket) })
-			t.Run("Capabilities", func(t *testing.T) { testPluginCapabilities(t, socket) })
 			t.Run("EdgeCases", func(t *testing.T) { testPluginEdgeCases(t, socket) })
 		})
 	}

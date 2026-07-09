@@ -7,8 +7,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +36,8 @@ var (
 	sharedAccessKey       string
 	sharedSecretKey       string
 	sharedEtcdEndpoint    string
+	driverBin             string
+	webBin                string
 )
 
 func TestMain(m *testing.M) {
@@ -60,7 +65,29 @@ func TestMain(m *testing.M) {
 	os.Setenv("S3_FORCE_PATH_STYLE", "true")
 	os.Setenv("BLT_DEV_MODE", "1")
 
+	tmpBinDir, err := os.MkdirTemp("", "blt-integration-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+
+	wd, _ := os.Getwd()
+	root := filepath.Dir(filepath.Dir(wd))
+
+	driverBin = filepath.Join(tmpBinDir, "driver")
+	if out, err := exec.Command("go", "build", "-o", driverBin, filepath.Join(root, "./cmd/driver")).CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "build driver: %v\n%s", err, out)
+		os.Exit(1)
+	}
+
+	webBin = filepath.Join(tmpBinDir, "web")
+	if out, err := exec.Command("go", "build", "-o", webBin, filepath.Join(root, "./cmd/web")).CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "build web: %v\n%s", err, out)
+		os.Exit(1)
+	}
+
 	code := m.Run()
+	os.RemoveAll(tmpBinDir)
 	stopSharedGarage()
 	stopSharedEtcd()
 	os.Exit(code)
@@ -291,4 +318,39 @@ func randomString(n int) string {
 		b[i] = letters[int(b[i])%len(letters)]
 	}
 	return string(b)
+}
+
+func waitForSocket(t *testing.T, path string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("socket %q did not appear within %v", path, timeout)
+}
+
+func waitForURL(t *testing.T, url string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("URL %s did not respond within %v", url, timeout)
+}
+
+func freePort() int {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }

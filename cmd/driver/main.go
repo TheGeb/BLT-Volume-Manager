@@ -69,7 +69,18 @@ func run() int {
 
 	socketErr := make(chan error, 1)
 	go func() {
-		socketErr <- h.ServeUnix(socketPath, 0)
+		if os.Getenv("BLT_LISTEN") != "" {
+			// intended for integration testing since docker plugin helper ServeUnix
+			// unconditionally runs MkdirAll("/run/docker/plugins") which is protected
+			l, err := net.Listen("unix", socketPath)
+			if err != nil {
+				socketErr <- err
+				return
+			}
+			socketErr <- h.Serve(l)
+		} else {
+			socketErr <- h.ServeUnix(socketPath, 0)
+		}
 	}()
 
 	select {

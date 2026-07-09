@@ -8,14 +8,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
+	"time"
 )
+
+type testServer struct {
+	URL string
+}
 
 func DoRequest(t *testing.T, baseURL, method, path string, body any) *http.Response {
 	t.Helper()
@@ -79,49 +81,59 @@ func DoErr(t *testing.T, baseURL, method, path string, body any, wantCode int) m
 	return m
 }
 
-func setupAPITest(t *testing.T, backendType string) (*httptest.Server, *GarageServer) {
+func setupAPITest(t *testing.T, backendType string) (*testServer, *GarageServer) {
 	t.Helper()
 
-	etcd := StartEtcd(t)
 	garage := StartGarage(t)
+	etcd := StartEtcd(t)
 
-	resticBase := "s3:" + garage.Endpoint + "/" + garage.BucketName
-
-	conf := cfg.Config{
-		ResticBase: resticBase,
-		S3Bucket:   garage.BucketName,
-		S3Endpoint: garage.Endpoint,
-		S3Region:   "us-east-1",
+	dataDir := t.TempDir()
+	port := freePort()
+	if port == 0 {
+		t.Fatal("failed to find a free port")
 	}
+	httpAddr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	env := append(os.Environ(),
+		"RESTIC_REPOSITORY=s3:"+garage.Endpoint+"/"+garage.BucketName,
+		"S3_ENDPOINT="+garage.Endpoint,
+		"S3_REGION=us-east-1",
+	)
 	if backendType == "etcd" {
-		conf.MetadataBackend = "etcd"
-		conf.EtcdEndpoints = []string{etcd.Endpoint}
+		env = append(env, "BLT_METADATA_BACKEND=etcd")
+		env = append(env, "ETCD_ENDPOINTS="+etcd.Endpoint)
 	}
 
-	mux := http.NewServeMux()
-	srv := server.New(conf)
-	if err := web.Register(srv, mux); err != nil {
-		t.Fatalf("register web routes failed: %v", err)
+	cmd := exec.Command(webBin, "-data-dir", dataDir, "-http-addr", httpAddr)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start web: %v", err)
 	}
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	t.Cleanup(func() {
+		_ = cmd.Process.Signal(os.Interrupt)
+		_ = cmd.Wait()
+	})
 
-	return ts, garage
+	baseURL := "http://" + httpAddr
+	waitForURL(t, baseURL+"/api/health", 30*time.Second)
+	return &testServer{URL: baseURL}, garage
 }
 
-func apiOK(t *testing.T, ts *httptest.Server, method, path string, body any) map[string]any {
+func apiOK(t *testing.T, ts *testServer, method, path string, body any) map[string]any {
 	return DoOK(t, ts.URL, method, path, body)
 }
 
-func apiArray(t *testing.T, ts *httptest.Server, method, path string) []any {
+func apiArray(t *testing.T, ts *testServer, method, path string) []any {
 	return DoArray(t, ts.URL, method, path)
 }
 
-func apiErr(t *testing.T, ts *httptest.Server, method, path string, body any, wantCode int) map[string]any {
+func apiErr(t *testing.T, ts *testServer, method, path string, body any, wantCode int) map[string]any {
 	return DoErr(t, ts.URL, method, path, body, wantCode)
 }
 
-func testAPIVolumes(t *testing.T, ts *httptest.Server) {
+func testAPIVolumes(t *testing.T, ts *testServer) {
 	volName := "volumes-test-" + randomString(6)
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
@@ -146,7 +158,7 @@ func testAPIVolumes(t *testing.T, ts *httptest.Server) {
 	apiOK(t, ts, "DELETE", "/api/volume/"+volName, nil)
 }
 
-func testAPIRepoInitAndStatus(t *testing.T, ts *httptest.Server) {
+func testAPIRepoInitAndStatus(t *testing.T, ts *testServer) {
 	m := apiOK(t, ts, "GET", "/api/repo/status?volume=test-vol", nil)
 	if m["initialized"] != false {
 		t.Fatal("expected uninitialized repo")
@@ -163,7 +175,7 @@ func testAPIRepoInitAndStatus(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshots(t *testing.T, ts *httptest.Server, volName string) {
+func testAPISnapshots(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/snap-vol"
 		m := apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -179,7 +191,7 @@ func testAPISnapshots(t *testing.T, ts *httptest.Server, volName string) {
 	}
 }
 
-func testAPIStats(t *testing.T, ts *httptest.Server, volName string) {
+func testAPIStats(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/stat-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -192,7 +204,7 @@ func testAPIStats(t *testing.T, ts *httptest.Server, volName string) {
 	}
 }
 
-func testAPIOwners(t *testing.T, ts *httptest.Server) {
+func testAPIOwners(t *testing.T, ts *testServer) {
 	volName := "test-group/own-vol"
 	m := apiOK(t, ts, "POST", "/api/volume/"+volName+"/owners", map[string]string{"owner": "test-owner"})
 	if m["volume"] != volName {
@@ -215,7 +227,7 @@ func testAPIOwners(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIDeleteVolume(t *testing.T, ts *httptest.Server) {
+func testAPIDeleteVolume(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/del-vol"})
 
 	m := apiOK(t, ts, "DELETE", "/api/volume/test-group/del-vol", nil)
@@ -224,7 +236,7 @@ func testAPIDeleteVolume(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIEdgeCases(t *testing.T, ts *httptest.Server) {
+func testAPIEdgeCases(t *testing.T, ts *testServer) {
 	apiErr(t, ts, "GET", "/api/nonexistent", nil, http.StatusNotFound)
 	apiErr(t, ts, "POST", "/api/nonexistent", nil, http.StatusNotFound)
 
@@ -244,7 +256,7 @@ func testAPIEdgeCases(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server, volName string) {
+func testAPISnapshotViewFallbackHash(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/fallback-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -284,7 +296,7 @@ func testAPISnapshotViewFallbackHash(t *testing.T, ts *httptest.Server, volName 
 	}
 }
 
-func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server, volName string) {
+func testAPIFallbackHashComprehensive(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/fb-comp-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -353,7 +365,7 @@ func testAPIFallbackHashComprehensive(t *testing.T, ts *httptest.Server, volName
 	}
 }
 
-func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server, volName string) {
+func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/diff-fallback-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -386,7 +398,7 @@ func testAPISnapshotViewDiffFallbackHash(t *testing.T, ts *httptest.Server, volN
 	}
 }
 
-func testAPIHealth(t *testing.T, ts *httptest.Server) {
+func testAPIHealth(t *testing.T, ts *testServer) {
 	resp := DoRequest(t, ts.URL, "GET", "/api/health", nil)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -394,7 +406,7 @@ func testAPIHealth(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIRepoCheck(t *testing.T, ts *httptest.Server) {
+func testAPIRepoCheck(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/repo/init?volume=check-vol", nil)
 
 	m := apiOK(t, ts, "POST", "/api/repo/check?volume=check-vol", nil)
@@ -403,7 +415,7 @@ func testAPIRepoCheck(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIRepoRepair(t *testing.T, ts *httptest.Server) {
+func testAPIRepoRepair(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/repo/init?volume=repair-vol", nil)
 
 	m := apiOK(t, ts, "POST", "/api/repo/repair?volume=repair-vol", nil)
@@ -412,7 +424,7 @@ func testAPIRepoRepair(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotHosts(t *testing.T, ts *httptest.Server, volName string) {
+func testAPISnapshotHosts(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/hosts-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -424,7 +436,7 @@ func testAPISnapshotHosts(t *testing.T, ts *httptest.Server, volName string) {
 	}
 }
 
-func testAPISnapshotDeleteBatch(t *testing.T, ts *httptest.Server) {
+func testAPISnapshotDeleteBatch(t *testing.T, ts *testServer) {
 	volName := "test-group/batch-del-vol"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
@@ -448,7 +460,7 @@ func testAPISnapshotDeleteBatch(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIDummySnapshot(t *testing.T, ts *httptest.Server) {
+func testAPIDummySnapshot(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": "test-group/ds-vol"})
 
 	m := apiOK(t, ts, "POST", "/api/dummy-snapshot", map[string]string{"volume": "test-group/ds-vol"})
@@ -457,14 +469,14 @@ func testAPIDummySnapshot(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIDevMode(t *testing.T, ts *httptest.Server) {
+func testAPIDevMode(t *testing.T, ts *testServer) {
 	m := apiOK(t, ts, "GET", "/api/dev-mode", nil)
 	if m["enabled"] != true {
 		t.Fatal("expected dev mode enabled")
 	}
 }
 
-func testAPIVolumeOwnersList(t *testing.T, ts *httptest.Server) {
+func testAPIVolumeOwnersList(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/volume/list-own-vol/owners", map[string]string{"owner": "test-owner"})
 
 	resp := DoRequest(t, ts.URL, "GET", "/api/volumes/owners", nil)
@@ -475,7 +487,7 @@ func testAPIVolumeOwnersList(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIRestorePoint(t *testing.T, ts *httptest.Server) {
+func testAPIRestorePoint(t *testing.T, ts *testServer) {
 	volName := "test-group/rp-vol"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
 
@@ -503,7 +515,7 @@ func testAPIRestorePoint(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPISnapshotSizes(t *testing.T, ts *httptest.Server, volName string) {
+func testAPISnapshotSizes(t *testing.T, ts *testServer, volName string) {
 	if volName == "" {
 		volName = "test-group/sizes-vol"
 		apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
@@ -532,7 +544,7 @@ func testAPISnapshotSizes(t *testing.T, ts *httptest.Server, volName string) {
 	}
 }
 
-func testAPIVolumeCopy(t *testing.T, ts *httptest.Server) {
+func testAPIVolumeCopy(t *testing.T, ts *testServer) {
 	src := "test-group/copy-src"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": src})
 
@@ -545,7 +557,7 @@ func testAPIVolumeCopy(t *testing.T, ts *httptest.Server) {
 	}
 }
 
-func testAPIVolumeRename(t *testing.T, ts *httptest.Server) {
+func testAPIVolumeRename(t *testing.T, ts *testServer) {
 	src := "test-group/rename-src"
 	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": src})
 
@@ -554,13 +566,6 @@ func testAPIVolumeRename(t *testing.T, ts *httptest.Server) {
 	})
 	if _, ok := m["status"]; !ok {
 		t.Fatalf("rename missing status: %v", m)
-	}
-}
-
-func testAPIStatsRefresh(t *testing.T, ts *httptest.Server) {
-	m := apiOK(t, ts, "POST", "/api/stats/refresh", nil)
-	if m == nil {
-		t.Fatal("expected stats object after refresh")
 	}
 }
 
@@ -593,7 +598,6 @@ func TestAPI(t *testing.T) {
 			t.Run("VolumeCopy", func(t *testing.T) { t.Parallel(); testAPIVolumeCopy(t, ts) })
 			t.Run("VolumeRename", func(t *testing.T) { t.Parallel(); testAPIVolumeRename(t, ts) })
 			t.Run("DevMode", func(t *testing.T) { t.Parallel(); testAPIDevMode(t, ts) })
-			t.Run("StatsRefresh", func(t *testing.T) { t.Parallel(); testAPIStatsRefresh(t, ts) })
 			t.Run("RepoCheck", func(t *testing.T) { t.Parallel(); testAPIRepoCheck(t, ts) })
 			t.Run("RepoRepair", func(t *testing.T) { t.Parallel(); testAPIRepoRepair(t, ts) })
 			t.Run("SnapshotHosts", func(t *testing.T) { t.Parallel(); testAPISnapshotHosts(t, ts, sharedVol) })

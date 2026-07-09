@@ -297,3 +297,40 @@ func TestPath(t *testing.T) {
 		t.Errorf("Mountpoint = %q", resp.Mountpoint)
 	}
 }
+
+func TestRemoveNonExistent(t *testing.T) {
+	d := &Driver{volumePath: t.TempDir()}
+	err := d.Remove(&volume.RemoveRequest{Name: "no-such-vol"})
+	if err != nil {
+		t.Fatalf("Remove on non-existent volume: %v", err)
+	}
+}
+
+func TestGetNonExistent(t *testing.T) {
+	d := &Driver{volumePath: t.TempDir()}
+	resp, err := d.Get(&volume.GetRequest{Name: "no-such-vol"})
+	if err != nil {
+		t.Fatalf("Get on non-existent volume: %v", err)
+	}
+	if resp == nil || resp.Volume == nil {
+		t.Fatal("expected non-nil response with Volume")
+		return
+	}
+	if resp.Volume.Name != "no-such-vol" {
+		t.Errorf("Name = %q, want %q", resp.Volume.Name, "no-such-vol")
+	}
+	if resp.Volume.Mountpoint != filepath.Join(d.volumePath, "volumes", "no-such-vol") {
+		t.Errorf("Mountpoint = %q", resp.Volume.Mountpoint)
+	}
+	if state, ok := resp.Volume.Status["state"].(string); !ok || state != "unclaimed" {
+		t.Errorf("state = %q, want %q", state, "unclaimed")
+	}
+}
+
+func TestUnmountNonExistent(t *testing.T) {
+	d := &Driver{}
+	err := d.Unmount(&volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
+	if err != nil {
+		t.Fatalf("Unmount on non-existent volume: %v", err)
+	}
+}
