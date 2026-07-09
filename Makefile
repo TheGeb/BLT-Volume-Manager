@@ -3,6 +3,7 @@
 # Override args: make dev-driver ARGS="--http-addr :9090"
 
 .PHONY: all dev-driver dev-web build test lint lint-go format clean coverage check hadolint ui ui-dev-build run-driver tidy
+.PHONY: nix-vendor-hash nix-npm-hash nix-hashes
 .PHONY: build-driver build-web docker-driver docker-web
 
 # Configurable run arguments (override from command line)
@@ -36,6 +37,50 @@ clean:
 	rm -rf web/ui/node_modules 2>/dev/null || true
 	rm -f web/ui/node_modules/.install-stamp
 	rm -rf internal/web/static/*
+
+# === Nix hashes ===
+
+nix-vendor-hash:
+	@OLD=$$(grep -oP 'vendorHash = "\K[^"]+' flake.nix); \
+	cp flake.nix flake.nix.bak; \
+	sed -i 's/vendorHash = "[^"]*"/vendorHash = ""/' flake.nix; \
+	OUTPUT=$$(nix build '.#blt-volume-manager' 2>&1 || true); \
+	NEW=$$(echo "$$OUTPUT" | grep -oP 'got:\s*\K\S+'); \
+	if [ -n "$$NEW" ] && [ "$$NEW" != "$$OLD" ]; then \
+		sed -i "s|vendorHash = \"\"|vendorHash = \"$$NEW\"|" flake.nix; \
+		echo "vendorHash: $$OLD → $$NEW"; \
+		echo "Updated vendorHash in flake.nix"; \
+	elif [ -n "$$NEW" ]; then \
+		sed -i "s|vendorHash = \"\"|vendorHash = \"$$OLD\"|" flake.nix; \
+		echo "vendorHash is up to date ($$OLD)"; \
+	else \
+		mv flake.nix.bak flake.nix; \
+		echo "Failed to extract vendorHash — restored original" >&2; \
+		exit 1; \
+	fi; \
+	rm -f flake.nix.bak
+
+nix-npm-hash:
+	@OLD=$$(grep -oP 'npmDepsHash = "\K[^"]+' flake.nix); \
+	cp flake.nix flake.nix.bak; \
+	sed -i 's/npmDepsHash = "[^"]*"/npmDepsHash = ""/' flake.nix; \
+	OUTPUT=$$(nix build '.#ui' 2>&1 || true); \
+	NEW=$$(echo "$$OUTPUT" | grep -oP 'got:\s*\K\S+'); \
+	if [ -n "$$NEW" ] && [ "$$NEW" != "$$OLD" ]; then \
+		sed -i "s|npmDepsHash = \"\"|npmDepsHash = \"$$NEW\"|" flake.nix; \
+		echo "npmDepsHash: $$OLD → $$NEW"; \
+		echo "Updated npmDepsHash in flake.nix"; \
+	elif [ -n "$$NEW" ]; then \
+		sed -i "s|npmDepsHash = \"\"|npmDepsHash = \"$$OLD\"|" flake.nix; \
+		echo "npmDepsHash is up to date ($$OLD)"; \
+	else \
+		mv flake.nix.bak flake.nix; \
+		echo "Failed to extract npmDepsHash — restored original" >&2; \
+		exit 1; \
+	fi; \
+	rm -f flake.nix.bak
+
+nix-hashes: nix-vendor-hash nix-npm-hash
 
 # === Lint ===
 
@@ -87,6 +132,7 @@ ui:
 	cd web/ui && npm install
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
+	cp -r web/ui/dist/* internal/web/static/
 
 run-web:
 	go run ./cmd/web $(ARGS)
@@ -101,10 +147,10 @@ ui-dev-build: web/ui/node_modules/.install-stamp
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 
-build-driver: tidy format
+build-driver:
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver
 
-build-web: tidy format ui
+build-web: ui
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-web ./cmd/web
 
 build: build-driver build-web

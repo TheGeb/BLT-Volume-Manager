@@ -10,25 +10,35 @@
     let
       version = builtins.replaceStrings ["\n"] [""] (builtins.readFile ./VERSION);
     in
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        build-module = { pname, subPackages, meta-description }:
+        ui = pkgs.buildNpmPackage {
+          pname = "blt-volume-manager-ui";
+          version = version;
+          src = ./web/ui;
+          npmDepsHash = "sha256-ErqUzOvgdpo1JWp2HL6QjG8SSvx33DV9YhkW6sEVFPo=";
+          installPhase = ''
+            mkdir -p $out
+            cp -r dist/. $out/
+          '';
+        };
+
+        build-module = { pname, subPackages, meta-description, withUi ? false }:
           pkgs.buildGoModule {
             inherit pname version;
-            vendorHash = null;
-            proxyVendor = true;
+            vendorHash = "sha256-wBQUcIN0m6RUH/4XMAfH6rfFJCHLb7ffpJGbYz2GhJw=";
             src = ./.;
 
             inherit subPackages;
 
-            preBuild = ''
-              export HOME=/tmp
-              cd web/ui && npm install
-              patchShebangs web/ui/node_modules/.bin
-              cd web/ui && npm run build
+            preBuild = if withUi then ''
               mkdir -p internal/web/static
+              cp -r ${ui}/. internal/web/static/
+            '' else ''
+              mkdir -p internal/web/static
+              touch internal/web/static/.dummy
             '';
 
             ldflags = [
@@ -39,8 +49,9 @@
               "-X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=${self.lastModifiedDate or "unknown"}"
             ];
             env.CGO_ENABLED = "0";
+            strictDeps = true;
 
-            nativeBuildInputs = [ pkgs.gnumake pkgs.nodejs ];
+            nativeBuildInputs = [ ];
 
             meta = with pkgs.lib; {
               inherit meta-description;
@@ -50,9 +61,10 @@
           };
       in
       {
-        formatter = pkgs.nixfmt-rfc-style;
+        formatter = pkgs.nixfmt;
 
         packages = rec {
+          inherit ui;
           blt-volume-manager = build-module {
             pname = "blt-volume-manager";
             subPackages = [ "cmd/driver" ];
@@ -62,6 +74,7 @@
             pname = "blt-volume-manager-web";
             subPackages = [ "cmd/web" ];
             meta-description = "BLT Volume Manager web UI";
+            withUi = true;
           };
           default = blt-volume-manager;
         };

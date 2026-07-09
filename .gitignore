@@ -19,8 +19,8 @@ coverage.html
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+vendor/
 
 # Go workspace file
 go.work
@@ -31,16 +31,23 @@ go.work.sum
 
 # Node.js
 node_modules/
+/package-lock.json
 
 # Build output
 /web/static/
 /internal/web/static/
+/web/ui/dist/
 
 # Built binaries
 blt-volume-manager
 blt-volume-manager-web
 blt-volume-manager-plugin
 .node-bin
+
+# Nix build result symlinks
+result
+result-*
+flake.nix.tmp
 
 # Editor/IDE
 .idea/
