@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { toast as sonnerToast } from 'svelte-sonner';
-import ToastCopyButton from './ToastCopyButton.svelte';
+import ToastCopyButton from '../components/ToastCopyButton.svelte';
 
 export const toastCopyMsg = writable('');
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { toast } from 'svelte-sonner';
-  import { toastCopyMsg } from './toast';
+  import { toastCopyMsg } from '../stores/toast';
 
   let showCopied = $state(false);
 
