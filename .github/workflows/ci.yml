@@ -124,12 +124,31 @@ jobs:
 
   nix-flake:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
 
       - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update and push dependency hashes
+        run: |
+          make nix-vendor-hash nix-npm-hash
+          if [ -z "$(git diff --stat flake.nix)" ]; then
+            echo "Hashes are current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flake.nix
+          git commit -m "chore: update nix dependency hashes"
+          git push
 
       - name: Validate flake and build packages
         run: nix flake check --log-format raw
