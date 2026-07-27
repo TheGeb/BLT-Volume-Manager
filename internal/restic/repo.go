@@ -4,10 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
+
+type HostSnapshots struct {
+	Host      string     `json:"host"`
+	Snapshots []Snapshot `json:"snapshots"`
+}
 
 type RepoStats struct {
 	TotalSize             int64 `json:"total_size"`
@@ -105,4 +111,45 @@ func (m *Manager) Unlock(ctx context.Context) error {
 	unlockCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return m.runner.Unlock(unlockCtx)
+}
+
+func (m *Manager) DeleteRepo(ctx context.Context) error {
+	if m.backend == nil {
+		return fmt.Errorf("no backend configured for repo cleanup")
+	}
+	return m.backend.DeleteRepo(ctx, m.repo)
+}
+
+func (m *Manager) SnapshotHosts(ctx context.Context, latest int) ([]string, error) {
+	hostCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
+	defer cancel()
+
+	out, err := m.runner.HostSnapshots(hostCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw []json.RawMessage
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, err
+	}
+
+	hostSet := make(map[string]bool)
+	for _, item := range raw {
+		var group struct {
+			GroupKey struct {
+				Hostname string `json:"hostname"`
+			} `json:"group_key"`
+		}
+		if json.Unmarshal(item, &group) == nil && group.GroupKey.Hostname != "" {
+			hostSet[group.GroupKey.Hostname] = true
+		}
+	}
+
+	hosts := make([]string, 0, len(hostSet))
+	for h := range hostSet {
+		hosts = append(hosts, h)
+	}
+	sort.Strings(hosts)
+	return hosts, nil
 }

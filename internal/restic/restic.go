@@ -3,13 +3,21 @@ package restic
 import (
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
 
+type Backend = backend.Backend
+
+var NewS3Backend = backend.NewS3Backend
+
+type Option func(*Manager)
+
 // Manager provides operations against a single restic repository.
 type Manager struct {
-	repo   string
-	runner *cli.Runner
+	repo    string
+	runner  *cli.Runner
+	backend Backend
 }
 
 // Snapshot is a restic snapshot as returned by the JSON API.
@@ -37,8 +45,16 @@ const (
 )
 
 // NewManager creates a Manager for the given repo path.
-func NewManager(repo string) *Manager {
-	return &Manager{repo: repo, runner: &cli.Runner{Repo: repo}}
+func NewManager(repo string, opts ...Option) *Manager {
+	m := &Manager{repo: repo, runner: &cli.Runner{Repo: repo}}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+func WithBackend(b Backend) Option {
+	return func(m *Manager) { m.backend = b }
 }
 
 // WithTags prepends base to extra and returns the combined tag slice.

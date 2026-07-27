@@ -44,10 +44,6 @@ func (r *Runner) Forget(ctx context.Context, ids ...string) error {
 	return r.run(ctx, append([]string{"forget"}, ids...)...)
 }
 
-func (r *Runner) ForgetAll(ctx context.Context) error {
-	return r.run(ctx, "forget", "--keep-last", "0", "--prune")
-}
-
 func (r *Runner) TagAdd(ctx context.Context, snapshotID, tag string) error {
 	return r.run(ctx, "tag", "--add", tag, snapshotID)
 }

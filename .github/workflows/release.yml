@@ -28,6 +28,11 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION="v$(cat VERSION)"
           fi
+          # Validate version format to prevent injection
+          if ! echo "$VERSION" | grep -qP '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'; then
+            echo "Invalid version format: $VERSION" >&2
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if tag exists

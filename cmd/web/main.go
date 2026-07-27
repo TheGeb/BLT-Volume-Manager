@@ -11,6 +11,8 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
@@ -55,7 +57,20 @@ func run() int {
 	}
 
 	mux := http.NewServeMux()
-	webSrv := server.New(conf, b)
+
+	// Restic data always lives in S3 regardless of the metadata backend.
+	s3Client, err := s3.NewClient(s3.Config{
+		Bucket:         conf.S3Bucket,
+		Endpoint:       conf.S3Endpoint,
+		Region:         conf.S3Region,
+		ForcePathStyle: conf.S3ForcePathStyle,
+	})
+	if err != nil {
+		log.Error("restic_s3_backend_error", err)
+		return 1
+	}
+
+	webSrv := server.New(conf, b, server.WithResticBackend(restic.NewS3Backend(s3Client)))
 	if err := web.Register(webSrv, mux); err != nil {
 		log.Errorf("register_web_routes_failed", err, "http_addr=%s", httpAddr)
 		return 1

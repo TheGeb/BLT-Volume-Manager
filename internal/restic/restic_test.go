@@ -6,30 +6,6 @@ import (
 	"time"
 )
 
-func TestHasTag(t *testing.T) {
-	t.Parallel()
-	tags := []string{BackupTagHot, BackupTagCold, "restore-point"}
-
-	if !hasTag(tags, BackupTagHot) {
-		t.Error("expected 'hot' found")
-	}
-	if !hasTag(tags, "restore-point") {
-		t.Error("expected 'restore-point' found")
-	}
-	if hasTag(tags, "nonexistent") {
-		t.Error("expected 'nonexistent' not found")
-	}
-	if hasTag(nil, "hot") {
-		t.Error("expected false for nil tags")
-	}
-	if hasTag([]string{}, "hot") {
-		t.Error("expected false for empty tags")
-	}
-	if hasTag([]string{BackupTagHot, BackupTagCold}, "") {
-		t.Error("expected false for empty target")
-	}
-}
-
 func TestCommonPathPrefix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -139,10 +115,18 @@ func TestSnapshotSortLogic(t *testing.T) {
 		{ShortID: "s3", Time: now, Tags: []string{BackupTagHot}, Paths: []string{"/volumes/my-vol/data"}},
 	}
 
-	if !hasTag(snaps[0].Tags, "restore-point") {
+	tagFound := func(tags []string, target string) bool {
+		for _, t := range tags {
+			if t == target {
+				return true
+			}
+		}
+		return false
+	}
+	if !tagFound(snaps[0].Tags, "restore-point") {
 		t.Error("expected s1 to have restore-point tag")
 	}
-	if hasTag(snaps[2].Tags, "restore-point") {
+	if tagFound(snaps[2].Tags, "restore-point") {
 		t.Error("expected s3 to not have restore-point tag")
 	}
 	if !snaps[2].Time.After(snaps[1].Time) {

@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 )
 
 type MockBackend struct {
-	Objects    []backend.Entry
+	Objects    []s3.Object
 	ObjectsErr error
-	ListFunc   func(ctx context.Context, prefix string) ([]backend.Entry, error)
+	ListFunc   func(ctx context.Context, prefix string) ([]s3.Object, error)
 }
 
 func (m *MockBackend) PutObject(context.Context, string, []byte) error {
@@ -20,14 +20,14 @@ func (m *MockBackend) PutObject(context.Context, string, []byte) error {
 }
 
 func (m *MockBackend) ReadObject(context.Context, string) ([]byte, error) {
-	return nil, backend.ErrKeyNotFound
+	return nil, store.ErrKeyNotFound
 }
 
 func (m *MockBackend) DeleteObject(context.Context, string) error {
 	return nil
 }
 
-func (m *MockBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
+func (m *MockBackend) ListObjects(ctx context.Context, prefix string) ([]s3.Object, error) {
 	if m.ListFunc != nil {
 		return m.ListFunc(ctx, prefix)
 	}
@@ -43,7 +43,7 @@ func sPtr(s string) *string { return &s }
 func TestListRegisteredVolumes(t *testing.T) {
 	t.Parallel()
 	st := store.NewRegisteredVolumeStore(&MockBackend{
-		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
+		ListFunc: func(ctx context.Context, prefix string) ([]s3.Object, error) {
 			return nil, nil
 		},
 	})
@@ -59,8 +59,8 @@ func TestListRegisteredVolumes(t *testing.T) {
 func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 	t.Parallel()
 	st := store.NewRegisteredVolumeStore(&MockBackend{
-		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
-			return []backend.Entry{
+		ListFunc: func(ctx context.Context, prefix string) ([]s3.Object, error) {
+			return []s3.Object{
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-a.json")},
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-b.json")},
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "deep/nested-vol.json")},
@@ -85,8 +85,8 @@ func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 	t.Parallel()
 	st := store.NewRegisteredVolumeStore(&MockBackend{
-		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
-			return []backend.Entry{
+		ListFunc: func(ctx context.Context, prefix string) ([]s3.Object, error) {
+			return []s3.Object{
 				{Key: nil},
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "valid.json")},
 			}, nil
@@ -104,8 +104,8 @@ func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
 	t.Parallel()
 	st := store.NewRegisteredVolumeStore(&MockBackend{
-		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
-			return []backend.Entry{
+		ListFunc: func(ctx context.Context, prefix string) ([]s3.Object, error) {
+			return []s3.Object{
 				{Key: sPtr(store.RegisteredVolumeKeyspace + ".json")},
 			}, nil
 		},

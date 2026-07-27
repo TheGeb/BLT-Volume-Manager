@@ -31,7 +31,7 @@ func TestNoWebDriverDependency(t *testing.T) {
 
 func TestBackendOnlyInMetadata(t *testing.T) {
 	t.Parallel()
-	backendPath := "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	backendPath := "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/etcd"
 	allowedPrefixes := []string{
 		"github.com/TheGeb/BLT-Volume-Manager/internal/metadata",
 		"github.com/TheGeb/BLT-Volume-Manager/internal/cfg",

@@ -1,10 +1,12 @@
-package backend
+package etcd
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -60,7 +62,7 @@ func (c *EtcdClient) ReadObject(ctx context.Context, key string) ([]byte, error)
 		return nil, err
 	}
 	if len(resp.Kvs) == 0 {
-		return nil, ErrKeyNotFound
+		return nil, store.ErrKeyNotFound
 	}
 	return resp.Kvs[0].Value, nil
 }
@@ -73,7 +75,7 @@ func (c *EtcdClient) DeleteObject(ctx context.Context, key string) error {
 	return err
 }
 
-func (c *EtcdClient) ListObjects(ctx context.Context, prefix string) ([]Entry, error) {
+func (c *EtcdClient) ListObjects(ctx context.Context, prefix string) ([]s3.Object, error) {
 	listCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
@@ -82,10 +84,10 @@ func (c *EtcdClient) ListObjects(ctx context.Context, prefix string) ([]Entry, e
 		return nil, err
 	}
 
-	entries := make([]Entry, 0, len(resp.Kvs))
+	entries := make([]s3.Object, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		key := string(kv.Key)
-		entries = append(entries, Entry{Key: &key, ModificationCounter: &kv.ModRevision})
+		entries = append(entries, s3.Object{Key: &key, ModificationCounter: &kv.ModRevision})
 	}
 	return entries, nil
 }

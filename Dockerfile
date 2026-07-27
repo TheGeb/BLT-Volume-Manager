@@ -29,6 +29,7 @@ RUN npm run build
 WORKDIR /src
 RUN --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p internal/web/static && \
+    cp -r web/ui/dist/* internal/web/static/ && \
     CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -ldflags "-s -w \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$VERSION \

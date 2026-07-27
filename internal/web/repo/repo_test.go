@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
@@ -16,10 +17,10 @@ type noopBackend struct{}
 
 func (noopBackend) PutObject(context.Context, string, []byte) error { return nil }
 func (noopBackend) ReadObject(context.Context, string) ([]byte, error) {
-	return nil, backend.ErrKeyNotFound
+	return nil, store.ErrKeyNotFound
 }
 func (noopBackend) DeleteObject(context.Context, string) error { return nil }
-func (noopBackend) ListObjects(context.Context, string) ([]backend.Entry, error) {
+func (noopBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return nil, nil
 }
 func (noopBackend) DeleteObjectsWithPrefix(context.Context, string) error { return nil }

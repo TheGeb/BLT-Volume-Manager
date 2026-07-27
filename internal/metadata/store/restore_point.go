@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
 const RestorePointKeyspace = "blt-volume-manager/restore-points/"
@@ -42,7 +40,7 @@ func (s *RestorePointStore) FindByName(ctx context.Context, volName string) (str
 	}
 	data, err := s.b.ReadObject(ctx, RestorePointKeyspace+volName+".json")
 	if err != nil {
-		if errors.Is(err, backend.ErrKeyNotFound) {
+		if errors.Is(err, ErrKeyNotFound) {
 			return "", nil
 		}
 		return "", fmt.Errorf("read restore point: %w", err)

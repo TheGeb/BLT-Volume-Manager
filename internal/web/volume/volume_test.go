@@ -8,38 +8,38 @@ import (
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
 type mockBackend struct {
-	objects    []backend.Entry
+	objects    []s3.Object
 	objectsErr error
 }
 
 func (m *mockBackend) PutObject(context.Context, string, []byte) error { return nil }
 func (m *mockBackend) ReadObject(context.Context, string) ([]byte, error) {
-	return nil, backend.ErrKeyNotFound
+	return nil, store.ErrKeyNotFound
 }
 func (m *mockBackend) DeleteObject(context.Context, string) error { return nil }
-func (m *mockBackend) ListObjects(context.Context, string) ([]backend.Entry, error) {
+func (m *mockBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return m.objects, m.objectsErr
 }
 func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error { return nil }
 
-func mockStores(objects []backend.Entry, objectsErr error) func(*server.BLTService) {
+func mockStores(objects []s3.Object, objectsErr error) func(*server.BLTService) {
 	return func(s *server.BLTService) {
 		b := &mockBackend{objects: objects, objectsErr: objectsErr}
 		s.SetStores(nil, store.NewRegisteredVolumeStore(b), nil, nil)
 	}
 }
 
-func volumeObjects(names ...string) []backend.Entry {
-	var objs []backend.Entry
+func volumeObjects(names ...string) []s3.Object {
+	var objs []s3.Object
 	for _, n := range names {
 		key := store.RegisteredVolumeKeyspace + n + ".json"
-		objs = append(objs, backend.Entry{Key: &key})
+		objs = append(objs, s3.Object{Key: &key})
 	}
 	return objs
 }
@@ -153,5 +153,3 @@ func TestValidVolumeName(t *testing.T) {
 		})
 	}
 }
-
-

@@ -4,10 +4,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
-var ErrKeyNotFound = backend.ErrKeyNotFound
+var ErrKeyNotFound = store.ErrKeyNotFound
 
 const (
 	BackendS3   = "s3"

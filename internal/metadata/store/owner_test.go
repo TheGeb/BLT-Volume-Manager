@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 )
 
 // orderedBackend tracks insertion order for deterministic ListObjects.
@@ -46,7 +46,7 @@ func (b *orderedBackend) ReadObject(ctx context.Context, key string) ([]byte, er
 			return e.data, nil
 		}
 	}
-	return nil, backend.ErrKeyNotFound
+	return nil, ErrKeyNotFound
 }
 
 func (b *orderedBackend) DeleteObject(ctx context.Context, key string) error {
@@ -61,15 +61,15 @@ func (b *orderedBackend) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }
 
-func (b *orderedBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
+func (b *orderedBackend) ListObjects(ctx context.Context, prefix string) ([]s3.Object, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var result []backend.Entry
+	var result []s3.Object
 	for _, e := range b.entries {
 		if strings.HasPrefix(e.key, prefix) {
 			key := e.key
 			counter := e.clock
-			result = append(result, backend.Entry{
+			result = append(result, s3.Object{
 				Key:                 &key,
 				ModificationCounter: &counter,
 			})
@@ -568,11 +568,11 @@ func TestDetermineOwner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var objs []backend.Entry
+			var objs []s3.Object
 			for _, e := range tt.entries {
 				keyCopy := e.key
 				counter := e.clock
-				entry := backend.Entry{}
+				entry := s3.Object{}
 				if e.key != "" {
 					entry.Key = &keyCopy
 				}
@@ -618,14 +618,14 @@ func TestRemoveStaleObjects(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		entries   []backend.Entry
+		entries   []s3.Object
 		ttl       time.Duration
 		wantCount int
 		wantKept  []string
 	}{
 		{
 			name: "all valid none removed",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(validKey), ModificationCounter: int64Ptr(now.UnixNano())},
 			},
 			ttl:       24 * time.Hour,
@@ -634,7 +634,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "expired fresh kept",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(expiredFreshKey), ModificationCounter: int64Ptr(now.Add(-30 * time.Minute).UnixNano())},
 			},
 			ttl:       24 * time.Hour,
@@ -643,7 +643,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "expired stale removed",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(expiredStaleKey), ModificationCounter: int64Ptr(now.Add(-48 * time.Hour).UnixNano())},
 			},
 			ttl:       24 * time.Hour,
@@ -652,7 +652,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "permanent never removed",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(permKey), ModificationCounter: int64Ptr(now.Add(-48 * time.Hour).UnixNano())},
 			},
 			ttl:       1 * time.Hour,
@@ -661,7 +661,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "nil key skipped",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: nil, ModificationCounter: int64Ptr(now.UnixNano())},
 				{Key: stringPtr(validKey), ModificationCounter: int64Ptr(now.UnixNano())},
 			},
@@ -671,7 +671,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "mixed: valid, stale removed, fresh expired kept, perm kept",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(validKey), ModificationCounter: int64Ptr(now.UnixNano())},
 				{Key: stringPtr(expiredStaleKey), ModificationCounter: int64Ptr(now.Add(-48 * time.Hour).UnixNano())},
 				{Key: stringPtr(expiredFreshKey), ModificationCounter: int64Ptr(now.Add(-30 * time.Minute).UnixNano())},
@@ -683,7 +683,7 @@ func TestRemoveStaleObjects(t *testing.T) {
 		},
 		{
 			name: "nil modification counter on expired non-permanent kept",
-			entries: []backend.Entry{
+			entries: []s3.Object{
 				{Key: stringPtr(expiredFreshKey), ModificationCounter: nil},
 			},
 			ttl:       1 * time.Hour,
@@ -1005,7 +1005,7 @@ func TestReleaseLock(t *testing.T) {
 	if err := s.ReleaseLock(context.Background(), key); err != nil {
 		t.Fatalf("ReleaseLock error: %v", err)
 	}
-	if _, err := b.ReadObject(context.Background(), key); err != backend.ErrKeyNotFound {
+	if _, err := b.ReadObject(context.Background(), key); err != ErrKeyNotFound {
 		t.Error("expected key to be deleted after release")
 	}
 }
@@ -1106,7 +1106,7 @@ func TestFindForVolume(t *testing.T) {
 
 type listErrorBackend struct{ orderedBackend }
 
-func (l *listErrorBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
+func (l *listErrorBackend) ListObjects(ctx context.Context, prefix string) ([]s3.Object, error) {
 	return nil, fmt.Errorf("list error")
 }
 

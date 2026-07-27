@@ -2,10 +2,16 @@ package restic
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
+	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
 
@@ -21,6 +27,10 @@ func (m *Manager) ListSnapshotsWithOpts(ctx context.Context, opts *ListSnapshots
 
 	out, err := m.runner.Snapshots(listCtx, opts)
 	if err != nil {
+		exists, repoErr := m.RepoExists(ctx)
+		if repoErr == nil && !exists {
+			return []Snapshot{}, nil
+		}
 		return nil, err
 	}
 
@@ -56,19 +66,35 @@ func (m *Manager) UntagSnapshot(ctx context.Context, snapshotID, tag string) err
 	return m.runner.TagRemove(ctx, snapshotID, tag)
 }
 
-func (m *Manager) PurgeSnapshots(ctx context.Context) error {
-	exists, err := m.RepoExists(ctx)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return nil
-	}
-	return m.runner.ForgetAll(ctx)
-}
-
 func (m *Manager) RestoreSnapshot(ctx context.Context, snapshotID, target string) error {
 	restoreCtx, cancel := context.WithTimeout(ctx, TimeoutMedium)
 	defer cancel()
 	return m.runner.Restore(restoreCtx, snapshotID, target)
+}
+
+func (m *Manager) GenerateHash(s Snapshot) string {
+	paths := make([]string, len(s.Paths))
+	copy(paths, s.Paths)
+	sort.Strings(paths)
+
+	data := s.Hostname + s.Time.Format(time.RFC3339Nano) + s.Tree + strings.Join(paths, ",")
+	h := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(h[:])
+}
+
+func (m *Manager) FindSnapshotByHash(ctx context.Context, hash string) (*Snapshot, error) {
+	snapshots, err := m.ListSnapshots(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range snapshots {
+		fullHash := m.GenerateHash(s)
+		shortHash := fullHash[:len(s.ShortID)]
+		log.Debugf("comparing_hash", "hash=%s snapshot=%s", hash, s.ID)
+		if shortHash == hash {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("snapshot not found for hash %s", hash)
 }

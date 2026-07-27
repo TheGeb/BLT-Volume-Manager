@@ -24,6 +24,8 @@ type BLTService struct {
 	versions *store.VersionStore
 	restores *store.RestorePointStore
 
+	resticBackend restic.Backend
+
 	statsMu      sync.RWMutex
 	statsCache   *StatsCache
 	statsCacheAt time.Time
@@ -34,14 +36,24 @@ func (s *BLTService) Shutdown() {
 	s.wg.Wait()
 }
 
-func New(cfg cfg.Config, b store.Backend) *BLTService {
-	return &BLTService{
+func New(cfg cfg.Config, b store.Backend, opts ...ServiceOption) *BLTService {
+	s := &BLTService{
 		Config:   cfg,
 		owners:   store.NewOwnerStore(b),
 		volumes:  store.NewRegisteredVolumeStore(b),
 		versions: store.NewVersionStore(b),
 		restores: store.NewRestorePointStore(b),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+type ServiceOption func(*BLTService)
+
+func WithResticBackend(rb restic.Backend) ServiceOption {
+	return func(s *BLTService) { s.resticBackend = rb }
 }
 
 func (s *BLTService) SetStores(owners *store.OwnerStore, volumes *store.RegisteredVolumeStore, versions *store.VersionStore, restores *store.RestorePointStore) {
@@ -58,7 +70,11 @@ func (s *BLTService) RestoreStore() *store.RestorePointStore { return s.restores
 func (s *BLTService) VolumeStore() *store.RegisteredVolumeStore { return s.volumes }
 
 func (s *BLTService) ResticManager(volName string) *restic.Manager {
-	return restic.NewManager(s.Config.ResticBase + "/restic/" + volName)
+	opts := []restic.Option{}
+	if s.resticBackend != nil {
+		opts = append(opts, restic.WithBackend(s.resticBackend))
+	}
+	return restic.NewManager(s.Config.ResticBase+"/restic/"+volName, opts...)
 }
 
 func (s *BLTService) NextVersionTags(ctx context.Context, volName string, major bool) []string {
@@ -87,7 +103,7 @@ func (s *BLTService) DeleteVolumeData(ctx context.Context, volumeName string) er
 	if err := s.restores.Delete(ctx, volumeName); err != nil {
 		return err
 	}
-	return s.ResticManager(volumeName).PurgeSnapshots(ctx)
+	return s.ResticManager(volumeName).DeleteRepo(ctx)
 }
 
 func (s *BLTService) RegisterVolume(ctx context.Context, volumeName string) error {

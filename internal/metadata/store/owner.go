@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 )
 
 const OwnerKeyspace = "blt-volume-manager/owners/"
@@ -85,7 +85,7 @@ func (s *OwnerStore) ListAllGrouped(ctx context.Context) (map[string]VolumeOwner
 
 	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
 
-	grouped := make(map[string][]backend.Entry)
+	grouped := make(map[string][]s3.Object)
 	for _, obj := range objects {
 		if obj.Key == nil {
 			continue
@@ -272,7 +272,7 @@ func ParseOwnerKey(key string) (volume, owner string, creation int64, expiry int
 	return volume, owner, creation, expiry, nil
 }
 
-func determineOwner(objects []backend.Entry) (firstKey string, firstOwner string, firstCreation int64, firstExpiry int64) {
+func determineOwner(objects []s3.Object) (firstKey string, firstOwner string, firstCreation int64, firstExpiry int64) {
 	sort.Slice(objects, func(i, j int) bool {
 		ti, tj := objects[i].ModificationCounter, objects[j].ModificationCounter
 		if ti != nil && tj != nil && *ti != *tj {
@@ -324,9 +324,9 @@ func determineOwner(objects []backend.Entry) (firstKey string, firstOwner string
 	return "", "", 0, 0
 }
 
-func RemoveStaleObjects(ctx context.Context, store Backend, objects []backend.Entry, ttl time.Duration) []backend.Entry {
+func RemoveStaleObjects(ctx context.Context, store Backend, objects []s3.Object, ttl time.Duration) []s3.Object {
 	now := time.Now()
-	kept := make([]backend.Entry, 0, len(objects))
+	kept := make([]s3.Object, 0, len(objects))
 	for _, obj := range objects {
 		if obj.Key == nil {
 			continue

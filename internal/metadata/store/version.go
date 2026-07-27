@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
 const VersionKeyspace = "blt-volume-manager/versions/"
@@ -27,7 +25,7 @@ type VersionCounter struct {
 func (s *VersionStore) NextTags(ctx context.Context, name string, major bool) ([]string, error) {
 	v, err := s.ReadCounter(ctx, name)
 	if err != nil {
-		if !errors.Is(err, backend.ErrKeyNotFound) {
+		if !errors.Is(err, ErrKeyNotFound) {
 			return nil, err
 		}
 		v = &VersionCounter{}
@@ -58,8 +56,8 @@ func (s *VersionStore) WriteCounter(ctx context.Context, vol string, v VersionCo
 func (s *VersionStore) ReadCounter(ctx context.Context, vol string) (*VersionCounter, error) {
 	data, err := s.b.ReadObject(ctx, VersionKeyspace+vol+".json")
 	if err != nil {
-		if errors.Is(err, backend.ErrKeyNotFound) {
-			return nil, backend.ErrKeyNotFound
+		if errors.Is(err, ErrKeyNotFound) {
+			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}

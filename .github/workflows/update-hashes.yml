@@ -1,12 +1,6 @@
 name: Update Nix hashes
 
 on:
-  pull_request:
-    paths:
-      - 'go.mod'
-      - 'go.sum'
-      - 'web/ui/package.json'
-      - 'web/ui/package-lock.json'
   push:
     branches: [main]
     paths:
