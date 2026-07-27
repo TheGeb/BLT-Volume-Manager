@@ -63,6 +63,7 @@ jobs:
           npm ci
           npm run build
           mkdir -p ../../internal/web/static
+          cp -r dist/* ../../internal/web/static/
         working-directory: web/ui
 
       - name: Login to GitHub Container Registry
