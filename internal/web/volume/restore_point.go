@@ -12,7 +12,7 @@ type setRestorePointRequest struct {
 	SnapshotID string `json:"snapshot_id"`
 }
 
-func RestorePointRouter(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func RestorePointRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	switch r.Method {
 	case http.MethodPut:
 		setRestorePoint(s, w, r, volumeName)
@@ -23,7 +23,7 @@ func RestorePointRouter(s *server.Service, w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func setRestorePoint(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func setRestorePoint(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	var req setRestorePointRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		server.RespondError(w, fmt.Errorf("invalid JSON: %w", err), http.StatusBadRequest)
@@ -33,15 +33,16 @@ func setRestorePoint(s *server.Service, w http.ResponseWriter, r *http.Request, 
 		server.RespondError(w, fmt.Errorf("snapshot_id is required"), http.StatusBadRequest)
 		return
 	}
-	if err := s.SetRestorePoint(volumeName, req.SnapshotID); err != nil {
+
+	if err := s.RestoreStore().Set(r.Context(), volumeName, req.SnapshotID); err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
 	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Restore point set to %q for volume %q", req.SnapshotID, volumeName)})
 }
 
-func deleteRestorePoint(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
-	if err := s.DeleteRestorePoint(volumeName); err != nil {
+func deleteRestorePoint(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
+	if err := s.RestoreStore().Delete(r.Context(), volumeName); err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}

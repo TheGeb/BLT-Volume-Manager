@@ -1,16 +1,32 @@
 package repo
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
+type noopBackend struct{}
+
+func (noopBackend) PutObject(context.Context, string, []byte) error { return nil }
+func (noopBackend) ReadObject(context.Context, string) ([]byte, error) {
+	return nil, backend.ErrKeyNotFound
+}
+func (noopBackend) DeleteObject(context.Context, string) error { return nil }
+func (noopBackend) ListObjects(context.Context, string) ([]backend.Entry, error) {
+	return nil, nil
+}
+func (noopBackend) DeleteObjectsWithPrefix(context.Context, string) error { return nil }
+
 func TestInitRepo_MissingVolume(t *testing.T) {
-	s := &server.Service{}
+	t.Parallel()
+	s := &server.BLTService{}
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/init", nil)
 	rec := httptest.NewRecorder()
 	InitRepo(s, rec, req)
@@ -21,9 +37,10 @@ func TestInitRepo_MissingVolume(t *testing.T) {
 }
 
 func TestInitRepo_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/init?volume=test", nil)
 	rec := httptest.NewRecorder()
-	InitRepo(&server.Service{}, rec, req)
+	InitRepo(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -31,9 +48,10 @@ func TestInitRepo_WrongMethod(t *testing.T) {
 }
 
 func TestRepoStatus_MissingVolume(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/status", nil)
 	rec := httptest.NewRecorder()
-	RepoStatus(&server.Service{}, rec, req)
+	RepoStatus(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -41,9 +59,10 @@ func TestRepoStatus_MissingVolume(t *testing.T) {
 }
 
 func TestRepoStatus_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/status?volume=test", nil)
 	rec := httptest.NewRecorder()
-	RepoStatus(&server.Service{}, rec, req)
+	RepoStatus(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -51,9 +70,10 @@ func TestRepoStatus_WrongMethod(t *testing.T) {
 }
 
 func TestStats_MissingVolume(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
 	rec := httptest.NewRecorder()
-	Stats(&server.Service{}, rec, req)
+	Stats(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -61,9 +81,10 @@ func TestStats_MissingVolume(t *testing.T) {
 }
 
 func TestStats_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodPost, "/api/stats?volume=test", nil)
 	rec := httptest.NewRecorder()
-	Stats(&server.Service{}, rec, req)
+	Stats(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -71,9 +92,12 @@ func TestStats_WrongMethod(t *testing.T) {
 }
 
 func TestRefreshStats(t *testing.T) {
+	t.Parallel()
+	var b noopBackend
+	s := server.New(cfg.Config{}, b)
 	req := httptest.NewRequest(http.MethodPost, "/api/stats/refresh", nil)
 	rec := httptest.NewRecorder()
-	RefreshStats(&server.Service{}, rec, req)
+	RefreshStats(s, rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -89,9 +113,10 @@ func TestRefreshStats(t *testing.T) {
 }
 
 func TestRefreshStats_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/stats/refresh", nil)
 	rec := httptest.NewRecorder()
-	RefreshStats(&server.Service{}, rec, req)
+	RefreshStats(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -99,9 +124,10 @@ func TestRefreshStats_WrongMethod(t *testing.T) {
 }
 
 func TestCheckRepo_MissingVolume(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/check", nil)
 	rec := httptest.NewRecorder()
-	CheckRepo(&server.Service{}, rec, req)
+	CheckRepo(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -109,9 +135,10 @@ func TestCheckRepo_MissingVolume(t *testing.T) {
 }
 
 func TestCheckRepo_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/check?volume=test", nil)
 	rec := httptest.NewRecorder()
-	CheckRepo(&server.Service{}, rec, req)
+	CheckRepo(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)
@@ -119,9 +146,10 @@ func TestCheckRepo_WrongMethod(t *testing.T) {
 }
 
 func TestRepairRepo_MissingVolume(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodPost, "/api/repo/repair", nil)
 	rec := httptest.NewRecorder()
-	RepairRepo(&server.Service{}, rec, req)
+	RepairRepo(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -129,9 +157,10 @@ func TestRepairRepo_MissingVolume(t *testing.T) {
 }
 
 func TestRepairRepo_WrongMethod(t *testing.T) {
+	t.Parallel()
 	req := httptest.NewRequest(http.MethodGet, "/api/repo/repair?volume=test", nil)
 	rec := httptest.NewRecorder()
-	RepairRepo(&server.Service{}, rec, req)
+	RepairRepo(&server.BLTService{}, rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected 405, got %d", rec.Code)

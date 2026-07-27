@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func registerVersionRoute(s *server.Service, inner *http.ServeMux) {
+func registerVersionRoute(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		metaBackend := s.Config.MetadataBackend
 		if metaBackend == "" {

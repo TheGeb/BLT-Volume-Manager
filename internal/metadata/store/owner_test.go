@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -29,7 +30,7 @@ func newOrderedBackend() *orderedBackend {
 	return &orderedBackend{}
 }
 
-func (b *orderedBackend) PutObject(key string, data []byte) error {
+func (b *orderedBackend) PutObject(ctx context.Context, key string, data []byte) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.clock++
@@ -37,7 +38,7 @@ func (b *orderedBackend) PutObject(key string, data []byte) error {
 	return nil
 }
 
-func (b *orderedBackend) ReadObject(key string) ([]byte, error) {
+func (b *orderedBackend) ReadObject(ctx context.Context, key string) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, e := range b.entries {
@@ -48,7 +49,7 @@ func (b *orderedBackend) ReadObject(key string) ([]byte, error) {
 	return nil, backend.ErrKeyNotFound
 }
 
-func (b *orderedBackend) DeleteObject(key string) error {
+func (b *orderedBackend) DeleteObject(ctx context.Context, key string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for i, e := range b.entries {
@@ -60,7 +61,7 @@ func (b *orderedBackend) DeleteObject(key string) error {
 	return nil
 }
 
-func (b *orderedBackend) ListObjects(prefix string) ([]backend.Entry, error) {
+func (b *orderedBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var result []backend.Entry
@@ -77,7 +78,7 @@ func (b *orderedBackend) ListObjects(prefix string) ([]backend.Entry, error) {
 	return result, nil
 }
 
-func (b *orderedBackend) DeleteObjectsWithPrefix(prefix string) error {
+func (b *orderedBackend) DeleteObjectsWithPrefix(ctx context.Context, prefix string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var kept []orderedEntry
@@ -97,6 +98,7 @@ func stringPtr(s string) *string { return &s }
 func int64Ptr(n int64) *int64 { return &n }
 
 func TestEncodeDecodeOwner(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -166,6 +168,7 @@ func TestEncodeDecodeOwner(t *testing.T) {
 }
 
 func TestParseDuration(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -208,6 +211,7 @@ func TestParseDuration(t *testing.T) {
 }
 
 func TestFormatDuration(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		input time.Duration
@@ -236,6 +240,7 @@ func TestFormatDuration(t *testing.T) {
 }
 
 func TestFormatDurationRoundTrip(t *testing.T) {
+	t.Parallel()
 	durations := []time.Duration{
 		1 * time.Second,
 		30 * time.Second,
@@ -262,6 +267,7 @@ func TestFormatDurationRoundTrip(t *testing.T) {
 }
 
 func TestOwnerPrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		volume string
 		want   string
@@ -281,6 +287,7 @@ func TestOwnerPrefix(t *testing.T) {
 }
 
 func TestRemainingSeconds(t *testing.T) {
+	t.Parallel()
 	now := time.Now().Unix()
 	tests := []struct {
 		name     string
@@ -317,6 +324,7 @@ func TestRemainingSeconds(t *testing.T) {
 // --- ParseOwnerKey ---
 
 func TestParseOwnerKey(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		key          string
@@ -447,6 +455,7 @@ func TestParseOwnerKey(t *testing.T) {
 // --- determineOwner ---
 
 func TestDetermineOwner(t *testing.T) {
+	t.Parallel()
 	now := time.Now().Unix()
 	future := now + 3600
 	past := now - 3600
@@ -597,6 +606,7 @@ func TestDetermineOwner(t *testing.T) {
 // --- RemoveStaleObjects ---
 
 func TestRemoveStaleObjects(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	futureUnix := now.Add(time.Hour).Unix()
 	pastUnix := now.Add(-2 * time.Hour).Unix()
@@ -688,11 +698,11 @@ func TestRemoveStaleObjects(t *testing.T) {
 			// Pre-populate so deletions can be verified
 			for _, e := range tt.entries {
 				if e.Key != nil {
-					_ = b.PutObject(*e.Key, []byte(`{}`))
+					_ = b.PutObject(context.Background(), *e.Key, []byte(`{}`))
 				}
 			}
 
-			got := RemoveStaleObjects(b, tt.entries, tt.ttl)
+			got := RemoveStaleObjects(context.Background(), b, tt.entries, tt.ttl)
 			if len(got) != tt.wantCount {
 				t.Errorf("RemoveStaleObjects returned %d entries, want %d", len(got), tt.wantCount)
 			}
@@ -720,11 +730,12 @@ func TestRemoveStaleObjects(t *testing.T) {
 // --- AcquireOwnerLock ---
 
 func TestAcquireOwnerLock_Success(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 	expiry := time.Now().Add(time.Hour).Unix()
 
-	key, err := AcquireOwnerLock(b, folder, "myhost", expiry)
+	key, err := AcquireOwnerLock(context.Background(), b, folder, "myhost", expiry)
 	if err != nil {
 		t.Fatalf("AcquireOwnerLock() unexpected error: %v", err)
 	}
@@ -736,7 +747,7 @@ func TestAcquireOwnerLock_Success(t *testing.T) {
 	}
 
 	// Verify the object was stored
-	data, err := b.ReadObject(key)
+	data, err := b.ReadObject(context.Background(), key)
 	if err != nil {
 		t.Fatalf("ReadObject(%q) error: %v", key, err)
 	}
@@ -768,10 +779,11 @@ func TestAcquireOwnerLock_Success(t *testing.T) {
 }
 
 func TestAcquireOwnerLock_Permanent(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 
-	key, err := AcquireOwnerLock(b, folder, "myhost", 0)
+	key, err := AcquireOwnerLock(context.Background(), b, folder, "myhost", 0)
 	if err != nil {
 		t.Fatalf("AcquireOwnerLock() permanent error: %v", err)
 	}
@@ -789,39 +801,42 @@ func TestAcquireOwnerLock_Permanent(t *testing.T) {
 }
 
 func TestAcquireOwnerLock_PastExpiry(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 
-	_, err := AcquireOwnerLock(b, folder, "myhost", 1) // expiry in the past (Unix epoch 1)
+	_, err := AcquireOwnerLock(context.Background(), b, folder, "myhost", 1) // expiry in the past (Unix epoch 1)
 	if err == nil {
 		t.Fatal("expected error for past expiry, got nil")
 	}
 }
 
 func TestAcquireOwnerLock_CompetingLock(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 	expiry := time.Now().Add(time.Hour).Unix()
 
 	// First lock wins
-	_, err := AcquireOwnerLock(b, folder, "first", expiry)
+	_, err := AcquireOwnerLock(context.Background(), b, folder, "first", expiry)
 	if err != nil {
 		t.Fatalf("first AcquireOwnerLock() error: %v", err)
 	}
 
 	// Second attempt should fail
-	_, err = AcquireOwnerLock(b, folder, "second", expiry)
+	_, err = AcquireOwnerLock(context.Background(), b, folder, "second", expiry)
 	if err == nil {
 		t.Fatal("expected error for competing lock, got nil")
 	}
 }
 
 func TestAcquireOwnerLock_OwnerWithDash(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 	expiry := time.Now().Add(time.Hour).Unix()
 
-	key, err := AcquireOwnerLock(b, folder, "myHost-12345", expiry)
+	key, err := AcquireOwnerLock(context.Background(), b, folder, "myHost-12345", expiry)
 	if err != nil {
 		t.Fatalf("AcquireOwnerLock() with dashed owner error: %v", err)
 	}
@@ -852,11 +867,12 @@ func TestAcquireOwnerLock_OwnerWithDash(t *testing.T) {
 }
 
 func TestAcquireOwnerLock_CleanupOnFailure(t *testing.T) {
+	t.Parallel()
 	// Use a backend that fails on PutObject
 	failBackend := &failOnPutBackend{}
 	folder := OwnerPrefix("myvol")
 
-	_, err := AcquireOwnerLock(failBackend, folder, "myhost", time.Now().Add(time.Hour).Unix())
+	_, err := AcquireOwnerLock(context.Background(), failBackend, folder, "myhost", time.Now().Add(time.Hour).Unix())
 	if err == nil {
 		t.Fatal("expected error from failing backend")
 	}
@@ -866,22 +882,23 @@ type failOnPutBackend struct {
 	orderedBackend
 }
 
-func (f *failOnPutBackend) PutObject(key string, data []byte) error {
+func (f *failOnPutBackend) PutObject(ctx context.Context, key string, data []byte) error {
 	return fmt.Errorf("storage failure")
 }
 
 func TestAcquireOwnerLock_ListFails(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	folder := OwnerPrefix("myvol")
 	expiry := time.Now().Add(time.Hour).Unix()
 
-	_, err := AcquireOwnerLock(b, folder, "myhost", expiry)
+	_, err := AcquireOwnerLock(context.Background(), b, folder, "myhost", expiry)
 	if err != nil {
 		t.Fatalf("AcquireOwnerLock() error: %v", err)
 	}
 
 	// After listing, ensure the key was stored
-	listed, err := b.ListObjects(folder)
+	listed, err := b.ListObjects(context.Background(), folder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,14 +908,15 @@ func TestAcquireOwnerLock_ListFails(t *testing.T) {
 }
 
 func TestAcquireOwnerLock_MultipleVolumes(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	expiry := time.Now().Add(time.Hour).Unix()
 
-	key1, err := AcquireOwnerLock(b, OwnerPrefix("vol1"), "host1", expiry)
+	key1, err := AcquireOwnerLock(context.Background(), b, OwnerPrefix("vol1"), "host1", expiry)
 	if err != nil {
 		t.Fatalf("vol1 lock error: %v", err)
 	}
-	key2, err := AcquireOwnerLock(b, OwnerPrefix("vol2"), "host2", expiry)
+	key2, err := AcquireOwnerLock(context.Background(), b, OwnerPrefix("vol2"), "host2", expiry)
 	if err != nil {
 		t.Fatalf("vol2 lock error: %v", err)
 	}
@@ -906,10 +924,10 @@ func TestAcquireOwnerLock_MultipleVolumes(t *testing.T) {
 		t.Error("keys for different volumes should differ")
 	}
 	// Verify each was stored
-	if _, err := b.ReadObject(key1); err != nil {
+	if _, err := b.ReadObject(context.Background(), key1); err != nil {
 		t.Errorf("key1 missing: %v", err)
 	}
-	if _, err := b.ReadObject(key2); err != nil {
+	if _, err := b.ReadObject(context.Background(), key2); err != nil {
 		t.Errorf("key2 missing: %v", err)
 	}
 }
@@ -917,14 +935,15 @@ func TestAcquireOwnerLock_MultipleVolumes(t *testing.T) {
 // --- OwnerStore methods ---
 
 func TestLockIsValid(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 	expiry := time.Now().Add(time.Hour).Unix()
 	futureKey := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
 
 	t.Run("valid key with stored object", func(t *testing.T) {
-		_ = b.PutObject(futureKey, []byte(`{}`))
-		valid, err := s.LockIsValid(futureKey)
+		_ = b.PutObject(context.Background(), futureKey, []byte(`{}`))
+		valid, err := s.LockIsValid(context.Background(), futureKey)
 		if err != nil {
 			t.Fatalf("LockIsValid error: %v", err)
 		}
@@ -935,7 +954,7 @@ func TestLockIsValid(t *testing.T) {
 
 	t.Run("no stored object", func(t *testing.T) {
 		missingKey := fmt.Sprintf("blt-volume-manager/owners/myvol/ghost-%d-1h.json", time.Now().Add(time.Hour).Unix()-3600)
-		valid, err := s.LockIsValid(missingKey)
+		valid, err := s.LockIsValid(context.Background(), missingKey)
 		if err != nil {
 			t.Fatalf("LockIsValid error: %v", err)
 		}
@@ -945,7 +964,7 @@ func TestLockIsValid(t *testing.T) {
 	})
 
 	t.Run("invalid key format", func(t *testing.T) {
-		_, err := s.LockIsValid("not-a-valid-key")
+		_, err := s.LockIsValid(context.Background(), "not-a-valid-key")
 		if err == nil {
 			t.Fatal("expected error for invalid key")
 		}
@@ -953,8 +972,8 @@ func TestLockIsValid(t *testing.T) {
 
 	t.Run("expired key", func(t *testing.T) {
 		expiredKey := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-5m.json", time.Now().Add(-10*time.Minute).Unix())
-		_ = b.PutObject(expiredKey, []byte(`{}`))
-		valid, err := s.LockIsValid(expiredKey)
+		_ = b.PutObject(context.Background(), expiredKey, []byte(`{}`))
+		valid, err := s.LockIsValid(context.Background(), expiredKey)
 		if err != nil {
 			t.Fatalf("LockIsValid error: %v", err)
 		}
@@ -965,8 +984,8 @@ func TestLockIsValid(t *testing.T) {
 
 	t.Run("permanent key", func(t *testing.T) {
 		permKey := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-0.json", time.Now().Unix())
-		_ = b.PutObject(permKey, []byte(`{}`))
-		valid, err := s.LockIsValid(permKey)
+		_ = b.PutObject(context.Background(), permKey, []byte(`{}`))
+		valid, err := s.LockIsValid(context.Background(), permKey)
 		if err != nil {
 			t.Fatalf("LockIsValid error: %v", err)
 		}
@@ -977,24 +996,26 @@ func TestLockIsValid(t *testing.T) {
 }
 
 func TestReleaseLock(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 	key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", time.Now().Add(time.Hour).Unix())
-	_ = b.PutObject(key, []byte(`{}`))
+	_ = b.PutObject(context.Background(), key, []byte(`{}`))
 
-	if err := s.ReleaseLock(key); err != nil {
+	if err := s.ReleaseLock(context.Background(), key); err != nil {
 		t.Fatalf("ReleaseLock error: %v", err)
 	}
-	if _, err := b.ReadObject(key); err != backend.ErrKeyNotFound {
+	if _, err := b.ReadObject(context.Background(), key); err != backend.ErrKeyNotFound {
 		t.Error("expected key to be deleted after release")
 	}
 }
 
 func TestAcquireForVolume(t *testing.T) {
+	t.Parallel()
 	t.Run("success with duration", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		expiry, err := s.AcquireForVolume("myvol", "myhost", 10)
+		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", 10)
 		if err != nil {
 			t.Fatalf("AcquireForVolume error: %v", err)
 		}
@@ -1006,7 +1027,7 @@ func TestAcquireForVolume(t *testing.T) {
 	t.Run("permanent when duration is 0", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		expiry, err := s.AcquireForVolume("myvol", "myhost", 0)
+		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", 0)
 		if err != nil {
 			t.Fatalf("AcquireForVolume(0) error: %v", err)
 		}
@@ -1018,7 +1039,7 @@ func TestAcquireForVolume(t *testing.T) {
 	t.Run("permanent when duration is negative", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		expiry, err := s.AcquireForVolume("myvol", "myhost", -1)
+		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", -1)
 		if err != nil {
 			t.Fatalf("AcquireForVolume(-1) error: %v", err)
 		}
@@ -1030,7 +1051,7 @@ func TestAcquireForVolume(t *testing.T) {
 	t.Run("empty owner name", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		_, err := s.AcquireForVolume("myvol", "", 10)
+		_, err := s.AcquireForVolume(context.Background(), "myvol", "", 10)
 		if err == nil {
 			t.Fatal("expected error for empty owner name")
 		}
@@ -1038,14 +1059,15 @@ func TestAcquireForVolume(t *testing.T) {
 }
 
 func TestFindForVolume(t *testing.T) {
+	t.Parallel()
 	t.Run("volume with owner", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
 		expiry := time.Now().Add(time.Hour).Unix()
 		key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
-		_ = b.PutObject(key, []byte(`{}`))
+		_ = b.PutObject(context.Background(), key, []byte(`{}`))
 
-		vo, err := s.FindForVolume("myvol")
+		vo, err := s.FindForVolume(context.Background(), "myvol")
 		if err != nil {
 			t.Fatalf("FindForVolume error: %v", err)
 		}
@@ -1063,7 +1085,7 @@ func TestFindForVolume(t *testing.T) {
 	t.Run("volume without owner", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		vo, err := s.FindForVolume("emptyvol")
+		vo, err := s.FindForVolume(context.Background(), "emptyvol")
 		if err != nil {
 			t.Fatalf("FindForVolume error: %v", err)
 		}
@@ -1075,7 +1097,7 @@ func TestFindForVolume(t *testing.T) {
 	t.Run("list error", func(t *testing.T) {
 		errBackend := &listErrorBackend{}
 		s := NewOwnerStore(errBackend)
-		_, err := s.FindForVolume("myvol")
+		_, err := s.FindForVolume(context.Background(), "myvol")
 		if err == nil {
 			t.Fatal("expected error from failing backend")
 		}
@@ -1084,43 +1106,45 @@ func TestFindForVolume(t *testing.T) {
 
 type listErrorBackend struct{ orderedBackend }
 
-func (l *listErrorBackend) ListObjects(prefix string) ([]backend.Entry, error) {
+func (l *listErrorBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
 	return nil, fmt.Errorf("list error")
 }
 
 func TestDeleteForVolume(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 	expiry := time.Now().Add(time.Hour).Unix()
 	key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
-	_ = b.PutObject(key, []byte(`{}`))
+	_ = b.PutObject(context.Background(), key, []byte(`{}`))
 
-	if err := s.DeleteForVolume("myvol"); err != nil {
+	if err := s.DeleteForVolume(context.Background(), "myvol"); err != nil {
 		t.Fatalf("DeleteForVolume error: %v", err)
 	}
-	listed, _ := b.ListObjects("blt-volume-manager/owners/myvol/")
+	listed, _ := b.ListObjects(context.Background(), "blt-volume-manager/owners/myvol/")
 	if len(listed) != 0 {
 		t.Error("expected no objects after delete")
 	}
 }
 
 func TestListAllGrouped(t *testing.T) {
+	t.Parallel()
 	t.Run("multiple volumes with owners", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
 		expiry := time.Now().Add(time.Hour).Unix()
 
 		// Create owners for vol1 and vol2
-		_, err := AcquireOwnerLock(b, OwnerPrefix("vol1"), "host-a", expiry)
+		_, err := AcquireOwnerLock(context.Background(), b, OwnerPrefix("vol1"), "host-a", expiry)
 		if err != nil {
 			t.Fatalf("create vol1 owner: %v", err)
 		}
-		_, err = AcquireOwnerLock(b, OwnerPrefix("vol2"), "host-b", expiry)
+		_, err = AcquireOwnerLock(context.Background(), b, OwnerPrefix("vol2"), "host-b", expiry)
 		if err != nil {
 			t.Fatalf("create vol2 owner: %v", err)
 		}
 
-		grouped, err := s.ListAllGrouped()
+		grouped, err := s.ListAllGrouped(context.Background())
 		if err != nil {
 			t.Fatalf("ListAllGrouped error: %v", err)
 		}
@@ -1142,7 +1166,7 @@ func TestListAllGrouped(t *testing.T) {
 	t.Run("no owners", func(t *testing.T) {
 		b := newOrderedBackend()
 		s := NewOwnerStore(b)
-		grouped, err := s.ListAllGrouped()
+		grouped, err := s.ListAllGrouped(context.Background())
 		if err != nil {
 			t.Fatalf("ListAllGrouped error: %v", err)
 		}
@@ -1154,7 +1178,7 @@ func TestListAllGrouped(t *testing.T) {
 	t.Run("list error", func(t *testing.T) {
 		errBackend := &listErrorBackend{}
 		s := NewOwnerStore(errBackend)
-		_, err := s.ListAllGrouped()
+		_, err := s.ListAllGrouped(context.Background())
 		if err == nil {
 			t.Fatal("expected error from failing backend")
 		}
@@ -1162,6 +1186,7 @@ func TestListAllGrouped(t *testing.T) {
 }
 
 func TestNewOwnerStore(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 	if s == nil {
@@ -1170,11 +1195,12 @@ func TestNewOwnerStore(t *testing.T) {
 }
 
 func TestLockVolume(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 	expiry := time.Now().Add(time.Hour).Unix()
 
-	key, err := s.LockVolume("myvol", "myhost", expiry)
+	key, err := s.LockVolume(context.Background(), "myvol", "myhost", expiry)
 	if err != nil {
 		t.Fatalf("LockVolume error: %v", err)
 	}
@@ -1186,18 +1212,19 @@ func TestLockVolume(t *testing.T) {
 // --- Full integration scenarios ---
 
 func TestLockAcquireReleaseCycle(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	s := NewOwnerStore(b)
 
 	// Acquire
 	expiry := time.Now().Add(30 * time.Minute).Unix()
-	key, err := s.LockVolume("testvol", "testhost", expiry)
+	key, err := s.LockVolume(context.Background(), "testvol", "testhost", expiry)
 	if err != nil {
 		t.Fatalf("LockVolume error: %v", err)
 	}
 
 	// Validate
-	valid, err := s.LockIsValid(key)
+	valid, err := s.LockIsValid(context.Background(), key)
 	if err != nil {
 		t.Fatalf("LockIsValid error: %v", err)
 	}
@@ -1206,7 +1233,7 @@ func TestLockAcquireReleaseCycle(t *testing.T) {
 	}
 
 	// Find
-	vo, err := s.FindForVolume("testvol")
+	vo, err := s.FindForVolume(context.Background(), "testvol")
 	if err != nil {
 		t.Fatalf("FindForVolume error: %v", err)
 	}
@@ -1215,12 +1242,12 @@ func TestLockAcquireReleaseCycle(t *testing.T) {
 	}
 
 	// Release
-	if err := s.ReleaseLock(key); err != nil {
+	if err := s.ReleaseLock(context.Background(), key); err != nil {
 		t.Fatalf("ReleaseLock error: %v", err)
 	}
 
 	// Validate after release
-	valid, err = s.LockIsValid(key)
+	valid, err = s.LockIsValid(context.Background(), key)
 	if err != nil {
 		t.Fatalf("LockIsValid error: %v", err)
 	}
@@ -1229,7 +1256,7 @@ func TestLockAcquireReleaseCycle(t *testing.T) {
 	}
 
 	// Now another owner should be able to acquire
-	newKey, err := s.LockVolume("testvol", "newhost", expiry)
+	newKey, err := s.LockVolume(context.Background(), "testvol", "newhost", expiry)
 	if err != nil {
 		t.Fatalf("second LockVolume error: %v", err)
 	}
@@ -1239,23 +1266,24 @@ func TestLockAcquireReleaseCycle(t *testing.T) {
 }
 
 func TestConcurrentLockAttempts(t *testing.T) {
+	t.Parallel()
 	b := newOrderedBackend()
 	expiry := time.Now().Add(time.Hour).Unix()
 
 	// Simulate concurrent lock attempts by using the raw AcquireOwnerLock
 	// (since OwnerStore serializes through the backend, concurrency is at the backend level)
-	_, err := AcquireOwnerLock(b, OwnerPrefix("convol"), "first", expiry)
+	_, err := AcquireOwnerLock(context.Background(), b, OwnerPrefix("convol"), "first", expiry)
 	if err != nil {
 		t.Fatalf("first lock error: %v", err)
 	}
 
-	_, err = AcquireOwnerLock(b, OwnerPrefix("convol"), "second", expiry)
+	_, err = AcquireOwnerLock(context.Background(), b, OwnerPrefix("convol"), "second", expiry)
 	if err == nil {
 		t.Error("expected second lock to fail")
 	}
 
 	// First lock should still be valid
-	listed, err := b.ListObjects(OwnerPrefix("convol"))
+	listed, err := b.ListObjects(context.Background(), OwnerPrefix("convol"))
 	if err != nil {
 		t.Fatal(err)
 	}

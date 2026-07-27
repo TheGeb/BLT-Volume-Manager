@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func SnapshotRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func SnapshotRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot/") {
 		http.NotFound(w, r)
 		return
@@ -25,7 +26,7 @@ func SnapshotRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func SnapshotFileRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func SnapshotFileRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
 		http.NotFound(w, r)
 		return
@@ -50,7 +51,7 @@ func SnapshotFileRouter(s *server.Service, w http.ResponseWriter, r *http.Reques
 	fallbackHash := r.URL.Query().Get("fallbackHash")
 	action := parts[1]
 
-	rawID = ResolveSnapshotID(rm, rawID, version, volName)
+	rawID = ResolveSnapshotID(r.Context(), rm, rawID, version, volName)
 
 	switch action {
 	case "ls":
@@ -65,14 +66,14 @@ func SnapshotFileRouter(s *server.Service, w http.ResponseWriter, r *http.Reques
 		secondID := parts[2]
 		diffVersion := r.URL.Query().Get("diffTag")
 		diffFallback := r.URL.Query().Get("diffFallbackHash")
-		secondID = ResolveSnapshotID(rm, secondID, diffVersion, volName)
+		secondID = ResolveSnapshotID(r.Context(), rm, secondID, diffVersion, volName)
 		diffSnapshots(s, w, r, rm, rawID, secondID, fallbackHash, diffFallback)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
-func ListSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func ListSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -81,8 +82,9 @@ func ListSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	opts, filter, offset, limit := ParseSnapshotListOpts(r)
-	resp, err := BuildSnapshotListResponse(s, volName, opts, filter, offset, limit)
+	resp, err := BuildSnapshotListResponse(ctx, s, volName, opts, filter, offset, limit)
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
@@ -90,7 +92,7 @@ func ListSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, resp)
 }
 
-func SnapshotSizes(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func SnapshotSizes(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -108,10 +110,11 @@ func SnapshotSizes(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	rm := s.ResticManager(req.Volume)
 	result := map[string]int64{}
 	for _, id := range req.IDs {
-		stats, err := rm.SnapshotStats(id)
+		stats, err := rm.SnapshotStats(ctx, id)
 		if err != nil {
 			continue
 		}
@@ -120,7 +123,7 @@ func SnapshotSizes(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, result)
 }
 
-func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func ListSnapshotHosts(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -129,6 +132,7 @@ func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	ctx := r.Context()
 	rm := s.ResticManager(volName)
 	latest := 1
 	if l := r.URL.Query().Get("latest"); l != "" {
@@ -137,7 +141,7 @@ func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	hosts, err := rm.SnapshotHosts(latest)
+	hosts, err := rm.SnapshotHosts(ctx, latest)
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
@@ -145,7 +149,7 @@ func ListSnapshotHosts(s *server.Service, w http.ResponseWriter, r *http.Request
 	server.RespondJSON(w, hosts)
 }
 
-func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func BatchDeleteSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -162,10 +166,11 @@ func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	ctx := r.Context()
 	rm := s.ResticManager(req.Volume)
 	resp := batchDeleteResponse{Errors: []batchDeleteError{}}
 	for _, id := range req.IDs {
-		if err := rm.ForgetSnapshots(id); err != nil {
+		if err := rm.ForgetSnapshots(ctx, id); err != nil {
 			resp.Failed++
 			resp.Errors = append(resp.Errors, batchDeleteError{ID: id, Error: err.Error()})
 		} else {
@@ -175,14 +180,15 @@ func BatchDeleteSnapshots(s *server.Service, w http.ResponseWriter, r *http.Requ
 	server.RespondJSON(w, resp)
 }
 
-func listSnapshotFiles(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+func listSnapshotFiles(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
+	ctx := r.Context()
 	path := r.URL.Query().Get("path")
-	nodes, err := withFallback(rm, rawID, fallbackHash, func(id string) ([]restic.FileNode, error) {
-		return rm.ListSnapshotFiles(id, path)
+	nodes, err := withFallback(ctx, rm, rawID, fallbackHash, func(ctx context.Context, id string) ([]restic.FileNode, error) {
+		return rm.ListSnapshotFiles(ctx, id, path)
 	})
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
@@ -191,18 +197,19 @@ func listSnapshotFiles(s *server.Service, w http.ResponseWriter, r *http.Request
 	server.RespondJSON(w, nodes)
 }
 
-func dumpSnapshotFile(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, fallbackHash string) {
+func dumpSnapshotFile(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
+	ctx := r.Context()
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		http.Error(w, "missing path", http.StatusBadRequest)
 		return
 	}
-	data, err := withFallback(rm, rawID, fallbackHash, func(id string) ([]byte, error) {
-		return rm.DumpFile(id, path)
+	data, err := withFallback(ctx, rm, rawID, fallbackHash, func(ctx context.Context, id string) ([]byte, error) {
+		return rm.DumpFile(ctx, id, path)
 	})
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
@@ -213,25 +220,26 @@ func dumpSnapshotFile(s *server.Service, w http.ResponseWriter, r *http.Request,
 	_, _ = w.Write(data) //nolint:gosec // data is served as text/plain with nosniff
 }
 
-func diffSnapshots(s *server.Service, w http.ResponseWriter, r *http.Request, rm *restic.Manager, rawID, secondID, fallbackHash, diffFallback string) {
+func diffSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, secondID, fallbackHash, diffFallback string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
-	result, err := rm.DiffSnapshots(rawID, secondID)
+	ctx := r.Context()
+	result, err := rm.DiffSnapshots(ctx, rawID, secondID)
 	if err != nil {
 		resolvedFirst, resolvedSecond := rawID, secondID
 		if fallbackHash != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
+			if snap, lookupErr := rm.FindSnapshotByHash(ctx, fallbackHash); lookupErr == nil {
 				resolvedFirst = snap.ID
 			}
 		}
 		if diffFallback != "" {
-			if snap, lookupErr := rm.FindSnapshotByHash(diffFallback); lookupErr == nil {
+			if snap, lookupErr := rm.FindSnapshotByHash(ctx, diffFallback); lookupErr == nil {
 				resolvedSecond = snap.ID
 			}
 		}
-		result, err = rm.DiffSnapshots(resolvedFirst, resolvedSecond)
+		result, err = rm.DiffSnapshots(ctx, resolvedFirst, resolvedSecond)
 	}
 	if err != nil {
 		server.RespondError(w, err, http.StatusNotFound)

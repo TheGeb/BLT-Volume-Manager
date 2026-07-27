@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -30,19 +31,19 @@ type VolumeOwner struct {
 }
 
 type OwnerStore struct {
-	be backend.KeyValueStore
+	b Backend
 }
 
-func NewOwnerStore(be backend.KeyValueStore) *OwnerStore {
-	return &OwnerStore{be: be}
+func NewOwnerStore(b Backend) *OwnerStore {
+	return &OwnerStore{b: b}
 }
 
-func (s *OwnerStore) LockVolume(volumeName, ownerName string, expiry int64) (string, error) {
+func (s *OwnerStore) LockVolume(ctx context.Context, volumeName, ownerName string, expiry int64) (string, error) {
 	folder := OwnerPrefix(volumeName)
-	return AcquireOwnerLock(s.be, folder, ownerName, expiry)
+	return AcquireOwnerLock(ctx, s.b, folder, ownerName, expiry)
 }
 
-func (s *OwnerStore) LockIsValid(key string) (bool, error) {
+func (s *OwnerStore) LockIsValid(ctx context.Context, key string) (bool, error) {
 	_, _, _, expiry, err := ParseOwnerKey(key)
 	if err != nil {
 		return false, fmt.Errorf("parse lock key: %w", err)
@@ -50,24 +51,24 @@ func (s *OwnerStore) LockIsValid(key string) (bool, error) {
 	if expiry > 0 && expiry <= time.Now().Unix() {
 		return false, nil
 	}
-	_, err = s.be.ReadObject(key)
+	_, err = s.b.ReadObject(ctx, key)
 	if err != nil {
 		return false, nil
 	}
 	return true, nil
 }
 
-func (s *OwnerStore) ReleaseLock(key string) error {
-	return s.be.DeleteObject(key)
+func (s *OwnerStore) ReleaseLock(ctx context.Context, key string) error {
+	return s.b.DeleteObject(ctx, key)
 }
 
-func (s *OwnerStore) FindForVolume(volumeName string) (*VolumeOwner, error) {
-	objects, err := s.be.ListObjects(OwnerPrefix(volumeName))
+func (s *OwnerStore) FindForVolume(ctx context.Context, volumeName string) (*VolumeOwner, error) {
+	objects, err := s.b.ListObjects(ctx, OwnerPrefix(volumeName))
 	if err != nil {
 		return nil, fmt.Errorf("list owner objects: %w", err)
 	}
 
-	objects = RemoveStaleObjects(s.be, objects, DefaultOwnerTTL)
+	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
 
 	key, owner, creation, expiry := determineOwner(objects)
 	if key == "" {
@@ -76,13 +77,13 @@ func (s *OwnerStore) FindForVolume(volumeName string) (*VolumeOwner, error) {
 	return &VolumeOwner{Volume: volumeName, Owner: owner, Creation: creation, Expiry: expiry}, nil
 }
 
-func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
-	objects, err := s.be.ListObjects(OwnerKeyspace)
+func (s *OwnerStore) ListAllGrouped(ctx context.Context) (map[string]VolumeOwner, error) {
+	objects, err := s.b.ListObjects(ctx, OwnerKeyspace)
 	if err != nil {
 		return nil, err
 	}
 
-	objects = RemoveStaleObjects(s.be, objects, DefaultOwnerTTL)
+	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
 
 	grouped := make(map[string][]backend.Entry)
 	for _, obj := range objects {
@@ -106,11 +107,11 @@ func (s *OwnerStore) ListAllGrouped() (map[string]VolumeOwner, error) {
 	return result, nil
 }
 
-func (s *OwnerStore) DeleteForVolume(volumeName string) error {
-	return s.be.DeleteObjectsWithPrefix(OwnerPrefix(volumeName))
+func (s *OwnerStore) DeleteForVolume(ctx context.Context, volumeName string) error {
+	return s.b.DeleteObjectsWithPrefix(ctx, OwnerPrefix(volumeName))
 }
 
-func (s *OwnerStore) AcquireForVolume(volumeName, ownerName string, durationMins int) (int64, error) {
+func (s *OwnerStore) AcquireForVolume(ctx context.Context, volumeName, ownerName string, durationMins int) (int64, error) {
 	if ownerName == "" {
 		return 0, fmt.Errorf("owner name is required")
 	}
@@ -119,7 +120,7 @@ func (s *OwnerStore) AcquireForVolume(volumeName, ownerName string, durationMins
 		expiry = time.Now().Add(time.Duration(durationMins) * time.Minute).Unix()
 	}
 
-	_, err := s.LockVolume(volumeName, ownerName, expiry)
+	_, err := s.LockVolume(ctx, volumeName, ownerName, expiry)
 	if err != nil {
 		return 0, err
 	}
@@ -134,7 +135,7 @@ func decodeOwner(s string) string {
 	return strings.ReplaceAll(s, "%2D", "-")
 }
 
-func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry int64) (myKey string, err error) {
+func AcquireOwnerLock(ctx context.Context, store Backend, folder, owner string, expiry int64) (myKey string, err error) {
 	creation := time.Now().Unix()
 	var durStr string
 	switch {
@@ -154,16 +155,16 @@ func AcquireOwnerLock(store backend.KeyValueStore, folder, owner string, expiry 
 		return "", fmt.Errorf("marshal proposal: %w", err)
 	}
 
-	if err := store.PutObject(newKey, data); err != nil {
+	if err := store.PutObject(ctx, newKey, data); err != nil {
 		return "", fmt.Errorf("create proposal: %w", err)
 	}
 	defer func() {
 		if err != nil {
-			_ = store.DeleteObject(newKey)
+			_ = store.DeleteObject(ctx, newKey)
 		}
 	}()
 
-	objects, err := store.ListObjects(folder)
+	objects, err := store.ListObjects(ctx, folder)
 	if err != nil {
 		return "", fmt.Errorf("list proposals: %w", err)
 	}
@@ -323,7 +324,7 @@ func determineOwner(objects []backend.Entry) (firstKey string, firstOwner string
 	return "", "", 0, 0
 }
 
-func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, ttl time.Duration) []backend.Entry {
+func RemoveStaleObjects(ctx context.Context, store Backend, objects []backend.Entry, ttl time.Duration) []backend.Entry {
 	now := time.Now()
 	kept := make([]backend.Entry, 0, len(objects))
 	for _, obj := range objects {
@@ -339,7 +340,7 @@ func RemoveStaleObjects(store backend.KeyValueStore, objects []backend.Entry, tt
 		if !isPermanent && obj.ModificationCounter != nil {
 			modTime := time.Unix(0, *obj.ModificationCounter)
 			if now.Sub(modTime) > ttl {
-				_ = store.DeleteObject(*obj.Key)
+				_ = store.DeleteObject(ctx, *obj.Key)
 				continue
 			}
 		}

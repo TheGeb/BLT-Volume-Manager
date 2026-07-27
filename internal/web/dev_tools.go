@@ -14,7 +14,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func DevMode(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func DevMode(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	enabled := os.Getenv("BLT_DEV_MODE") != ""
 	server.RespondJSON(w, DevModeResponse{Enabled: enabled})
 }
@@ -28,7 +28,7 @@ type devToolCreateResponse struct {
 	Message string `json:"message"`
 }
 
-func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func CreateDummyVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -60,25 +60,25 @@ func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request
 
 	count := writeDummyFiles(volPath)
 
-	exists, err := rm.RepoExists()
+	exists, err := rm.RepoExists(r.Context())
 	if err != nil {
 		server.RespondError(w, fmt.Errorf("check repo: %w", err), http.StatusInternalServerError)
 		return
 	}
 	if !exists {
-		if err := rm.Init(); err != nil {
+		if err := rm.Init(r.Context()); err != nil {
 			server.RespondError(w, fmt.Errorf("init repo: %w", err), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	vt := s.NextVersionTags(req.Name, true)
-	if err := rm.BackupInDir(".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
+	vt := s.NextVersionTags(r.Context(), req.Name, true)
+	if err := rm.BackupInDir(r.Context(), ".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
 		server.RespondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}
 
-	if err := s.RegisterVolume(req.Name); err != nil {
+	if err := s.RegisterVolume(r.Context(), req.Name); err != nil {
 		log.Error("register_volume_failed", err)
 	}
 
@@ -88,7 +88,7 @@ func CreateDummyVolume(s *server.Service, w http.ResponseWriter, r *http.Request
 	})
 }
 
-func CreateDummySnapshot(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func CreateDummySnapshot(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
@@ -116,8 +116,8 @@ func CreateDummySnapshot(s *server.Service, w http.ResponseWriter, r *http.Reque
 
 	count := writeDummyFiles(volPath)
 
-	vt := s.NextVersionTags(req.Volume, false)
-	if err := rm.BackupInDir(".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
+	vt := s.NextVersionTags(r.Context(), req.Volume, false)
+	if err := rm.BackupInDir(r.Context(), ".", restic.WithTags(restic.BackupTagCold, vt...), volPath); err != nil {
 		server.RespondError(w, fmt.Errorf("backup: %w", err), http.StatusInternalServerError)
 		return
 	}

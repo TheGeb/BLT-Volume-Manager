@@ -1,31 +1,30 @@
 package store
 
 import (
+	"context"
 	"strings"
-
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 )
 
 const RegisteredVolumeKeyspace = "blt-volume-manager/registered-volumes/"
 
 type RegisteredVolumeStore struct {
-	be backend.KeyValueStore
+	b Backend
 }
 
-func NewRegisteredVolumeStore(be backend.KeyValueStore) *RegisteredVolumeStore {
-	return &RegisteredVolumeStore{be: be}
+func NewRegisteredVolumeStore(b Backend) *RegisteredVolumeStore {
+	return &RegisteredVolumeStore{b: b}
 }
 
-func (s *RegisteredVolumeStore) Register(name string) error {
-	return s.be.PutObject(RegisteredVolumeKeyspace+name+".json", nil)
+func (s *RegisteredVolumeStore) Register(ctx context.Context, name string) error {
+	return s.b.PutObject(ctx, RegisteredVolumeKeyspace+name+".json", nil)
 }
 
-func (s *RegisteredVolumeStore) Delete(name string) error {
-	return s.be.DeleteObject(RegisteredVolumeKeyspace + name + ".json")
+func (s *RegisteredVolumeStore) Delete(ctx context.Context, name string) error {
+	return s.b.DeleteObject(ctx, RegisteredVolumeKeyspace+name+".json")
 }
 
-func (s *RegisteredVolumeStore) List() ([]string, error) {
-	objects, err := s.be.ListObjects(RegisteredVolumeKeyspace)
+func (s *RegisteredVolumeStore) List(ctx context.Context) ([]string, error) {
+	objects, err := s.b.ListObjects(ctx, RegisteredVolumeKeyspace)
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,7 @@ type RepoStatusResponse struct {
 	Hostname    string `json:"hostname"`
 }
 
-func InitRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func InitRepo(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -21,14 +21,14 @@ func InitRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.ResticManager(volName)
-	if err := rm.Init(); err != nil {
+	if err := rm.Init(r.Context()); err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
 	server.RespondJSON(w, server.StatusResponse{Status: "repository initialized"})
 }
 
-func RepoStatus(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func RepoStatus(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -37,7 +37,7 @@ func RepoStatus(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.ResticManager(volName)
-	exists, err := rm.RepoExists()
+	exists, err := rm.RepoExists(r.Context())
 	if err != nil {
 		server.RespondError(w, err, http.StatusInternalServerError)
 		return

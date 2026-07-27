@@ -9,6 +9,7 @@ import (
 )
 
 func TestTypeString(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		typ      Type
 		expected string
@@ -28,6 +29,7 @@ func TestTypeString(t *testing.T) {
 }
 
 func TestFromString(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		s        string
 		expected Type
@@ -50,6 +52,7 @@ func TestFromString(t *testing.T) {
 }
 
 func TestListOrphaned_NoDir(t *testing.T) {
+	t.Parallel()
 	snaps, err := ListOrphaned(filepath.Join(t.TempDir(), "nonexistent"))
 	if err != nil {
 		t.Fatalf("ListOrphaned nonexistent dir: %v", err)
@@ -60,6 +63,7 @@ func TestListOrphaned_NoDir(t *testing.T) {
 }
 
 func TestListOrphaned_EmptyDir(t *testing.T) {
+	t.Parallel()
 	snaps, err := ListOrphaned(t.TempDir())
 	if err != nil {
 		t.Fatalf("ListOrphaned empty dir: %v", err)
@@ -70,6 +74,7 @@ func TestListOrphaned_EmptyDir(t *testing.T) {
 }
 
 func TestListOrphaned_FindsColdSnaps(t *testing.T) {
+	t.Parallel()
 	snapDir := t.TempDir()
 
 	if err := os.MkdirAll(filepath.Join(snapDir, "vol1"+ColdSuffix), app.DefaultDirPerm); err != nil {
@@ -106,6 +111,7 @@ func TestListOrphaned_FindsColdSnaps(t *testing.T) {
 }
 
 func TestListOrphaned_AccessPath(t *testing.T) {
+	t.Parallel()
 	snapDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(snapDir, "test-vol"+ColdSuffix), app.DefaultDirPerm); err != nil {
 		t.Fatal(err)
@@ -126,6 +132,7 @@ func TestListOrphaned_AccessPath(t *testing.T) {
 }
 
 func TestResolveType_DetectNonExistent(t *testing.T) {
+	t.Parallel()
 	info := &Info{AccessPath: filepath.Join(t.TempDir(), "nonexistent")}
 	err := ResolveType(info)
 	if err == nil {
@@ -134,6 +141,7 @@ func TestResolveType_DetectNonExistent(t *testing.T) {
 }
 
 func TestInfoZeroValue(t *testing.T) {
+	t.Parallel()
 	info := &Info{}
 	if info.Subtype != TypeNone {
 		t.Errorf("expected TypeNone, got %d", info.Subtype)
@@ -141,6 +149,7 @@ func TestInfoZeroValue(t *testing.T) {
 }
 
 func TestRemove_NoneType(t *testing.T) {
+	t.Parallel()
 	err := Remove(&Info{Subtype: TypeNone})
 	if err != nil {
 		t.Errorf("expected no error for TypeNone, got %v", err)

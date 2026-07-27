@@ -19,10 +19,13 @@ type OwnersListResponse struct {
 	Owners map[string]OwnerEntry `json:"owners"`
 }
 
-func OwnerRouter(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func OwnerRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
+	ctx := r.Context()
+	os := s.OwnerStore()
+
 	switch r.Method {
 	case http.MethodGet:
-		status, err := VolumeOwner(s, volumeName)
+		status, err := VolumeOwner(ctx, os, volumeName)
 		if err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return
@@ -40,7 +43,7 @@ func OwnerRouter(s *server.Service, w http.ResponseWriter, r *http.Request, volu
 				return
 			}
 		}
-		ownerData, err := CreateVolumeOwner(s, volumeName, reqBody.Owner, reqBody.OwnerDurationMins)
+		ownerData, err := CreateVolumeOwner(ctx, os, volumeName, reqBody.Owner, reqBody.OwnerDurationMins)
 		if err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return
@@ -48,7 +51,7 @@ func OwnerRouter(s *server.Service, w http.ResponseWriter, r *http.Request, volu
 		server.RespondJSON(w, ownerData)
 
 	case http.MethodDelete:
-		if err := DeleteVolumeOwners(s, volumeName); err != nil {
+		if err := DeleteVolumeOwners(ctx, os, volumeName); err != nil {
 			server.RespondError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -59,19 +62,13 @@ func OwnerRouter(s *server.Service, w http.ResponseWriter, r *http.Request, volu
 	}
 }
 
-func ListVolumeOwners(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func ListVolumeOwners(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
-	os, err := s.OwnerStore()
-	if err != nil || os == nil {
-		server.RespondJSON(w, OwnersListResponse{Owners: nil})
-		return
-	}
-
-	grouped, err := os.ListAllGrouped()
+	grouped, err := s.OwnerStore().ListAllGrouped(r.Context())
 	if err != nil {
 		server.RespondJSON(w, OwnersListResponse{Owners: nil})
 		return

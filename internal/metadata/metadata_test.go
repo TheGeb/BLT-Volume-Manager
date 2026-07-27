@@ -1,6 +1,7 @@
 package metadata_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
@@ -8,44 +9,45 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
-type MockKeyValueStore struct {
+type MockBackend struct {
 	Objects    []backend.Entry
 	ObjectsErr error
-	ListFunc   func(prefix string) ([]backend.Entry, error)
+	ListFunc   func(ctx context.Context, prefix string) ([]backend.Entry, error)
 }
 
-func (m *MockKeyValueStore) PutObject(string, []byte) error {
+func (m *MockBackend) PutObject(context.Context, string, []byte) error {
 	return nil
 }
 
-func (m *MockKeyValueStore) ReadObject(string) ([]byte, error) {
+func (m *MockBackend) ReadObject(context.Context, string) ([]byte, error) {
 	return nil, backend.ErrKeyNotFound
 }
 
-func (m *MockKeyValueStore) DeleteObject(string) error {
+func (m *MockBackend) DeleteObject(context.Context, string) error {
 	return nil
 }
 
-func (m *MockKeyValueStore) ListObjects(prefix string) ([]backend.Entry, error) {
+func (m *MockBackend) ListObjects(ctx context.Context, prefix string) ([]backend.Entry, error) {
 	if m.ListFunc != nil {
-		return m.ListFunc(prefix)
+		return m.ListFunc(ctx, prefix)
 	}
 	return m.Objects, m.ObjectsErr
 }
 
-func (m *MockKeyValueStore) DeleteObjectsWithPrefix(string) error {
+func (m *MockBackend) DeleteObjectsWithPrefix(context.Context, string) error {
 	return nil
 }
 
 func sPtr(s string) *string { return &s }
 
 func TestListRegisteredVolumes(t *testing.T) {
-	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
-		ListFunc: func(prefix string) ([]backend.Entry, error) {
+	t.Parallel()
+	st := store.NewRegisteredVolumeStore(&MockBackend{
+		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
 			return nil, nil
 		},
 	})
-	names, err := st.List()
+	names, err := st.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +57,9 @@ func TestListRegisteredVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesWithVolumes(t *testing.T) {
-	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
-		ListFunc: func(prefix string) ([]backend.Entry, error) {
+	t.Parallel()
+	st := store.NewRegisteredVolumeStore(&MockBackend{
+		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-a.json")},
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "vol-b.json")},
@@ -64,7 +67,7 @@ func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 			}, nil
 		},
 	})
-	names, err := st.List()
+	names, err := st.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,15 +83,16 @@ func TestListRegisteredVolumesWithVolumes(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
-	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
-		ListFunc: func(prefix string) ([]backend.Entry, error) {
+	t.Parallel()
+	st := store.NewRegisteredVolumeStore(&MockBackend{
+		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
 				{Key: nil},
 				{Key: sPtr(store.RegisteredVolumeKeyspace + "valid.json")},
 			}, nil
 		},
 	})
-	names, err := st.List()
+	names, err := st.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,14 +102,15 @@ func TestListRegisteredVolumesSkipsNilKey(t *testing.T) {
 }
 
 func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
-	st := store.NewRegisteredVolumeStore(&MockKeyValueStore{
-		ListFunc: func(prefix string) ([]backend.Entry, error) {
+	t.Parallel()
+	st := store.NewRegisteredVolumeStore(&MockBackend{
+		ListFunc: func(ctx context.Context, prefix string) ([]backend.Entry, error) {
 			return []backend.Entry{
 				{Key: sPtr(store.RegisteredVolumeKeyspace + ".json")},
 			}, nil
 		},
 	})
-	names, err := st.List()
+	names, err := st.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,6 +120,7 @@ func TestListRegisteredVolumesSkipsEmptyName(t *testing.T) {
 }
 
 func TestHostname(t *testing.T) {
+	t.Parallel()
 	h := metadata.Hostname()
 	if h == "" {
 		t.Error("expected non-empty hostname")

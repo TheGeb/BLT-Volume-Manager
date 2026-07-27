@@ -16,7 +16,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/volume"
 )
 
-func Register(s *server.Service, mux *http.ServeMux) error {
+func Register(s *server.BLTService, mux *http.ServeMux) error {
 	inner := http.NewServeMux()
 
 	registerHealth(s, inner)
@@ -37,7 +37,7 @@ func Register(s *server.Service, mux *http.ServeMux) error {
 	return nil
 }
 
-func registerHealth(s *server.Service, inner *http.ServeMux) {
+func registerHealth(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: More robust health check - actually serving files (and can access backends? Or is that out of scope)
 		if s.Config.ResticBase == "" {
@@ -48,7 +48,7 @@ func registerHealth(s *server.Service, inner *http.ServeMux) {
 	})
 }
 
-func registerRepoRoutes(s *server.Service, inner *http.ServeMux) {
+func registerRepoRoutes(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/repo/init", func(w http.ResponseWriter, r *http.Request) {
 		repo.InitRepo(s, w, r)
 	})
@@ -63,7 +63,7 @@ func registerRepoRoutes(s *server.Service, inner *http.ServeMux) {
 	})
 }
 
-func registerSnapshotRoutes(s *server.Service, inner *http.ServeMux) {
+func registerSnapshotRoutes(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/snapshots", func(w http.ResponseWriter, r *http.Request) {
 		snapshot.ListSnapshots(s, w, r)
 	})
@@ -81,7 +81,7 @@ func registerSnapshotRoutes(s *server.Service, inner *http.ServeMux) {
 	})
 }
 
-func registerVolumeRoutes(s *server.Service, inner *http.ServeMux) {
+func registerVolumeRoutes(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/volume/", func(w http.ResponseWriter, r *http.Request) {
 		volume.VolumeRouter(s, w, r)
 	})
@@ -93,7 +93,7 @@ func registerVolumeRoutes(s *server.Service, inner *http.ServeMux) {
 	})
 }
 
-func registerStatsRoutes(s *server.Service, inner *http.ServeMux) {
+func registerStatsRoutes(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
 		repo.Stats(s, w, r)
 	})
@@ -102,7 +102,7 @@ func registerStatsRoutes(s *server.Service, inner *http.ServeMux) {
 	})
 }
 
-func registerDevRoutes(s *server.Service, inner *http.ServeMux) {
+func registerDevRoutes(s *server.BLTService, inner *http.ServeMux) {
 	inner.HandleFunc("/api/dev-mode", func(w http.ResponseWriter, r *http.Request) {
 		DevMode(s, w, r)
 	})

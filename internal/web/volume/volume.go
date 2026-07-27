@@ -1,6 +1,7 @@
 package volume
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,11 +11,11 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func CleanupVolumeData(s *server.Service, volumeName string) {
+func CleanupVolumeData(ctx context.Context, s *server.BLTService, volumeName string) {
 	if volumeName == "" {
 		return
 	}
-	if err := s.DeleteMetadata(volumeName); err != nil {
+	if err := s.DeleteVolumeData(ctx, volumeName); err != nil {
 		log.Error("cleanup_volume_data_failed", err)
 	}
 }
@@ -23,24 +24,24 @@ func validVolumeName(name string) bool {
 	return name != "" && !strings.ContainsAny(name, "\\") && !strings.Contains(name, "..")
 }
 
-func initTargetRepo(s *server.Service, target string) (*restic.Manager, error) {
+func initTargetRepo(ctx context.Context, s *server.BLTService, target string) (*restic.Manager, error) {
 	if !validVolumeName(target) {
 		return nil, fmt.Errorf("invalid target volume name")
 	}
-	for _, v := range s.VolumeNames() {
+	for _, v := range s.VolumeNames(ctx) {
 		if v == target {
 			return nil, fmt.Errorf("target volume %q already exists", target)
 		}
 	}
 	tm := s.ResticManager(target)
-	if err := tm.Init(); err != nil {
+	if err := tm.Init(ctx); err != nil {
 		return nil, fmt.Errorf("init target repo: %w", err)
 	}
 	return tm, nil
 }
 
-func registerVolume(s *server.Service, target string) error {
-	return s.RegisterVolume(target)
+func registerVolume(ctx context.Context, s *server.BLTService, target string) error {
+	return s.RegisterVolume(ctx, target)
 }
 
 type CopyVolumeResult struct {
@@ -49,13 +50,13 @@ type CopyVolumeResult struct {
 	PreserveHistory bool
 }
 
-func CopyVolumeData(s *server.Service, source, target string, preserveHistory *bool, snapshotIDs []string) (*CopyVolumeResult, error) {
-	tm, err := initTargetRepo(s, target)
+func CopyVolumeData(ctx context.Context, s *server.BLTService, source, target string, preserveHistory *bool, snapshotIDs []string) (*CopyVolumeResult, error) {
+	tm, err := initTargetRepo(ctx, s, target)
 	if err != nil {
 		return nil, err
 	}
 
-	owned, ownerName, err := owner.IsVolumeOwned(s, source)
+	owned, ownerName, err := owner.IsVolumeOwned(ctx, s.OwnerStore(), source)
 	if err != nil {
 		return nil, fmt.Errorf("check owner: %w", err)
 	}
@@ -67,18 +68,18 @@ func CopyVolumeData(s *server.Service, source, target string, preserveHistory *b
 	}
 	switch {
 	case len(snapshotIDs) > 0:
-		if err := sourceManager.CopyTo(tm.Repo(), snapshotIDs...); err != nil {
+		if err := sourceManager.CopyTo(ctx, tm.Repo(), snapshotIDs...); err != nil {
 			return nil, fmt.Errorf("copy snapshots: %w", err)
 		}
 	case preserve:
-		if err := sourceManager.CopyTo(tm.Repo()); err != nil {
+		if err := sourceManager.CopyTo(ctx, tm.Repo()); err != nil {
 			return nil, fmt.Errorf("copy snapshots: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("no snapshots to copy")
 	}
 
-	if err := registerVolume(s, target); err != nil {
+	if err := registerVolume(ctx, s, target); err != nil {
 		return nil, fmt.Errorf("register volume: %w", err)
 	}
 
@@ -89,13 +90,13 @@ func CopyVolumeData(s *server.Service, source, target string, preserveHistory *b
 	}, nil
 }
 
-func RenameVolumeData(s *server.Service, source, target string) error {
-	tm, err := initTargetRepo(s, target)
+func RenameVolumeData(ctx context.Context, s *server.BLTService, source, target string) error {
+	tm, err := initTargetRepo(ctx, s, target)
 	if err != nil {
 		return err
 	}
 
-	owned, ownerName, err := owner.IsVolumeOwned(s, source)
+	owned, ownerName, err := owner.IsVolumeOwned(ctx, s.OwnerStore(), source)
 	if err != nil {
 		return fmt.Errorf("check owner: %w", err)
 	}
@@ -104,25 +105,25 @@ func RenameVolumeData(s *server.Service, source, target string) error {
 	}
 
 	sourceManager := s.ResticManager(source)
-	if err := sourceManager.CopyTo(tm.Repo()); err != nil {
+	if err := sourceManager.CopyTo(ctx, tm.Repo()); err != nil {
 		return fmt.Errorf("copy snapshots: %w", err)
 	}
 
-	snapshots, err := sourceManager.ListSnapshots()
+	snapshots, err := sourceManager.ListSnapshots(ctx)
 	if err == nil {
 		ids := make([]string, len(snapshots))
 		for i, snap := range snapshots {
 			ids[i] = snap.ID
 		}
-		if err := sourceManager.ForgetSnapshots(ids...); err != nil {
+		if err := sourceManager.ForgetSnapshots(ctx, ids...); err != nil {
 			log.Error("forget_snapshots_failed", err)
 		}
 	}
 
-	if err := registerVolume(s, target); err != nil {
+	if err := registerVolume(ctx, s, target); err != nil {
 		return fmt.Errorf("register volume: %w", err)
 	}
 
-	CleanupVolumeData(s, source)
+	CleanupVolumeData(ctx, s, source)
 	return nil
 }

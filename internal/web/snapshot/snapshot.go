@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"context"
 	"strings"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -8,20 +9,20 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func ResolveSnapshotID(rm *restic.Manager, rawID, version, volName string) string {
+func ResolveSnapshotID(ctx context.Context, rm ResticManager, rawID, version, volName string) string {
 	if version != "" {
-		if resolved, err := FindSnapshotByVersion(rm, version, volName); err == nil {
+		if resolved, err := FindSnapshotByVersion(ctx, rm, version, volName); err == nil {
 			return resolved
 		}
 	}
 	return rawID
 }
 
-func withFallback[T any](rm *restic.Manager, rawID, fallbackHash string, fn func(string) (T, error)) (T, error) {
-	result, err := fn(rawID)
+func withFallback[T any](ctx context.Context, rm ResticManager, rawID, fallbackHash string, fn func(context.Context, string) (T, error)) (T, error) {
+	result, err := fn(ctx, rawID)
 	if err != nil && fallbackHash != "" {
-		if snap, lookupErr := rm.FindSnapshotByHash(fallbackHash); lookupErr == nil {
-			result, err = fn(snap.ID)
+		if snap, lookupErr := rm.FindSnapshotByHash(ctx, fallbackHash); lookupErr == nil {
+			result, err = fn(ctx, snap.ID)
 		}
 	}
 	return result, err
@@ -58,12 +59,12 @@ type batchDeleteResponse struct {
 	Errors  []batchDeleteError `json:"errors"`
 }
 
-func FindSnapshotByVersion(rm *restic.Manager, version, volumeName string) (string, error) {
+func FindSnapshotByVersion(ctx context.Context, rm ResticManager, version, volumeName string) (string, error) {
 	tag := version
 	if !strings.HasPrefix(version, "v") {
 		tag = "v" + version
 	}
-	snapshots, err := rm.ListSnapshotsWithOpts(&restic.ListSnapshotsOpts{Tags: []string{tag}})
+	snapshots, err := rm.ListSnapshotsWithOpts(ctx, &restic.ListSnapshotsOpts{Tags: []string{tag}})
 	if err != nil {
 		return "", err
 	}
@@ -82,9 +83,9 @@ func FindSnapshotByVersion(rm *restic.Manager, version, volumeName string) (stri
 	return newest.ID, nil
 }
 
-func BuildSnapshotListResponse(s *server.Service, volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (*SnapshotListResponse, error) {
+func BuildSnapshotListResponse(ctx context.Context, s *server.BLTService, volName string, opts *restic.ListSnapshotsOpts, filter *SnapshotFilter, offset, limit int) (*SnapshotListResponse, error) {
 	rm := s.ResticManager(volName)
-	snaps, err := rm.ListSnapshotsWithOpts(opts)
+	snaps, err := rm.ListSnapshotsWithOpts(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +109,7 @@ func BuildSnapshotListResponse(s *server.Service, volName string, opts *restic.L
 	}
 
 	restorePointID := ""
-	if id, err := s.FindRestorePointByName(volName); err == nil {
+	if id, err := s.RestoreStore().FindByName(ctx, volName); err == nil {
 		restorePointID = id
 	}
 

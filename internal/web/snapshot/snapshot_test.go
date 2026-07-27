@@ -10,6 +10,7 @@ import (
 )
 
 func TestParseVersionParam(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input  string
 		major  int
@@ -38,6 +39,7 @@ func TestParseVersionParam(t *testing.T) {
 }
 
 func TestParseVersionTag(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		tags   []string
 		major  int
@@ -65,6 +67,7 @@ func TestParseVersionTag(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_Nil(t *testing.T) {
+	t.Parallel()
 	snaps := []restic.Snapshot{
 		{ID: "a", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 		{ID: "b", Time: time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)},
@@ -76,6 +79,7 @@ func TestApplySnapshotFilter_Nil(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_TimeFrom(t *testing.T) {
+	t.Parallel()
 	t1 := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
 	snaps := []restic.Snapshot{
 		{ID: "a", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
@@ -88,6 +92,7 @@ func TestApplySnapshotFilter_TimeFrom(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_TimeTo(t *testing.T) {
+	t.Parallel()
 	t1 := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
 	snaps := []restic.Snapshot{
 		{ID: "a", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
@@ -100,6 +105,7 @@ func TestApplySnapshotFilter_TimeTo(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_TimeOfDay(t *testing.T) {
+	t.Parallel()
 	morning := 8 * 3600
 	afternoon := 14 * 3600
 	snaps := []restic.Snapshot{
@@ -114,6 +120,7 @@ func TestApplySnapshotFilter_TimeOfDay(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_VersionRange(t *testing.T) {
+	t.Parallel()
 	snaps := []restic.Snapshot{
 		{ID: "a", Tags: []string{"v1.0"}},
 		{ID: "b", Tags: []string{"v1.5"}},
@@ -129,6 +136,7 @@ func TestApplySnapshotFilter_VersionRange(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_Query(t *testing.T) {
+	t.Parallel()
 	q := "abc"
 	snaps := []restic.Snapshot{
 		{ID: "abc123", ShortID: "abc123"},
@@ -141,6 +149,7 @@ func TestApplySnapshotFilter_Query(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_QueryMatchTag(t *testing.T) {
+	t.Parallel()
 	q := "prod"
 	snaps := []restic.Snapshot{
 		{ID: "a", Tags: []string{"env:prod"}},
@@ -153,6 +162,7 @@ func TestApplySnapshotFilter_QueryMatchTag(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_QueryMatchHostname(t *testing.T) {
+	t.Parallel()
 	q := "server1"
 	snaps := []restic.Snapshot{
 		{ID: "a", Hostname: "server1"},
@@ -165,6 +175,7 @@ func TestApplySnapshotFilter_QueryMatchHostname(t *testing.T) {
 }
 
 func TestApplySnapshotFilter_QueryCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	q := "ABC"
 	snaps := []restic.Snapshot{
 		{ID: "abc123", ShortID: "abc123"},
@@ -176,6 +187,7 @@ func TestApplySnapshotFilter_QueryCaseInsensitive(t *testing.T) {
 }
 
 func TestParseSnapshotListOpts(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		query      string

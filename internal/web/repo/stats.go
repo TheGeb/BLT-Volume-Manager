@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -24,8 +25,8 @@ type StatsResponse struct {
 	TotalVolumes int        `json:"total_volumes,omitempty"`
 }
 
-func buildRepoStats(rm *restic.Manager) *RepoStats {
-	rst, err := rm.Stats()
+func buildRepoStats(ctx context.Context, rm *restic.Manager) *RepoStats {
+	rst, err := rm.Stats(ctx)
 	if err != nil {
 		log.Error("stats_failed", err)
 		return &RepoStats{Error: err.Error()}
@@ -42,7 +43,7 @@ func buildRepoStats(rm *restic.Manager) *RepoStats {
 	}
 }
 
-func Stats(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func Stats(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -51,11 +52,12 @@ func Stats(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	rm := s.ResticManager(volName)
 
 	resp := StatsResponse{
 		Volume: volName,
-		Repo:   buildRepoStats(rm),
+		Repo:   buildRepoStats(ctx, rm),
 	}
 
 	if c := s.StatsCache(); c != nil {
@@ -66,11 +68,11 @@ func Stats(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, resp)
 }
 
-func RefreshStats(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func RefreshStats(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
-	s.RefreshStats()
+	s.RefreshStats(r.Context())
 	cached := s.StatsCache()
 	server.RespondJSON(w, cached)
 }

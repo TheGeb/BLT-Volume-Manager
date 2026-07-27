@@ -8,6 +8,7 @@ import (
 )
 
 func TestRequireMethod_Allowed(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	if !RequireMethod(w, r, http.MethodGet) {
@@ -19,6 +20,7 @@ func TestRequireMethod_Allowed(t *testing.T) {
 }
 
 func TestRequireMethod_NotAllowed(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	if RequireMethod(w, r, http.MethodGet) {
@@ -30,6 +32,7 @@ func TestRequireMethod_NotAllowed(t *testing.T) {
 }
 
 func TestRequireMethod_PUTvsPOST(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPut, "/", nil)
 	if RequireMethod(w, r, http.MethodPost) {
@@ -41,6 +44,7 @@ func TestRequireMethod_PUTvsPOST(t *testing.T) {
 }
 
 func TestRespondJSON(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	RespondJSON(w, StatusResponse{Status: "ok"})
 
@@ -61,6 +65,7 @@ func TestRespondJSON(t *testing.T) {
 }
 
 func TestRespondJSON_Struct(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	type customResp struct {
 		Name  string `json:"name"`
@@ -78,6 +83,7 @@ func TestRespondJSON_Struct(t *testing.T) {
 }
 
 func TestRespondJSON_Nil(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	RespondJSON(w, nil)
 
@@ -91,6 +97,7 @@ func TestRespondJSON_Nil(t *testing.T) {
 }
 
 func TestRequireVolumeParam_Present(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/?volume=test-vol", nil)
 	vol, ok := RequireVolumeParam(w, r)
@@ -103,6 +110,7 @@ func TestRequireVolumeParam_Present(t *testing.T) {
 }
 
 func TestRequireVolumeParam_Missing(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	_, ok := RequireVolumeParam(w, r)
@@ -115,6 +123,7 @@ func TestRequireVolumeParam_Missing(t *testing.T) {
 }
 
 func TestRequireVolumeParam_EmptyValue(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/?volume=", nil)
 	_, ok := RequireVolumeParam(w, r)
@@ -124,6 +133,7 @@ func TestRequireVolumeParam_EmptyValue(t *testing.T) {
 }
 
 func TestRespondError(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	RespondError(w, http.ErrNoLocation, http.StatusInternalServerError)
 
@@ -144,6 +154,7 @@ func TestRespondError(t *testing.T) {
 }
 
 func TestRespondError_NilError(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	RespondError(w, nil, http.StatusBadRequest)
 

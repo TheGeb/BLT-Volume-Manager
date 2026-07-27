@@ -11,11 +11,11 @@ type HostSnapshots struct {
 	Snapshots []Snapshot `json:"snapshots"`
 }
 
-func (m *Manager) SnapshotHosts(latest int) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) SnapshotHosts(ctx context.Context, latest int) ([]string, error) {
+	hostCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.HostSnapshots(ctx)
+	out, err := m.runner.HostSnapshots(hostCtx)
 	if err != nil {
 		return nil, err
 	}

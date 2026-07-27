@@ -5,6 +5,7 @@ import (
 )
 
 func TestConfigValidate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		cfg     S3Config

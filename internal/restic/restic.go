@@ -6,11 +6,13 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
 
+// Manager provides operations against a single restic repository.
 type Manager struct {
 	repo   string
 	runner *cli.Runner
 }
 
+// Snapshot is a restic snapshot as returned by the JSON API.
 type Snapshot struct {
 	ID           string    `json:"id"`
 	ShortID      string    `json:"short_id"`
@@ -34,10 +36,13 @@ const (
 	TimeoutLong   = 30 * time.Minute
 )
 
+// NewManager creates a Manager for the given repo path.
 func NewManager(repo string) *Manager {
 	return &Manager{repo: repo, runner: &cli.Runner{Repo: repo}}
 }
 
+// WithTags prepends base to extra and returns the combined tag slice.
+// This is a helper for constructing restic tag arguments.
 func WithTags(base string, extra ...string) []string {
 	return append([]string{base}, extra...)
 }

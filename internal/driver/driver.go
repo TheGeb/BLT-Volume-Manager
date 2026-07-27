@@ -10,7 +10,6 @@ import (
 
 	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/btrfs"
 	_ "github.com/TheGeb/BLT-Volume-Manager/internal/driver/fs_snapshot/zfs"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
@@ -28,6 +27,7 @@ type VolumeInfo struct {
 	cancel   context.CancelFunc
 }
 
+// Driver implements the Docker volume plugin interface, managing volume lifecycle, backups, and metadata.
 type Driver struct {
 	volumePath        string
 	resticPath        string
@@ -42,10 +42,10 @@ type Driver struct {
 func New(c appcfg.Config, ctx context.Context) *Driver {
 	root := c.DataDir
 
-	var md *metadata.Metadata
+	var b store.Backend
 	if c.MetadataBackend != "" || c.S3Bucket != "" {
 		var err error
-		md, err = appcfg.OpenMetadataBackend(c)
+		b, err = appcfg.OpenMetadataBackend(c)
 		if err != nil {
 			log.Errorf("metadata_backend_init_failed", err, "backend=%s", c.MetadataBackend)
 		}
@@ -58,11 +58,11 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 		resticPath: c.ResticBase,
 		vols:       make(map[string]*VolumeInfo),
 	}
-	if md != nil {
+	if b != nil {
 		drv.ownerMaxMins = c.OwnerMaxMins
-		drv.ownerStore = md.Owners
-		drv.versionStore = md.Versions
-		drv.restorePointStore = md.RestorePoints
+		drv.ownerStore = store.NewOwnerStore(b)
+		drv.versionStore = store.NewVersionStore(b)
+		drv.restorePointStore = store.NewRestorePointStore(b)
 	}
 
 	go drv.monitorOrphanedSnapshots(ctx)
@@ -73,11 +73,11 @@ func (d *Driver) ResticManager(volName string) *restic.Manager {
 	return restic.NewManager(d.resticPath + "/restic/" + volName)
 }
 
-func (d *Driver) nextVersionTags(name string, major bool) []string {
+func (d *Driver) nextVersionTags(ctx context.Context, name string, major bool) []string {
 	if d.versionStore == nil {
 		return nil
 	}
-	tags, err := d.versionStore.NextTags(name, major)
+	tags, err := d.versionStore.NextTags(ctx, name, major)
 	if err != nil {
 		log.Errorf("version_counter_failed", err, "volume=%s", name)
 		return nil

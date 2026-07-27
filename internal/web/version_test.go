@@ -11,7 +11,8 @@ import (
 )
 
 func TestVersionRoute_ReturnsVersionInfo(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{
 			MetadataBackend: "s3",
 			S3Endpoint:      "https://s3.example.com",
@@ -52,7 +53,8 @@ func TestVersionRoute_ReturnsVersionInfo(t *testing.T) {
 }
 
 func TestVersionRoute_DefaultsToS3(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{
 			S3Bucket: "auto-bucket",
 		},
@@ -75,7 +77,8 @@ func TestVersionRoute_DefaultsToS3(t *testing.T) {
 }
 
 func TestVersionRoute_NoneBackend(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{
 			S3Bucket: "",
 		},
@@ -98,7 +101,8 @@ func TestVersionRoute_NoneBackend(t *testing.T) {
 }
 
 func TestVersionRoute_EtcdEndpoints(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{
 			MetadataBackend: "etcd",
 			EtcdEndpoints:   []string{"http://10.0.0.1:2379", "http://10.0.0.2:2379"},

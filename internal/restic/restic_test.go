@@ -1,11 +1,13 @@
 package restic
 
 import (
+	"context"
 	"testing"
 	"time"
 )
 
 func TestHasTag(t *testing.T) {
+	t.Parallel()
 	tags := []string{BackupTagHot, BackupTagCold, "restore-point"}
 
 	if !hasTag(tags, BackupTagHot) {
@@ -29,6 +31,7 @@ func TestHasTag(t *testing.T) {
 }
 
 func TestCommonPathPrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		paths    []string
 		expected string
@@ -52,6 +55,7 @@ func TestCommonPathPrefix(t *testing.T) {
 }
 
 func TestGenerateHash(t *testing.T) {
+	t.Parallel()
 	m := NewManager("/tmp/repo")
 
 	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -84,6 +88,7 @@ func TestGenerateHash(t *testing.T) {
 }
 
 func TestGenerateHashDiffers(t *testing.T) {
+	t.Parallel()
 	m := NewManager("/tmp/repo")
 	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -98,6 +103,7 @@ func TestGenerateHashDiffers(t *testing.T) {
 }
 
 func TestNewManager(t *testing.T) {
+	t.Parallel()
 	m := NewManager("s3:https://bucket.s3.amazonaws.com/repo")
 	if m == nil {
 		t.Fatal("expected non-nil manager")
@@ -108,6 +114,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestNewManagerLocalPath(t *testing.T) {
+	t.Parallel()
 	m := NewManager("/data/restic/vol1")
 	if m.Repo() != "/data/restic/vol1" {
 		t.Errorf("expected /data/restic/vol1, got %q", m.Repo())
@@ -115,14 +122,16 @@ func TestNewManagerLocalPath(t *testing.T) {
 }
 
 func TestFindSnapshotByHashEmpty(t *testing.T) {
+	t.Parallel()
 	m := NewManager("/nonexistent/repo")
-	_, err := m.FindSnapshotByHash("somehash")
+	_, err := m.FindSnapshotByHash(context.Background(), "somehash")
 	if err == nil {
 		t.Error("expected error for nonexistent repo")
 	}
 }
 
 func TestSnapshotSortLogic(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	snaps := []Snapshot{
 		{ShortID: "s1", Time: now.Add(-2 * time.Hour), Tags: []string{"restore-point"}, Paths: []string{"/volumes/my-vol/data"}},
@@ -142,6 +151,7 @@ func TestSnapshotSortLogic(t *testing.T) {
 }
 
 func TestCommonPathPrefixSingle(t *testing.T) {
+	t.Parallel()
 	got := commonPathPrefix([]string{"/a/b/c"})
 	if got != "/a/b/c" {
 		t.Errorf("expected '/a/b/c', got %q", got)
@@ -149,6 +159,7 @@ func TestCommonPathPrefixSingle(t *testing.T) {
 }
 
 func TestCommonPathPrefixIdentical(t *testing.T) {
+	t.Parallel()
 	got := commonPathPrefix([]string{"/a/b/c", "/a/b/c", "/a/b/c"})
 	if got != "/a/b/c" {
 		t.Errorf("expected '/a/b/c', got %q", got)

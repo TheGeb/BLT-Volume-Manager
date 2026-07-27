@@ -12,6 +12,7 @@ import (
 )
 
 func TestVolumeConfigReadWrite(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	volPath := filepath.Join(d.volumePath, "volumes", "test-vol")
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
@@ -34,6 +35,7 @@ func TestVolumeConfigReadWrite(t *testing.T) {
 }
 
 func TestVolumeConfigReadNonExistent(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	missing := d.readVolumeConfig(filepath.Join(d.volumePath, "volumes", "nonexistent"))
 	if missing != nil {
@@ -42,6 +44,7 @@ func TestVolumeConfigReadNonExistent(t *testing.T) {
 }
 
 func TestVolumeConfigDefaultFsType(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	volPath := filepath.Join(d.volumePath, "volumes", "plain-vol")
 	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
@@ -62,6 +65,7 @@ func TestVolumeConfigDefaultFsType(t *testing.T) {
 }
 
 func TestSnapVolumes(t *testing.T) {
+	t.Parallel()
 	d := &Driver{
 		vols: map[string]*VolumeInfo{
 			"vol1": {Name: "vol1", FsType: "btrfs"},
@@ -90,6 +94,7 @@ func TestSnapVolumes(t *testing.T) {
 }
 
 func TestSnapVolumesEmpty(t *testing.T) {
+	t.Parallel()
 	d := &Driver{vols: map[string]*VolumeInfo{}}
 	snaps := d.SnapVolumes()
 	if len(snaps) != 0 {
@@ -98,6 +103,7 @@ func TestSnapVolumesEmpty(t *testing.T) {
 }
 
 func TestSnapVolumesNilMap(t *testing.T) {
+	t.Parallel()
 	d := &Driver{vols: nil}
 	snaps := d.SnapVolumes()
 	if len(snaps) != 0 {
@@ -106,6 +112,7 @@ func TestSnapVolumesNilMap(t *testing.T) {
 }
 
 func TestCollectVolumeNames(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	d := &Driver{volumePath: root}
 
@@ -160,6 +167,7 @@ func TestCollectVolumeNames(t *testing.T) {
 }
 
 func TestCollectVolumeNamesEmpty(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	d := &Driver{volumePath: root}
 
@@ -171,6 +179,7 @@ func TestCollectVolumeNamesEmpty(t *testing.T) {
 }
 
 func TestVolumeNames(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	d := &Driver{volumePath: root}
 
@@ -191,6 +200,7 @@ func TestVolumeNames(t *testing.T) {
 }
 
 func TestResticManager(t *testing.T) {
+	t.Parallel()
 	d := &Driver{resticPath: "/data"}
 	rm := d.ResticManager("test-vol")
 	if rm == nil {
@@ -202,6 +212,7 @@ func TestResticManager(t *testing.T) {
 }
 
 func TestNewDriverDefaults(t *testing.T) {
+	t.Parallel()
 	d := New(cfg.Config{DataDir: t.TempDir(), ResticBase: "/tmp/restic"}, context.Background())
 	if d == nil {
 		t.Fatal("expected non-nil driver")
@@ -219,6 +230,7 @@ func TestNewDriverDefaults(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	d := &Driver{volumePath: root}
 
@@ -259,6 +271,7 @@ func TestList(t *testing.T) {
 }
 
 func TestListEmpty(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	resp, err := d.List()
 	if err != nil {
@@ -274,6 +287,7 @@ func TestListEmpty(t *testing.T) {
 }
 
 func TestCapabilities(t *testing.T) {
+	t.Parallel()
 	d := &Driver{}
 	cap := d.Capabilities()
 	if cap == nil {
@@ -286,6 +300,7 @@ func TestCapabilities(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	d := &Driver{volumePath: root}
 
@@ -299,6 +314,7 @@ func TestPath(t *testing.T) {
 }
 
 func TestRemoveNonExistent(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	err := d.Remove(&volume.RemoveRequest{Name: "no-such-vol"})
 	if err != nil {
@@ -307,6 +323,7 @@ func TestRemoveNonExistent(t *testing.T) {
 }
 
 func TestGetNonExistent(t *testing.T) {
+	t.Parallel()
 	d := &Driver{volumePath: t.TempDir()}
 	resp, err := d.Get(&volume.GetRequest{Name: "no-such-vol"})
 	if err != nil {
@@ -328,6 +345,7 @@ func TestGetNonExistent(t *testing.T) {
 }
 
 func TestUnmountNonExistent(t *testing.T) {
+	t.Parallel()
 	d := &Driver{}
 	err := d.Unmount(&volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
 	if err != nil {

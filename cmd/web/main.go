@@ -48,13 +48,14 @@ func run() int {
 		return 1
 	}
 
-	if _, err := cfg.OpenMetadataBackend(conf); err != nil {
+	b, err := cfg.OpenMetadataBackend(conf)
+	if err != nil {
 		log.Error("metadata_backend_config_error", err)
 		return 1
 	}
 
 	mux := http.NewServeMux()
-	webSrv := server.New(conf)
+	webSrv := server.New(conf, b)
 	if err := web.Register(webSrv, mux); err != nil {
 		log.Errorf("register_web_routes_failed", err, "http_addr=%s", httpAddr)
 		return 1

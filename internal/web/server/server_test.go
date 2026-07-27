@@ -8,6 +8,7 @@ import (
 
 // FIXME: This doesn't seem to test much
 func TestLoggingResponseWriter(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
 	lw.WriteHeader(http.StatusNotFound)

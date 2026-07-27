@@ -7,7 +7,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func CheckRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func CheckRepo(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -16,7 +16,7 @@ func CheckRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.ResticManager(volName)
-	err := rm.Check(true)
+	err := rm.Check(r.Context(), true)
 	if err != nil {
 		log.Error("check_failed", err)
 		server.RespondError(w, err, http.StatusInternalServerError)
@@ -26,7 +26,7 @@ func CheckRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	server.RespondJSON(w, server.StatusResponse{Status: "Check completed, repository is healthy."})
 }
 
-func RepairRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func RepairRepo(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !server.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -35,7 +35,7 @@ func RepairRepo(s *server.Service, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm := s.ResticManager(volName)
-	err := rm.Repair()
+	err := rm.Repair(r.Context())
 	if err != nil {
 		log.Error("repair_failed", err)
 		server.RespondError(w, err, http.StatusInternalServerError)

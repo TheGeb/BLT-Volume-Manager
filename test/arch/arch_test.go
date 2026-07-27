@@ -14,6 +14,7 @@ type goPackage struct {
 }
 
 func TestNoWebDriverDependency(t *testing.T) {
+	t.Parallel()
 	webPkgs, err := listPackages("github.com/TheGeb/BLT-Volume-Manager/internal/web/...")
 	if err != nil {
 		t.Fatal(err)
@@ -29,6 +30,7 @@ func TestNoWebDriverDependency(t *testing.T) {
 }
 
 func TestBackendOnlyInMetadata(t *testing.T) {
+	t.Parallel()
 	backendPath := "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	allowedPrefixes := []string{
 		"github.com/TheGeb/BLT-Volume-Manager/internal/metadata",
@@ -68,6 +70,7 @@ func isTestPkg(path string) bool {
 }
 
 func TestNoDriverWebDependency(t *testing.T) {
+	t.Parallel()
 	driverPkgs, err := listPackages("github.com/TheGeb/BLT-Volume-Manager/internal/driver/...")
 	if err != nil {
 		t.Fatal(err)

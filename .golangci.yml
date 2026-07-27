@@ -20,6 +20,7 @@ linters:
 
   exclusions:
     paths:
+      - node_modules
       - web/ui/node_modules
     rules:
       - linters:
@@ -41,4 +42,5 @@ formatters:
     - goimports
   exclusions:
     paths:
+      - node_modules
       - web/ui/node_modules

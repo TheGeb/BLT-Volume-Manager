@@ -1,156 +1,101 @@
 package server
 
 import (
-	"errors"
+	"context"
 	"sync"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
-
-var ErrNoBackend = errors.New("metadata backend not available")
 
 type StatsCache struct {
 	CachedAt     string `json:"cached_at"`
 	TotalVolumes int    `json:"total_volumes"`
 }
 
-type Service struct { // TODO: Rename to BLTService
+// BLTService is the central service object for the web API, holding config, metadata stores, and stats cache.
+type BLTService struct {
 	Config cfg.Config
 
-	metadata     *metadata.Metadata
-	metadataMu   sync.Mutex
+	owners   *store.OwnerStore
+	volumes  *store.RegisteredVolumeStore
+	versions *store.VersionStore
+	restores *store.RestorePointStore
+
 	statsMu      sync.RWMutex
 	statsCache   *StatsCache
 	statsCacheAt time.Time
 	wg           sync.WaitGroup
 }
 
-func (s *Service) Shutdown() {
+func (s *BLTService) Shutdown() {
 	s.wg.Wait()
 }
 
-func New(cfg cfg.Config) *Service {
-	return &Service{Config: cfg}
-}
-
-func (s *Service) SetMetadata(meta *metadata.Metadata) {
-	s.metadataMu.Lock()
-	defer s.metadataMu.Unlock()
-	s.metadata = meta
-}
-
-func (s *Service) initBackend() error {
-	s.metadataMu.Lock()
-	defer s.metadataMu.Unlock()
-	if s.metadata != nil {
-		return nil
+func New(cfg cfg.Config, b store.Backend) *BLTService {
+	return &BLTService{
+		Config:   cfg,
+		owners:   store.NewOwnerStore(b),
+		volumes:  store.NewRegisteredVolumeStore(b),
+		versions: store.NewVersionStore(b),
+		restores: store.NewRestorePointStore(b),
 	}
-	md, err := cfg.OpenMetadataBackend(s.Config)
-	if err != nil {
-		return err
-	}
-	s.metadata = md
-	return nil
 }
 
-func (s *Service) VolumeStore() (*store.RegisteredVolumeStore, error) {
-	if err := s.initBackend(); err != nil {
-		return nil, err
-	}
-	return s.metadata.Volumes, nil
+func (s *BLTService) SetStores(owners *store.OwnerStore, volumes *store.RegisteredVolumeStore, versions *store.VersionStore, restores *store.RestorePointStore) {
+	s.owners = owners
+	s.volumes = volumes
+	s.versions = versions
+	s.restores = restores
 }
 
-func (s *Service) RestorePointStore() (*store.RestorePointStore, error) {
-	if err := s.initBackend(); err != nil {
-		return nil, err
-	}
-	return s.metadata.RestorePoints, nil
-}
+func (s *BLTService) OwnerStore() *store.OwnerStore { return s.owners }
 
-func (s *Service) VersionStore() (*store.VersionStore, error) {
-	if err := s.initBackend(); err != nil {
-		return nil, err
-	}
-	return s.metadata.Versions, nil
-}
+func (s *BLTService) RestoreStore() *store.RestorePointStore { return s.restores }
 
-func (s *Service) OwnerStore() (*store.OwnerStore, error) {
-	if err := s.initBackend(); err != nil {
-		return nil, err
-	}
-	return s.metadata.Owners, nil
-}
+func (s *BLTService) VolumeStore() *store.RegisteredVolumeStore { return s.volumes }
 
-func (s *Service) RegisterVolume(name string) error {
-	vs, err := s.VolumeStore()
-	if err != nil {
-		return err
-	}
-	return vs.Register(name)
-}
-
-func (s *Service) SetRestorePoint(volume, snapshotID string) error {
-	rps, err := s.RestorePointStore()
-	if err != nil {
-		return err
-	}
-	return rps.Set(volume, snapshotID)
-}
-
-func (s *Service) DeleteRestorePoint(volume string) error {
-	rps, err := s.RestorePointStore()
-	if err != nil {
-		return err
-	}
-	return rps.Delete(volume)
-}
-
-func (s *Service) FindRestorePointByName(volName string) (string, error) {
-	rps, err := s.RestorePointStore()
-	if err != nil {
-		return "", err
-	}
-	return rps.FindByName(volName)
-}
-
-func (s *Service) DeleteMetadata(volumeName string) error {
-	return s.metadata.DeleteMetadata(volumeName)
-}
-
-func (s *Service) ResticManager(volName string) *restic.Manager {
+func (s *BLTService) ResticManager(volName string) *restic.Manager {
 	return restic.NewManager(s.Config.ResticBase + "/restic/" + volName)
 }
 
-func (s *Service) NextVersionTags(volName string, major bool) []string {
-	vs, err := s.VersionStore()
-	if err != nil {
-		return nil
-	}
-	tags, err := vs.NextTags(volName, major)
+func (s *BLTService) NextVersionTags(ctx context.Context, volName string, major bool) []string {
+	tags, err := s.versions.NextTags(ctx, volName, major)
 	if err != nil {
 		return nil
 	}
 	return tags
 }
 
-func (s *Service) VolumeNames() []string {
-	vs, err := s.VolumeStore()
-	if err != nil {
-		return nil
-	}
-	names, err := vs.List()
+func (s *BLTService) VolumeNames(ctx context.Context) []string {
+	names, err := s.volumes.List(ctx)
 	if err != nil {
 		return nil
 	}
 	return names
 }
 
-func (s *Service) RefreshStats() {
-	volNames := s.VolumeNames()
+func (s *BLTService) DeleteVolumeData(ctx context.Context, volumeName string) error {
+	if err := s.volumes.Delete(ctx, volumeName); err != nil {
+		return err
+	}
+	if err := s.owners.DeleteForVolume(ctx, volumeName); err != nil {
+		return err
+	}
+	if err := s.restores.Delete(ctx, volumeName); err != nil {
+		return err
+	}
+	return s.ResticManager(volumeName).PurgeSnapshots(ctx)
+}
+
+func (s *BLTService) RegisterVolume(ctx context.Context, volumeName string) error {
+	return s.volumes.Register(ctx, volumeName)
+}
+
+func (s *BLTService) RefreshStats(ctx context.Context) {
+	volNames := s.VolumeNames(ctx)
 
 	s.statsMu.Lock()
 	s.statsCache = &StatsCache{
@@ -161,23 +106,23 @@ func (s *Service) RefreshStats() {
 	s.statsMu.Unlock()
 }
 
-func (s *Service) WithStatsLock(f func()) {
+func (s *BLTService) WithStatsLock(f func()) {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
 	f()
 }
 
-func (s *Service) WithStatsRLock(f func()) {
+func (s *BLTService) WithStatsRLock(f func()) {
 	s.statsMu.RLock()
 	defer s.statsMu.RUnlock()
 	f()
 }
 
-func (s *Service) StatsCache() *StatsCache {
+func (s *BLTService) StatsCache() *StatsCache {
 	s.statsMu.RLock()
 	defer s.statsMu.RUnlock()
 	return s.statsCache
 }
 
-func (s *Service) AddWork()  { s.wg.Add(1) }
-func (s *Service) DoneWork() { s.wg.Done() }
+func (s *BLTService) AddWork()  { s.wg.Add(1) }
+func (s *BLTService) DoneWork() { s.wg.Done() }

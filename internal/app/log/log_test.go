@@ -7,12 +7,14 @@ import (
 )
 
 func TestLogLevelInit(t *testing.T) {
+	t.Parallel()
 	if l := logLevel(); l < slog.LevelInfo {
 		t.Errorf("logLevel() = %d, should be >= %d", l, slog.LevelInfo)
 	}
 }
 
 func TestLogLevelFiltering(t *testing.T) {
+	t.Parallel()
 	oldLevel := logLevel()
 	oldHandler := slog.Default().Handler()
 	defer func() {
@@ -33,6 +35,7 @@ func TestLogLevelFiltering(t *testing.T) {
 }
 
 func TestLogLevelNames(t *testing.T) {
+	t.Parallel()
 	levels := map[string]slog.Level{
 		"error": slog.LevelError,
 		"info":  slog.LevelInfo,
@@ -47,6 +50,7 @@ func TestLogLevelNames(t *testing.T) {
 }
 
 func TestLogJSONBelowLevel(t *testing.T) {
+	t.Parallel()
 	oldLevel := logLevel()
 	oldHandler := slog.Default().Handler()
 	defer func() {
@@ -67,13 +71,16 @@ func TestLogJSONBelowLevel(t *testing.T) {
 }
 
 func TestLogInfo(t *testing.T) {
+	t.Parallel()
 	Info("test_info_event")
 }
 
 func TestLogError(t *testing.T) {
+	t.Parallel()
 	Error("test_error_event", nil)
 }
 
 func TestS3Call(t *testing.T) {
+	t.Parallel()
 	S3Call("PutObject", "bucket", "key", 0, nil)
 }

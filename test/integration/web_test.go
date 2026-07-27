@@ -476,6 +476,50 @@ func testAPIDevMode(t *testing.T, ts *testServer) {
 	}
 }
 
+func testAPIDeleteVolumeWithResticCleanup(t *testing.T, ts *testServer) {
+	volName := "test-group/del-restic-vol-" + randomString(4)
+
+	apiOK(t, ts, "POST", "/api/dummy-volume", map[string]string{"name": volName})
+
+	m := apiOK(t, ts, "GET", "/api/volumes", nil)
+	vols, _ := m["volumes"].([]any)
+	found := false
+	for _, v := range vols {
+		if v == volName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("volume %q not found in listing before deletion", volName)
+	}
+
+	m = apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snaps, _ := m["snapshots"].([]any)
+	if len(snaps) == 0 {
+		t.Fatal("expected snapshots before deletion")
+	}
+
+	m = apiOK(t, ts, "DELETE", "/api/volume/"+volName, nil)
+	if !strings.Contains(fmt.Sprint(m["status"]), "deleted") {
+		t.Fatalf("delete volume: %v", m)
+	}
+
+	m = apiOK(t, ts, "GET", "/api/volumes", nil)
+	vols, _ = m["volumes"].([]any)
+	for _, v := range vols {
+		if v == volName {
+			t.Fatal("volume should not be listed after deletion")
+		}
+	}
+
+	m = apiOK(t, ts, "GET", "/api/snapshots?volume="+volName, nil)
+	snaps, _ = m["snapshots"].([]any)
+	if len(snaps) > 0 {
+		t.Fatalf("expected no snapshots after deletion, got %d", len(snaps))
+	}
+}
+
 func testAPIVolumeOwnersList(t *testing.T, ts *testServer) {
 	apiOK(t, ts, "POST", "/api/volume/list-own-vol/owners", map[string]string{"owner": "test-owner"})
 
@@ -604,6 +648,7 @@ func TestAPI(t *testing.T) {
 			t.Run("SnapshotDeleteBatch", func(t *testing.T) { t.Parallel(); testAPISnapshotDeleteBatch(t, ts) })
 			t.Run("DummySnapshot", func(t *testing.T) { t.Parallel(); testAPIDummySnapshot(t, ts) })
 			t.Run("VolumeOwnersList", func(t *testing.T) { t.Parallel(); testAPIVolumeOwnersList(t, ts) })
+			t.Run("DeleteVolumeWithResticCleanup", func(t *testing.T) { t.Parallel(); testAPIDeleteVolumeWithResticCleanup(t, ts) })
 		})
 	}
 }

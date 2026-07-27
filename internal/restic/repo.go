@@ -23,19 +23,19 @@ type SnapshotSizeResult struct {
 	TotalFileCount int64 `json:"total_file_count"`
 }
 
-func (m *Manager) RepoExists() (bool, error) {
-	return m.repositoryExists()
+func (m *Manager) RepoExists(ctx context.Context) (bool, error) {
+	return m.repositoryExists(ctx)
 }
 
-func (m *Manager) Init() error {
-	return m.initRepository()
+func (m *Manager) Init(ctx context.Context) error {
+	return m.initRepository(ctx)
 }
 
-func (m *Manager) Stats() (*RepoStats, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) Stats(ctx context.Context) (*RepoStats, error) {
+	statsCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.Stats(ctx, "raw-data")
+	out, err := m.runner.Stats(statsCtx, "raw-data")
 	if err != nil {
 		log.Errorf("restic_stats_failed", err, "stderr=%s", string(out))
 		return nil, fmt.Errorf("restic stats: %w", err)
@@ -49,11 +49,11 @@ func (m *Manager) Stats() (*RepoStats, error) {
 	return &stats, nil
 }
 
-func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) SnapshotStats(ctx context.Context, snapshotID string) (*SnapshotSizeResult, error) {
+	statsCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.StatsSnapshot(ctx, snapshotID)
+	out, err := m.runner.StatsSnapshot(statsCtx, snapshotID)
 	if err != nil {
 		return nil, fmt.Errorf("restic snapshot stats: %w", err)
 	}
@@ -65,44 +65,44 @@ func (m *Manager) SnapshotStats(snapshotID string) (*SnapshotSizeResult, error) 
 	return &result, nil
 }
 
-func (m *Manager) repositoryExists() (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) repositoryExists(ctx context.Context) (bool, error) {
+	checkCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	_, err := m.runner.RepoExists(ctx)
+	_, err := m.runner.RepoExists(checkCtx)
 	if err != nil {
 		return false, nil
 	}
 	return true, nil
 }
 
-func (m *Manager) initRepository() error {
-	return m.runner.Init(context.Background())
+func (m *Manager) initRepository(ctx context.Context) error {
+	return m.runner.Init(ctx)
 }
 
-func (m *Manager) Check(noLock bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutMedium)
+func (m *Manager) Check(ctx context.Context, noLock bool) error {
+	checkCtx, cancel := context.WithTimeout(ctx, TimeoutMedium)
 	defer cancel()
-	return m.runner.Check(ctx, noLock)
+	return m.runner.Check(checkCtx, noLock)
 }
 
-func (m *Manager) Repair() error {
-	if err := m.Unlock(); err != nil {
+func (m *Manager) Repair(ctx context.Context) error {
+	if err := m.Unlock(ctx); err != nil {
 		log.Warnf("repair_unlock_failed_continuing", "error=%v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
+	repairCtx, cancel := context.WithTimeout(ctx, TimeoutLong)
 	defer cancel()
-	return m.runner.Repair(ctx)
+	return m.runner.Repair(repairCtx)
 }
 
-func (m *Manager) CopyTo(destRepo string, snapshotIDs ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutLong)
+func (m *Manager) CopyTo(ctx context.Context, destRepo string, snapshotIDs ...string) error {
+	copyCtx, cancel := context.WithTimeout(ctx, TimeoutLong)
 	defer cancel()
-	return m.runner.Copy(ctx, destRepo, snapshotIDs...)
+	return m.runner.Copy(copyCtx, destRepo, snapshotIDs...)
 }
 
-func (m *Manager) Unlock() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func (m *Manager) Unlock(ctx context.Context) error {
+	unlockCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return m.runner.Unlock(ctx)
+	return m.runner.Unlock(unlockCtx)
 }

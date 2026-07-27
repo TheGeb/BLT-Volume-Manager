@@ -61,18 +61,18 @@ func (d *Driver) Create(r *volume.CreateRequest) (err error) {
 	if d.ownerStore != nil {
 		myName := ownerName()
 		expiry := time.Now().Add(time.Minute * time.Duration(d.ownerMaxMins+2)).Unix()
-		lockKey, err := d.ownerStore.LockVolume(name, myName, expiry)
+		lockKey, err := d.ownerStore.LockVolume(context.Background(), name, myName, expiry)
 		if err != nil {
 			return err
 		}
-		if rerr := d.ownerStore.ReleaseLock(lockKey); rerr != nil {
+		if rerr := d.ownerStore.ReleaseLock(context.Background(), lockKey); rerr != nil {
 			log.Errorf("release_owner_failed", rerr, "volume=%s", name)
 		}
 	}
 
 	// Cold backup on create — marks the volume's initial state (v0, v0.0)
 	rm := d.ResticManager(name)
-	if err := rm.Backup(volPath, "cold", "v0", "v0.0"); err != nil {
+	if err := rm.Backup(context.Background(), volPath, "cold", "v0", "v0.0"); err != nil {
 		log.Errorf("create_cold_backup_failed", err, "volume=%s", name)
 	}
 
@@ -129,7 +129,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) (err error) {
 	}
 
 	rm := d.ResticManager(name)
-	if err := d.coldBackup(name, volPath, fsType, rm); err != nil {
+	if err := d.coldBackup(context.Background(), name, volPath, fsType, rm); err != nil {
 		log.Errorf("final_backup_failed", err, "volume=%s", name)
 	}
 	if fsType != "" {
@@ -142,7 +142,7 @@ func (d *Driver) Remove(r *volume.RemoveRequest) (err error) {
 		}
 	}
 	if lockKey != "" {
-		if err := d.ownerStore.ReleaseLock(lockKey); err != nil {
+		if err := d.ownerStore.ReleaseLock(context.Background(), lockKey); err != nil {
 			log.Errorf("release_owner_failed", err, "volume=%s", name)
 		}
 	}
@@ -176,7 +176,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 	rm := d.ResticManager(name)
 
 	if needsLock {
-		lockKey, lockErr := d.ownerStore.LockVolume(name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
+		lockKey, lockErr := d.ownerStore.LockVolume(context.Background(), name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
 		if lockErr != nil {
 			d.mu.Lock()
 			vi.attached--
@@ -186,18 +186,18 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 		}
 		vi.LockKey = lockKey
 
-		if vt := d.nextVersionTags(name, true); vt != nil {
-			if err := rm.Backup(volPath, restic.WithTags("cold", vt...)...); err != nil {
+		if vt := d.nextVersionTags(context.Background(), name, true); vt != nil {
+			if err := rm.Backup(context.Background(), volPath, restic.WithTags("cold", vt...)...); err != nil {
 				log.Errorf("mount_cold_backup_failed", err, "volume=%s", name)
 			}
 		}
 
 		if vi.FsType != "" && d.restorePointStore != nil {
-			snapID, err := d.restorePointStore.FindByName(name)
+			snapID, err := d.restorePointStore.FindByName(context.Background(), name)
 			if err != nil {
 				log.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
-				valid, verr := d.ownerStore.LockIsValid(vi.LockKey)
+				valid, verr := d.ownerStore.LockIsValid(context.Background(), vi.LockKey)
 				switch {
 				case verr != nil:
 					log.Errorf("owner_check_failed", verr, "volume=%s", name)
@@ -211,11 +211,11 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 					if snapErr != nil {
 						log.Errorf("pre_restore_snapshot_failed", snapErr, "volume=%s", name)
 					}
-					if err := rm.RestoreSnapshot(snapID, volPath); err != nil {
+					if err := rm.RestoreSnapshot(context.Background(), snapID, volPath); err != nil {
 						log.Errorf("restore_failed", err, "volume=%s snapshot=%s", name, snapID)
 					} else {
 						log.Infof("restore_complete_removing_point", "volume=%s", name)
-						if err := d.restorePointStore.Delete(name); err != nil {
+						if err := d.restorePointStore.Delete(context.Background(), name); err != nil {
 							log.Errorf("remove_restore_point_failed", err, "volume=%s", name)
 						}
 					}
@@ -248,7 +248,7 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) (err error) {
 		vi.attached--
 		if vi.attached <= 0 {
 			rm := d.ResticManager(name)
-			if err := d.coldBackup(name, vi.Path, vi.FsType, rm); err != nil {
+			if err := d.coldBackup(context.Background(), name, vi.Path, vi.FsType, rm); err != nil {
 				log.Errorf("unmount_cold_backup_failed", err, "volume=%s", name)
 			}
 			if vi.cancel != nil {

@@ -15,14 +15,12 @@ type EtcdConfig struct {
 	RequestTimeout time.Duration
 }
 
-type etcdClient struct {
+type EtcdClient struct {
 	client *clientv3.Client
 	cfg    EtcdConfig
 }
 
-var _ KeyValueStore = (*etcdClient)(nil)
-
-func NewEtcdClient(cfg EtcdConfig) (KeyValueStore, error) {
+func NewEtcdClient(cfg EtcdConfig) (*EtcdClient, error) {
 	if len(cfg.Endpoints) == 0 {
 		return nil, fmt.Errorf("etcd: at least one endpoint required")
 	}
@@ -42,22 +40,22 @@ func NewEtcdClient(cfg EtcdConfig) (KeyValueStore, error) {
 		return nil, fmt.Errorf("etcd: create client: %w", err)
 	}
 
-	return &etcdClient{client: cli, cfg: cfg}, nil
+	return &EtcdClient{client: cli, cfg: cfg}, nil
 }
 
-func (c *etcdClient) PutObject(key string, data []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+func (c *EtcdClient) PutObject(ctx context.Context, key string, data []byte) error {
+	putCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
-	_, err := c.client.Put(ctx, key, string(data))
+	_, err := c.client.Put(putCtx, key, string(data))
 	return err
 }
 
-func (c *etcdClient) ReadObject(key string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+func (c *EtcdClient) ReadObject(ctx context.Context, key string) ([]byte, error) {
+	getCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
-	resp, err := c.client.Get(ctx, key)
+	resp, err := c.client.Get(getCtx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -67,19 +65,19 @@ func (c *etcdClient) ReadObject(key string) ([]byte, error) {
 	return resp.Kvs[0].Value, nil
 }
 
-func (c *etcdClient) DeleteObject(key string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+func (c *EtcdClient) DeleteObject(ctx context.Context, key string) error {
+	delCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
-	_, err := c.client.Delete(ctx, key)
+	_, err := c.client.Delete(delCtx, key)
 	return err
 }
 
-func (c *etcdClient) ListObjects(prefix string) ([]Entry, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+func (c *EtcdClient) ListObjects(ctx context.Context, prefix string) ([]Entry, error) {
+	listCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
-	resp, err := c.client.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	resp, err := c.client.Get(listCtx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +90,10 @@ func (c *etcdClient) ListObjects(prefix string) ([]Entry, error) {
 	return entries, nil
 }
 
-func (c *etcdClient) DeleteObjectsWithPrefix(prefix string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+func (c *EtcdClient) DeleteObjectsWithPrefix(ctx context.Context, prefix string) error {
+	delCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer cancel()
 
-	_, err := c.client.Delete(ctx, prefix, clientv3.WithPrefix())
+	_, err := c.client.Delete(delCtx, prefix, clientv3.WithPrefix())
 	return err
 }

@@ -7,17 +7,18 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
-func OpenMetadataBackend(cfg Config) (*metadata.Metadata, error) {
-	backend, err := openBackend(cfg)
+func OpenMetadataBackend(cfg Config) (store.Backend, error) {
+	b, err := openBackend(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return metadata.NewMetadata(backend), nil
+	return b, nil
 }
 
-func openBackend(cfg Config) (backend.KeyValueStore, error) {
+func openBackend(cfg Config) (store.Backend, error) {
 	backendType := cfg.MetadataBackend
 	if backendType == "" {
 		if cfg.S3Bucket != "" {

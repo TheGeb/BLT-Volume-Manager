@@ -17,19 +17,19 @@ type VolumeListResponse struct {
 
 const OwnersDir = "owners"
 
-func ListVolumes(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func ListVolumes(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 		return
 	}
-	volumes := s.VolumeNames()
+	volumes := s.VolumeNames(r.Context())
 	if volumes == nil {
 		volumes = []string{}
 	}
 	server.RespondJSON(w, VolumeListResponse{Volumes: volumes})
 }
 
-func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
+func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	escapedPath := r.URL.EscapedPath()
 	if !strings.HasPrefix(escapedPath, "/api/volume/") {
 		http.NotFound(w, r)
@@ -91,13 +91,14 @@ func VolumeRouter(s *server.Service, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func DeleteVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if !validVolumeName(volumeName) {
 		http.Error(w, "invalid volume name", http.StatusBadRequest)
 		return
 	}
-	CleanupVolumeData(s, volumeName)
-	s.RefreshStats()
+	ctx := r.Context()
+	CleanupVolumeData(ctx, s, volumeName)
+	s.RefreshStats(ctx)
 	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
 }
 
@@ -116,7 +117,7 @@ func errorStatus(err error) int {
 	}
 }
 
-func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func CopyVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
@@ -132,13 +133,14 @@ func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volum
 		return
 	}
 
-	result, err := CopyVolumeData(s, volumeName, req.Target, req.PreserveHistory, req.SnapshotIDs)
+	ctx := r.Context()
+	result, err := CopyVolumeData(ctx, s, volumeName, req.Target, req.PreserveHistory, req.SnapshotIDs)
 	if err != nil {
 		server.RespondError(w, err, errorStatus(err))
 		return
 	}
 
-	s.RefreshStats()
+	s.RefreshStats(ctx)
 
 	type copyResponse struct {
 		Status          string `json:"status"`
@@ -157,7 +159,7 @@ func CopyVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volum
 	server.RespondJSON(w, cr)
 }
 
-func RenameVolume(s *server.Service, w http.ResponseWriter, r *http.Request, volumeName string) {
+func RenameVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if r.Method != http.MethodPost {
 		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
@@ -171,13 +173,14 @@ func RenameVolume(s *server.Service, w http.ResponseWriter, r *http.Request, vol
 		return
 	}
 
-	err := RenameVolumeData(s, volumeName, req.Target)
+	ctx := r.Context()
+	err := RenameVolumeData(ctx, s, volumeName, req.Target)
 	if err != nil {
 		server.RespondError(w, err, errorStatus(err))
 		return
 	}
 
-	s.RefreshStats()
+	s.RefreshStats(ctx)
 
 	type renameResponse struct {
 		Status string `json:"status"`

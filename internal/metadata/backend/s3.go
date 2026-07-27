@@ -33,14 +33,12 @@ func (cfg S3Config) validate() error {
 	return nil
 }
 
-type s3Client struct {
+type S3Client struct {
 	s3Client *s3sdk.Client
 	cfg      S3Config
 }
 
-var _ KeyValueStore = (*s3Client)(nil)
-
-func NewS3Client(cfg S3Config) (KeyValueStore, error) {
+func NewS3Client(cfg S3Config) (*S3Client, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid S3 store config: %w", err)
 	}
@@ -87,21 +85,21 @@ func NewS3Client(cfg S3Config) (KeyValueStore, error) {
 
 	client := s3sdk.NewFromConfig(awsCfg, clientOpts...)
 
-	return &s3Client{
+	return &S3Client{
 		s3Client: client,
 		cfg:      cfg,
 	}, nil
 }
 
-func (s *s3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
+func (s *S3Client) logS3Call(op, bucket, key string, dur time.Duration, err error) {
 	if fn := s.cfg.Logger; fn != nil {
 		fn(op, bucket, key, dur, err)
 	}
 }
 
-func (s *s3Client) PutObject(key string, data []byte) error {
+func (s *S3Client) PutObject(ctx context.Context, key string, data []byte) error {
 	start := time.Now()
-	_, err := s.s3Client.PutObject(context.Background(), &s3sdk.PutObjectInput{
+	_, err := s.s3Client.PutObject(ctx, &s3sdk.PutObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
@@ -110,9 +108,9 @@ func (s *s3Client) PutObject(key string, data []byte) error {
 	return err
 }
 
-func (s *s3Client) ReadObject(key string) ([]byte, error) {
+func (s *S3Client) ReadObject(ctx context.Context, key string) ([]byte, error) {
 	start := time.Now()
-	output, err := s.s3Client.GetObject(context.Background(), &s3sdk.GetObjectInput{
+	output, err := s.s3Client.GetObject(ctx, &s3sdk.GetObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 	})
@@ -128,9 +126,9 @@ func (s *s3Client) ReadObject(key string) ([]byte, error) {
 	return io.ReadAll(output.Body)
 }
 
-func (s *s3Client) DeleteObject(key string) error {
+func (s *S3Client) DeleteObject(ctx context.Context, key string) error {
 	start := time.Now()
-	_, err := s.s3Client.DeleteObject(context.Background(), &s3sdk.DeleteObjectInput{
+	_, err := s.s3Client.DeleteObject(ctx, &s3sdk.DeleteObjectInput{
 		Bucket: aws.String(s.cfg.S3Bucket),
 		Key:    aws.String(key),
 	})
@@ -138,7 +136,7 @@ func (s *s3Client) DeleteObject(key string) error {
 	return err
 }
 
-func (s *s3Client) ListObjects(prefix string) ([]Entry, error) {
+func (s *S3Client) ListObjects(ctx context.Context, prefix string) ([]Entry, error) {
 	start := time.Now()
 	var objects []Entry
 	paginator := s3sdk.NewListObjectsV2Paginator(s.s3Client, &s3sdk.ListObjectsV2Input{
@@ -146,7 +144,7 @@ func (s *s3Client) ListObjects(prefix string) ([]Entry, error) {
 		Prefix: aws.String(prefix),
 	})
 	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.Background())
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			s.logS3Call("ListObjectsV2", s.cfg.S3Bucket, prefix, time.Since(start), err)
 			return nil, err
@@ -163,8 +161,8 @@ func (s *s3Client) ListObjects(prefix string) ([]Entry, error) {
 	return objects, nil
 }
 
-func (s *s3Client) DeleteObjectsWithPrefix(prefix string) error {
-	objects, err := s.ListObjects(prefix)
+func (s *S3Client) DeleteObjectsWithPrefix(ctx context.Context, prefix string) error {
+	objects, err := s.ListObjects(ctx, prefix)
 	if err != nil {
 		return fmt.Errorf("listing objects (prefix=%s): %w", prefix, err)
 	}
@@ -183,7 +181,7 @@ func (s *s3Client) DeleteObjectsWithPrefix(prefix string) error {
 		if end > len(idents) {
 			end = len(idents)
 		}
-		_, err = s.s3Client.DeleteObjects(context.Background(), &s3sdk.DeleteObjectsInput{
+		_, err = s.s3Client.DeleteObjects(ctx, &s3sdk.DeleteObjectsInput{
 			Bucket: aws.String(s.cfg.S3Bucket),
 			Delete: &types.Delete{Objects: idents[i:end]},
 		})

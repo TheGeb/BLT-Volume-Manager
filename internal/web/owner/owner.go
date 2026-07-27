@@ -1,9 +1,9 @@
 package owner
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 )
 
 type OwnerInfo struct {
@@ -18,20 +18,16 @@ type CreateOwnerResponse struct {
 	ExpiresAt int64  `json:"expires_at,omitempty"`
 }
 
-func VolumeOwner(s *server.Service, volumeName string) (*OwnerInfo, error) {
-	os, err := s.OwnerStore()
-	if err != nil {
-		return nil, err
-	}
-	vo, err := os.FindForVolume(volumeName)
+func VolumeOwner(ctx context.Context, os *store.OwnerStore, volumeName string) (*OwnerInfo, error) {
+	vo, err := os.FindForVolume(ctx, volumeName)
 	if err != nil {
 		return nil, err
 	}
 	return &OwnerInfo{Volume: vo.Volume, Owner: vo.Owner, Expiry: vo.Expiry}, nil
 }
 
-func IsVolumeOwned(s *server.Service, volumeName string) (bool, string, error) {
-	status, err := VolumeOwner(s, volumeName)
+func IsVolumeOwned(ctx context.Context, os *store.OwnerStore, volumeName string) (bool, string, error) {
+	status, err := VolumeOwner(ctx, os, volumeName)
 	if err != nil {
 		return false, "", err
 	}
@@ -41,12 +37,8 @@ func IsVolumeOwned(s *server.Service, volumeName string) (bool, string, error) {
 	return false, "", nil
 }
 
-func CreateVolumeOwner(s *server.Service, volumeName, ownerName string, ownerDurationMins int) (*CreateOwnerResponse, error) {
-	os, err := s.OwnerStore()
-	if err != nil {
-		return nil, err
-	}
-	expiry, err := os.AcquireForVolume(volumeName, ownerName, ownerDurationMins)
+func CreateVolumeOwner(ctx context.Context, os *store.OwnerStore, volumeName, ownerName string, ownerDurationMins int) (*CreateOwnerResponse, error) {
+	expiry, err := os.AcquireForVolume(ctx, volumeName, ownerName, ownerDurationMins)
 	if err != nil {
 		return nil, err
 	}
@@ -57,10 +49,6 @@ func CreateVolumeOwner(s *server.Service, volumeName, ownerName string, ownerDur
 	}, nil
 }
 
-func DeleteVolumeOwners(s *server.Service, volumeName string) error {
-	os, err := s.OwnerStore()
-	if err != nil {
-		return fmt.Errorf("initialize metadata store: %w", err)
-	}
-	return os.DeleteForVolume(volumeName)
+func DeleteVolumeOwners(ctx context.Context, os *store.OwnerStore, volumeName string) error {
+	return os.DeleteForVolume(ctx, volumeName)
 }

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,11 +12,11 @@ import (
 const VersionKeyspace = "blt-volume-manager/versions/"
 
 type VersionStore struct {
-	be backend.KeyValueStore
+	b Backend
 }
 
-func NewVersionStore(be backend.KeyValueStore) *VersionStore {
-	return &VersionStore{be: be}
+func NewVersionStore(b Backend) *VersionStore {
+	return &VersionStore{b: b}
 }
 
 type VersionCounter struct {
@@ -23,8 +24,8 @@ type VersionCounter struct {
 	Minor int `json:"minor"`
 }
 
-func (s *VersionStore) NextTags(name string, major bool) ([]string, error) {
-	v, err := s.ReadCounter(name)
+func (s *VersionStore) NextTags(ctx context.Context, name string, major bool) ([]string, error) {
+	v, err := s.ReadCounter(ctx, name)
 	if err != nil {
 		if !errors.Is(err, backend.ErrKeyNotFound) {
 			return nil, err
@@ -37,7 +38,7 @@ func (s *VersionStore) NextTags(name string, major bool) ([]string, error) {
 	} else {
 		v.Minor++
 	}
-	if err := s.WriteCounter(name, *v); err != nil {
+	if err := s.WriteCounter(ctx, name, *v); err != nil {
 		return nil, err
 	}
 	return []string{
@@ -46,16 +47,16 @@ func (s *VersionStore) NextTags(name string, major bool) ([]string, error) {
 	}, nil
 }
 
-func (s *VersionStore) WriteCounter(vol string, v VersionCounter) error {
+func (s *VersionStore) WriteCounter(ctx context.Context, vol string, v VersionCounter) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("marshal version counter: %w", err)
 	}
-	return s.be.PutObject(VersionKeyspace+vol+".json", data)
+	return s.b.PutObject(ctx, VersionKeyspace+vol+".json", data)
 }
 
-func (s *VersionStore) ReadCounter(vol string) (*VersionCounter, error) {
-	data, err := s.be.ReadObject(VersionKeyspace + vol + ".json")
+func (s *VersionStore) ReadCounter(ctx context.Context, vol string) (*VersionCounter, error) {
+	data, err := s.b.ReadObject(ctx, VersionKeyspace+vol+".json")
 	if err != nil {
 		if errors.Is(err, backend.ErrKeyNotFound) {
 			return nil, backend.ErrKeyNotFound

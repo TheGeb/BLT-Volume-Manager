@@ -5,6 +5,7 @@ import (
 )
 
 func TestVolumeNameFromPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		path     string
 		expected string
@@ -28,6 +29,7 @@ func TestVolumeNameFromPath(t *testing.T) {
 }
 
 func TestPathBelongsToVolume(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		path   string
 		volume string
@@ -56,6 +58,7 @@ func TestPathBelongsToVolume(t *testing.T) {
 }
 
 func TestPathBelongsToVolumeColdSnapEdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		path   string
 		volume string

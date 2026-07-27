@@ -1,6 +1,7 @@
 package restic
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -21,8 +22,8 @@ func (m *Manager) GenerateHash(s Snapshot) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (m *Manager) FindSnapshotByHash(hash string) (*Snapshot, error) {
-	snapshots, err := m.ListSnapshots()
+func (m *Manager) FindSnapshotByHash(ctx context.Context, hash string) (*Snapshot, error) {
+	snapshots, err := m.ListSnapshots(ctx)
 	if err != nil {
 		return nil, err
 	}

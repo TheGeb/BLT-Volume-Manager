@@ -1,35 +1,37 @@
 package volume
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
-	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/backend"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-type mockKeyValueStore struct {
+type mockBackend struct {
 	objects    []backend.Entry
 	objectsErr error
 }
 
-func (m *mockKeyValueStore) PutObject(string, []byte) error    { return nil }
-func (m *mockKeyValueStore) ReadObject(string) ([]byte, error) { return nil, backend.ErrKeyNotFound }
-func (m *mockKeyValueStore) DeleteObject(string) error         { return nil }
-func (m *mockKeyValueStore) ListObjects(string) ([]backend.Entry, error) {
+func (m *mockBackend) PutObject(context.Context, string, []byte) error { return nil }
+func (m *mockBackend) ReadObject(context.Context, string) ([]byte, error) {
+	return nil, backend.ErrKeyNotFound
+}
+func (m *mockBackend) DeleteObject(context.Context, string) error { return nil }
+func (m *mockBackend) ListObjects(context.Context, string) ([]backend.Entry, error) {
 	return m.objects, m.objectsErr
 }
-func (m *mockKeyValueStore) DeleteObjectsWithPrefix(string) error { return nil }
+func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error { return nil }
 
-func mockStores(objects []backend.Entry, objectsErr error) *metadata.Metadata {
-	be := &mockKeyValueStore{objects: objects, objectsErr: objectsErr}
-	return &metadata.Metadata{
-		Volumes: store.NewRegisteredVolumeStore(be),
+func mockStores(objects []backend.Entry, objectsErr error) func(*server.BLTService) {
+	return func(s *server.BLTService) {
+		b := &mockBackend{objects: objects, objectsErr: objectsErr}
+		s.SetStores(nil, store.NewRegisteredVolumeStore(b), nil, nil)
 	}
 }
 
@@ -43,10 +45,11 @@ func volumeObjects(names ...string) []backend.Entry {
 }
 
 func TestListVolumes(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadata(mockStores(volumeObjects("vol-a", "vol-b", "group/nested"), nil))
+	mockStores(volumeObjects("vol-a", "vol-b", "group/nested"), nil)(s)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -78,10 +81,11 @@ func TestListVolumes(t *testing.T) {
 }
 
 func TestListVolumesEmpty(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadata(mockStores(nil, nil))
+	mockStores(nil, nil)(s)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -106,10 +110,11 @@ func TestListVolumesEmpty(t *testing.T) {
 }
 
 func TestListVolumesMethodNotAllowed(t *testing.T) {
-	s := &server.Service{
+	t.Parallel()
+	s := &server.BLTService{
 		Config: cfg.Config{S3Bucket: "test-bucket"},
 	}
-	s.SetMetadata(mockStores(volumeObjects("vol-a"), nil))
+	mockStores(volumeObjects("vol-a"), nil)(s)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/volumes", nil)
 	rec := httptest.NewRecorder()
@@ -121,6 +126,7 @@ func TestListVolumesMethodNotAllowed(t *testing.T) {
 }
 
 func TestValidVolumeName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -148,27 +154,4 @@ func TestValidVolumeName(t *testing.T) {
 	}
 }
 
-func TestListVolumesNoS3(t *testing.T) {
-	s := &server.Service{}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/volumes", nil)
-	rec := httptest.NewRecorder()
-	ListVolumes(s, rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	var resp struct {
-		Volumes []string `json:"volumes"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-	if resp.Volumes == nil {
-		t.Error("expected non-nil volumes slice")
-	}
-	if len(resp.Volumes) != 0 {
-		t.Errorf("expected 0 volumes (no S3), got %d", len(resp.Volumes))
-	}
-}

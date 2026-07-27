@@ -30,11 +30,11 @@ type DiffChange struct {
 	Paths []string `json:"paths"`
 }
 
-func (m *Manager) ListSnapshotFiles(snapshotID, path string) ([]FileNode, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) ListSnapshotFiles(ctx context.Context, snapshotID, path string) ([]FileNode, error) {
+	lsCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.Ls(ctx, snapshotID, path)
+	out, err := m.runner.Ls(lsCtx, snapshotID, path)
 	if err != nil {
 		return nil, fmt.Errorf("restic ls: %w", err)
 	}
@@ -109,22 +109,22 @@ func commonPathPrefix(paths []string) string {
 	return prefix
 }
 
-func (m *Manager) DumpFile(snapshotID, path string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) DumpFile(ctx context.Context, snapshotID, path string) ([]byte, error) {
+	dumpCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.Dump(ctx, snapshotID, path)
+	out, err := m.runner.Dump(dumpCtx, snapshotID, path)
 	if err != nil {
 		return nil, fmt.Errorf("restic dump: %w", err)
 	}
 	return out, nil
 }
 
-func (m *Manager) DiffSnapshots(snapID1, snapID2 string) (*DiffResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutShort)
+func (m *Manager) DiffSnapshots(ctx context.Context, snapID1, snapID2 string) (*DiffResult, error) {
+	diffCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.Diff(ctx, snapID1, snapID2)
+	out, err := m.runner.Diff(diffCtx, snapID1, snapID2)
 	if err != nil {
 		return nil, fmt.Errorf("restic diff: %w\n%s", err, string(out))
 	}
