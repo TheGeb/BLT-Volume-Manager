@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     ca-certificates=20260611-r0 \
     nodejs=24.17.0-r0 \
     npm=11.12.1-r0 \
-    make=4.4.1-r4
+    make=4.4.1-r4 \
+    restic=0.18.1-r7
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -43,13 +44,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o blt-volume-manager-web ./cmd/web
 
-FROM scratch AS plugin
-COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
+FROM scratch AS base
+COPY --from=build /usr/bin/restic /usr/local/bin/restic
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
-FROM alpine:3.24 AS web
+FROM base AS plugin
+COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
+
+FROM base AS web
 COPY --from=build /src/blt-volume-manager-web /usr/local/bin/blt-volume-manager
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD wget -qO- http://localhost:8080/api/health || exit 1
-ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD ["/usr/local/bin/blt-volume-manager", "--health"]

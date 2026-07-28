@@ -30,14 +30,20 @@ func run() int {
 	var httpAddr string
 	var dataDir string
 	var showVersion bool
+	var healthCheck bool
 	flag.StringVar(&httpAddr, "http-addr", ":8080", "HTTP address for the BLT Volume Manager UI")
 	flag.StringVar(&dataDir, "data-dir", "/var/lib/docker-volumes", "root directory for volumes")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
+	flag.BoolVar(&healthCheck, "health", false, "perform a health check against the running server and exit")
 	flag.Parse()
 
 	if showVersion {
 		fmt.Println(app.VersionString())
 		return 0
+	}
+
+	if healthCheck {
+		return runHealthCheck(httpAddr)
 	}
 
 	conf, err := cfg.FromEnv(dataDir)
@@ -98,5 +104,24 @@ func run() int {
 	_ = srv.Shutdown(shutdownCtx)
 	webSrv.Shutdown()
 
+	return 0
+}
+
+func runHealthCheck(addr string) int {
+	host := addr
+	if host[0] == ':' {
+		host = "localhost" + host
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://" + host + "/api/health")
+	if err != nil {
+		log.Error("health_check_failed", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("health_check_unhealthy", nil, "status=%d", resp.StatusCode)
+		return 1
+	}
 	return 0
 }
