@@ -12,8 +12,7 @@ RUN apk add --no-cache \
     ca-certificates=20260611-r0 \
     nodejs=24.17.0-r0 \
     npm=11.12.1-r0 \
-    make=4.4.1-r4 \
-    restic=0.18.1-r7
+    make=4.4.1-r4
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -44,8 +43,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o blt-volume-manager-web ./cmd/web
 
-FROM scratch AS base
-COPY --from=build /usr/bin/restic /usr/local/bin/restic
+FROM restic/restic:0.19.1 AS base
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
