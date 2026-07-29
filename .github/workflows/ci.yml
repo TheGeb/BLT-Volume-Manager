@@ -63,6 +63,10 @@ jobs:
         run: go test -run 'TestNo(WebDriver|DriverWeb)Dependency' ./test/arch -count=1
 
   go-integration:
+    strategy:
+      matrix:
+        backend: [s3, etcd]
+      fail-fast: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -78,8 +82,8 @@ jobs:
       - name: Install restic
         run: sudo apt-get update && sudo apt-get install -y restic
 
-      - name: Integration tests
-        run: go test -race -tags integration -v -count=1 ./test/integration/
+      - name: Integration tests (${{ matrix.backend }})
+        run: go test -race -tags integration -v -count=1 -run '/${{ matrix.backend }}' ./test/integration/
 
   ui-lint:
     runs-on: ubuntu-latest
@@ -142,6 +146,12 @@ jobs:
       - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: nix-community/cache-nix-action@e748db46ed7227f0eac581148b9a441fff7a5ae3 # v6
+        with:
+          key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock', 'go.sum', 'web/ui/package-lock.json') }}
+          restore-keys: |
+            nix-${{ runner.os }}-
 
       - name: Update and push dependency hashes
         run: |
