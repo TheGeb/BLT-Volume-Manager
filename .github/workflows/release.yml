@@ -26,7 +26,7 @@ jobs:
         run: |
           VERSION="${{ inputs.version || '' }}"
           if [ -z "$VERSION" ]; then
-            VERSION="v$(cat VERSION)"
+            VERSION="$(cat VERSION)"
           fi
           # Validate version format to prevent injection
           if ! echo "$VERSION" | grep -qP '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'; then
@@ -38,7 +38,7 @@ jobs:
       - name: Check if tag exists
         id: tag_check
         run: |
-          if git rev-parse "${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
+          if git rev-parse "v${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
             echo "skipped=true" >> $GITHUB_OUTPUT
           else
             echo "skipped=false" >> $GITHUB_OUTPUT
@@ -106,14 +106,14 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git tag "${{ steps.version.outputs.VERSION }}" ${{ github.sha }}
-          git push origin "${{ steps.version.outputs.VERSION }}"
+          git tag "v${{ steps.version.outputs.VERSION }}" ${{ github.sha }}
+          git push origin "v${{ steps.version.outputs.VERSION }}"
 
       - name: Create Release
         if: steps.tag_check.outputs.skipped == 'false'
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
+          tag_name: v${{ steps.version.outputs.VERSION }}
           target_commitish: ${{ github.sha }}
           draft: true
           files: |

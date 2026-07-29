@@ -15,6 +15,7 @@ target "plugin" {
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
     "ghcr.io/thegeb/blt-volume-manager-plugin:${VERSION}",
+    "ghcr.io/thegeb/blt-volume-manager-plugin:v${VERSION}",
     "ghcr.io/thegeb/blt-volume-manager-plugin:latest"
   ]
   args = {
@@ -32,6 +33,7 @@ target "web" {
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
     "ghcr.io/thegeb/blt-volume-manager-web:${VERSION}",
+    "ghcr.io/thegeb/blt-volume-manager-web:v${VERSION}",
     "ghcr.io/thegeb/blt-volume-manager-web:latest"
   ]
   args = {
