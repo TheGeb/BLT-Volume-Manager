@@ -147,11 +147,6 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # v6
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock', 'go.sum', 'web/ui/package-lock.json') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-
       - name: Update and push dependency hashes
         run: |
           make nix-vendor-hash nix-npm-hash
