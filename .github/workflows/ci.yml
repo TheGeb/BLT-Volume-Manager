@@ -147,7 +147,7 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: nix-community/cache-nix-action@e748db46ed7227f0eac581148b9a441fff7a5ae3 # v6
+      - uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a # v6
         with:
           key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock', 'go.sum', 'web/ui/package-lock.json') }}
           restore-keys: |
