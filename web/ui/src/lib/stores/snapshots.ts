@@ -42,8 +42,8 @@ export async function loadHosts(volume: string) {
 	try {
 		const hosts = await api.fetchSnapshotHosts(volume);
 		allHosts.set(hosts);
-	} catch {
-		// leave current hosts unchanged on failure
+	} catch (e: unknown) {
+		showToast((e as Error).message, true);
 	} finally {
 		hostsLoading.set(false);
   }

@@ -49,21 +49,25 @@ export async function loadVolumes() {
 async function fetchAllVolumeOwnerInfo() {
   const vols = get(volumes);
   if (vols.length === 0) return;
-  const allOwners = await api.fetchAllOwnerStatus();
-  const info: Record<string, VolumeOwnerInfo> = {};
-  for (const vol of vols) {
-    const r = allOwners[vol];
-    if (r) {
-      info[vol] = {
-        owner: r.owner,
-        expiry: r.expiry ?? 0,
-        status: r.owner ? 'owned' : 'unclaimed',
-      };
-    } else {
-      info[vol] = { owner: '', expiry: 0, status: 'unclaimed' };
+  try {
+    const allOwners = await api.fetchAllOwnerStatus();
+    const info: Record<string, VolumeOwnerInfo> = {};
+    for (const vol of vols) {
+      const r = allOwners[vol];
+      if (r) {
+        info[vol] = {
+          owner: r.owner,
+          expiry: r.expiry ?? 0,
+          status: r.owner ? 'owned' : 'unclaimed',
+        };
+      } else {
+        info[vol] = { owner: '', expiry: 0, status: 'unclaimed' };
+      }
     }
+    volumeOwnerInfo.set(info);
+  } catch {
+    volumeOwnerInfo.set({});
   }
-  volumeOwnerInfo.set(info);
 }
 
 export function onFilterChange(f: string) { volumeFilter.set(f); }
@@ -93,9 +97,10 @@ async function loadCopySnapshots(vol: string) {
     const result = await api.fetchSnapshots(vol);
     copySnapshots.set(result.snapshots);
     copyRestorePointID.set(result.restorePointID ?? '');
-  } catch {
+  } catch (e: unknown) {
     copySnapshots.set([]);
     copyRestorePointID.set('');
+    showToast((e as Error).message, true);
   } finally {
     copySnapshotsLoading.set(false);
   }

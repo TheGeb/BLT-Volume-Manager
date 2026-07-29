@@ -27,7 +27,7 @@
       <div class="skeleton" style="height:18px;width:120px;border-radius:6px;margin-bottom:16px;"></div>
       <div class="skeleton" style="height:40px;border-radius:8px;"></div>
     </div>
-  {:else if stats?.repo && !stats.repo.error}
+  {:else if stats?.repo}
     <h2 class="panel-title">Storage</h2>
     <div class="panel-info">
       <div class="panel-info-primary">{stats.repo.total_uncompressed_size ? formatBytes(stats.repo.total_uncompressed_size) : '?'}</div>
@@ -55,11 +55,6 @@
         </div>
       </div>
     {/if}
-  {:else if stats?.repo?.error}
-    <h2 class="panel-title">Storage</h2>
-    <div style="color:var(--red);font-size:0.85rem;padding:12px 0;">
-      {stats.repo.error}
-    </div>
   {:else}
     <div style="text-align:center;padding:40px;color:var(--muted);">No stats available</div>
   {/if}

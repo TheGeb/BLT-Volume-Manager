@@ -113,12 +113,18 @@ func SnapshotSizes(s *server.BLTService, w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	rm := s.ResticManager(req.Volume)
 	result := map[string]int64{}
+	var lastErr error
 	for _, id := range req.IDs {
 		stats, err := rm.SnapshotStats(ctx, id)
 		if err != nil {
+			lastErr = err
 			continue
 		}
 		result[id] = stats.TotalSize
+	}
+	if len(result) == 0 && lastErr != nil {
+		server.RespondError(w, lastErr, http.StatusInternalServerError)
+		return
 	}
 	server.RespondJSON(w, result)
 }

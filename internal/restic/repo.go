@@ -3,7 +3,9 @@ package restic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 	"sort"
 	"time"
 
@@ -77,6 +79,10 @@ func (m *Manager) repositoryExists(ctx context.Context) (bool, error) {
 
 	_, err := m.runner.RepoExists(checkCtx)
 	if err != nil {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) {
+			return false, err
+		}
 		return false, nil
 	}
 	return true, nil

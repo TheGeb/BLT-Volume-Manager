@@ -19,6 +19,7 @@ export interface SnapshotListParams {
 
 export async function fetchVolumes(): Promise<string[]> {
 	const resp = await fetch('/api/volumes');
+	if (!resp.ok) throw new Error('failed to fetch volumes');
 	const data = await resp.json() as { volumes?: string[] };
 	return data.volumes ?? [];
 }
@@ -63,6 +64,10 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 		}
 	}
 	const resp = await fetch(`/api/snapshots?${p.toString()}`);
+	if (!resp.ok) {
+		const d = await resp.json() as { error?: string };
+		throw new Error(d.error ?? 'failed to fetch snapshots');
+	}
 	const data = await resp.json() as SnapshotsResponse;
 	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
 	return { snapshots, restorePointID: data.restorePointID ?? '', hasMore: data.hasMore ?? false };
@@ -105,11 +110,15 @@ export async function fetchAllOwnerStatus(): Promise<Record<string, OwnerStatus>
 }
 
 export async function createOwnerLock(volume: string, owner?: string, durationMinutes?: number): Promise<void> {
-  await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ owner, owner_duration_mins: durationMinutes ?? 0 }),
   });
+  if (!resp.ok) {
+    const d = await resp.json() as { error?: string };
+    throw new Error(d.error ?? 'failed to create owner lock');
+  }
 }
 
 export async function deleteOwnerLock(volume: string): Promise<void> {
@@ -122,11 +131,16 @@ export async function deleteOwnerLock(volume: string): Promise<void> {
 
 export async function fetchStats(volume: string): Promise<StatsResponse> {
   const resp = await fetch(`/api/stats?volume=${encodeURIComponent(volume)}`);
+  if (!resp.ok) {
+    const d = await resp.json() as { error?: string };
+    throw new Error(d.error ?? 'failed to fetch stats');
+  }
   return resp.json() as Promise<StatsResponse>;
 }
 
 export async function refreshStats(): Promise<void> {
-  await fetch('/api/stats/refresh', { method: 'POST' });
+  const resp = await fetch('/api/stats/refresh', { method: 'POST' });
+  if (!resp.ok) throw new Error('failed to refresh stats');
 }
 
 export async function fetchSnapshotSizes(volume: string, ids: string[]): Promise<Record<string, number>> {
@@ -285,6 +299,7 @@ export async function createTestSnapshot(volume: string): Promise<void> {
 
 export async function fetchDevMode(): Promise<boolean> {
   const resp = await fetch('/api/dev-mode');
+  if (!resp.ok) throw new Error('failed to fetch dev mode');
   const data = await resp.json() as { enabled?: boolean };
   return data.enabled ?? false;
 }
@@ -301,5 +316,6 @@ export interface VersionInfo {
 
 export async function fetchVersion(): Promise<VersionInfo> {
   const resp = await fetch('/api/version');
+  if (!resp.ok) throw new Error('failed to fetch version');
   return resp.json() as Promise<VersionInfo>;
 }

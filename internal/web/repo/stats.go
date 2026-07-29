@@ -2,6 +2,8 @@ package repo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -9,13 +11,14 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
+var ErrNilStats = errors.New("stats: nil result")
+
 type RepoStats struct {
-	TotalSize             int64  `json:"total_size,omitempty"`
-	TotalFileCount        int64  `json:"total_file_count,omitempty"`
-	TotalBlobCount        int64  `json:"total_blob_count,omitempty"`
-	TotalUncompressedSize int64  `json:"total_uncompressed_size,omitempty"`
-	UniqueBlobCount       int64  `json:"unique_blob_count,omitempty"`
-	Error                 string `json:"error,omitempty"`
+	TotalSize             int64 `json:"total_size,omitempty"`
+	TotalFileCount        int64 `json:"total_file_count,omitempty"`
+	TotalBlobCount        int64 `json:"total_blob_count,omitempty"`
+	TotalUncompressedSize int64 `json:"total_uncompressed_size,omitempty"`
+	UniqueBlobCount       int64 `json:"unique_blob_count,omitempty"`
 }
 
 type StatsResponse struct {
@@ -25,14 +28,14 @@ type StatsResponse struct {
 	TotalVolumes int        `json:"total_volumes,omitempty"`
 }
 
-func buildRepoStats(ctx context.Context, rm *restic.Manager) *RepoStats {
+func buildRepoStats(ctx context.Context, rm *restic.Manager) (*RepoStats, error) {
 	rst, err := rm.Stats(ctx)
 	if err != nil {
 		log.Error("stats_failed", err)
-		return &RepoStats{Error: err.Error()}
+		return nil, fmt.Errorf("restic stats: %w", err)
 	}
 	if rst == nil {
-		return nil
+		return nil, ErrNilStats
 	}
 	return &RepoStats{
 		TotalSize:             rst.TotalSize,
@@ -40,7 +43,7 @@ func buildRepoStats(ctx context.Context, rm *restic.Manager) *RepoStats {
 		TotalBlobCount:        rst.TotalBlobCount,
 		TotalUncompressedSize: rst.TotalUncompressedSize,
 		UniqueBlobCount:       rst.UniqueBlobCount,
-	}
+	}, nil
 }
 
 func Stats(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
@@ -55,9 +58,15 @@ func Stats(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rm := s.ResticManager(volName)
 
+	repoStats, err := buildRepoStats(ctx, rm)
+	if err != nil && !errors.Is(err, ErrNilStats) {
+		server.RespondError(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	resp := StatsResponse{
 		Volume: volName,
-		Repo:   buildRepoStats(ctx, rm),
+		Repo:   repoStats,
 	}
 
 	if c := s.StatsCache(); c != nil {

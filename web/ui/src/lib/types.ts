@@ -34,7 +34,6 @@ export interface StatsResponse {
     total_blob_count?: number;
     total_uncompressed_size?: number;
     unique_blob_count?: number;
-    error?: string;
   };
 }
 

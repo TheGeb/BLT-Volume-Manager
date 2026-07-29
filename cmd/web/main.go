@@ -118,7 +118,11 @@ func runHealthCheck(addr string) int {
 		log.Error("health_check_failed", err)
 		return 1
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error("failed_to_close_response_body", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		log.Errorf("health_check_unhealthy", nil, "status=%d", resp.StatusCode)
 		return 1

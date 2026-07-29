@@ -3,6 +3,7 @@
   import type { OwnerStatus } from '$lib/types';
   import { formatExpiration } from '$lib/util';
   import * as api from '$lib/api';
+  import { showToast } from '$lib/stores/toast';
 
   export let ownerStatus: OwnerStatus | null = null;
   export let volume = '';
@@ -15,7 +16,9 @@
     try {
       await api.deleteOwnerLock(volume);
       onOwnerDeleted();
-    } catch {} finally { deleting = false; }
+    } catch (e: unknown) {
+      showToast((e as Error).message, true);
+    } finally { deleting = false; }
   }
 </script>
 

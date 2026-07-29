@@ -83,7 +83,11 @@ export async function navigateTo(volume: string, params?: { tab?: string; tag?: 
 
 export async function handleRefresh() {
   showToast('');
-  try { await api.refreshStats(); } catch {}
+  try {
+    await api.refreshStats();
+  } catch (e: unknown) {
+    showToast((e as Error).message, true);
+  }
   const vol = get(selectedVolume);
   if (vol) {
     const promises: Promise<unknown>[] = [loadSnapshots(vol)];
@@ -124,7 +128,7 @@ export async function confirmDeleteVolume() {
     viewerOpen.set(false);
     sizes.set({});
     await Promise.all([
-      api.refreshStats().catch(() => { /* intentionally ignored */ }),
+      api.refreshStats().catch((e: unknown) => { showToast((e as Error).message, true); }),
       loadVolumes(),
     ]);
   } catch (e: unknown) {
@@ -139,7 +143,7 @@ export async function handleCreateTestVolume(name: string) {
   try {
     await api.createTestVolume(name);
     testStatus.set('Updating volume list...');
-    await api.refreshStats().catch(() => { /* intentionally ignored */ });
+    await api.refreshStats().catch((e: unknown) => { showToast((e as Error).message, true); });
     await loadVolumes();
     await loadAll(name);
   } catch (e: unknown) { testStatus.set((e as Error).message); }

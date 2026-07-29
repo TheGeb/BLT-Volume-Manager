@@ -70,7 +70,7 @@ func ListVolumeOwners(s *server.BLTService, w http.ResponseWriter, r *http.Reque
 
 	grouped, err := s.OwnerStore().ListAllGrouped(r.Context())
 	if err != nil {
-		server.RespondJSON(w, OwnersListResponse{Owners: nil})
+		server.RespondError(w, err, http.StatusInternalServerError)
 		return
 	}
 

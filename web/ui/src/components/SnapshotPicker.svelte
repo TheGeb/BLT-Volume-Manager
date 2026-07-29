@@ -5,6 +5,7 @@
   import type { Snapshot } from '$lib/types';
   import type { SnapshotListParams } from '$lib/api';
   import * as api from '$lib/api';
+  import { showToast } from '$lib/stores/toast';
   import { versionTag, parseVersion } from '$lib/util';
   import HostDropdown from './HostDropdown.svelte';
   import VersionRangeInputs from './VersionRangeInputs.svelte';
@@ -85,9 +86,10 @@
       pickerSnapshots = r.snapshots;
       pickerHasMore = r.hasMore ?? false;
       pickerRestorePointID = r.restorePointID ?? '';
-    } catch {
+    } catch (e: unknown) {
       pickerSnapshots = [];
       pickerHasMore = false;
+      showToast((e as Error).message, true);
     } finally {
       pickerLoading = false;
     }
@@ -287,8 +289,8 @@
       const total = r.snapshots.length;
       const lastPage = Math.max(1, Math.ceil(total / pickerPageSize));
       pickerPage = lastPage;
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      showToast((e as Error).message, true);
     } finally {
       lastPageFetching = false;
     }

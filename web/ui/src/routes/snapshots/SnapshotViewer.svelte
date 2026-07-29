@@ -9,6 +9,7 @@
   import { collectAllPaths, buildDiffMap, buildTree } from '$lib/tree-utils';
   import { colResize, rowResize } from '$lib/resize';
   import * as api from '$lib/api';
+  import { showToast } from '$lib/stores/toast';
 
   import { Button } from 'bits-ui';
   import FileTreeNode from './FileTreeNode.svelte';
@@ -57,8 +58,9 @@
     try {
       const r = await api.fetchSnapshots(snapshot.volume, {});
       compareSnapshotList = r.snapshots;
-    } catch {
+    } catch (e: unknown) {
       compareSnapshotList = [];
+      showToast((e as Error).message, true);
     }
   }
 

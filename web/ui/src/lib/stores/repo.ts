@@ -75,8 +75,9 @@ export async function loadOwnerStatus() {
   if (!vol) { ownerStatus.set(null); return; }
   try {
     ownerStatus.set(await api.fetchOwnerStatus(vol));
-  } catch {
+  } catch (e: unknown) {
     ownerStatus.set({ volume: vol, owner: '' });
+    showToast((e as Error).message, true);
   }
 }
 
@@ -85,7 +86,10 @@ export async function loadStats(volume: string) {
   try {
     const s = await api.fetchStats(volume);
     stats.set(s);
-  } catch { /* stale stats ok */ } finally {
+  } catch (e: unknown) {
+    stats.set(null);
+    showToast((e as Error).message, true);
+  } finally {
     statsLoading.set(false);
   }
 }
