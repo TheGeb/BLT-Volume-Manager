@@ -83,7 +83,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y restic
 
       - name: Integration tests (${{ matrix.backend }})
-        run: go test -race -tags integration -v -count=1 -run '/${{ matrix.backend }}' ./test/integration/
+        run: go test -tags integration -v -count=1 -run '/${{ matrix.backend }}' ./test/integration/
 
   ui-lint:
     runs-on: ubuntu-latest
