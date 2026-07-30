@@ -6,7 +6,7 @@
   "schedule": ["before 9am on Monday"],
   "labels": ["dependencies"],
   "minimumReleaseAge": "7 days",
-  "rebaseWhen": "conflicted",
+  "rebaseWhen": "behind-base-branch",
   "postUpdateOptions": ["gomodTidy"],
   "vulnerabilityAlerts": {
     "enabled": true
