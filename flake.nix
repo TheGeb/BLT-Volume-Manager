@@ -18,7 +18,7 @@
           pname = "blt-volume-manager-ui";
           version = version;
           src = ./web/ui;
-          npmDepsHash = "sha256-ErqUzOvgdpo1JWp2HL6QjG8SSvx33DV9YhkW6sEVFPo=";
+          npmDepsHash = "sha256-gcNSoaaWEx8PFuJ5qeqSHzjeiztBDfM2Xc/C0AeDmoQ=";
           installPhase = ''
             mkdir -p $out
             cp -r dist/. $out/
@@ -28,7 +28,7 @@
         build-module = { pname, subPackages, meta-description, withUi ? false }:
           pkgs.buildGoModule {
             inherit pname version;
-            vendorHash = "sha256-wBQUcIN0m6RUH/4XMAfH6rfFJCHLb7ffpJGbYz2GhJw=";
+            vendorHash = "sha256-BcODKV/I3g5AOpGzyj5fNneuBzagw+aWGqqOq2QOji0=";
             src = ./.;
 
             inherit subPackages;
