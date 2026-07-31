@@ -28,7 +28,10 @@ func (m *mockBackend) DeleteObject(context.Context, string) error { return m.del
 func (m *mockBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return m.objects, m.objectsErr
 }
-func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error { return m.deletePrefixErr }
+
+func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error {
+	return m.deletePrefixErr
+}
 
 type mockResticBackend struct{}
 

@@ -156,12 +156,12 @@ func (c *EtcdClient) AcquireLock(ctx context.Context, volumeName, ownerID string
 
 	tresp, terr := txn.Commit()
 	if terr != nil {
-		_, _ = c.client.Lease.Revoke(ctx, leaseID)
+		_, _ = c.client.Revoke(ctx, leaseID)
 		return "", fmt.Errorf("cas lock: %w", terr)
 	}
 
 	if !tresp.Succeeded {
-		_, _ = c.client.Lease.Revoke(ctx, leaseID)
+		_, _ = c.client.Revoke(ctx, leaseID)
 		return "", store.ErrLockConflict
 	}
 
@@ -170,7 +170,7 @@ func (c *EtcdClient) AcquireLock(ctx context.Context, volumeName, ownerID string
 	kaCh, kaErr := c.client.KeepAlive(kaCtx, leaseID)
 	if kaErr != nil {
 		kaCancel()
-		_, _ = c.client.Lease.Revoke(ctx, leaseID)
+		_, _ = c.client.Revoke(ctx, leaseID)
 		return "", fmt.Errorf("keepalive lease: %w", kaErr)
 	}
 
@@ -212,7 +212,7 @@ func (c *EtcdClient) ReleaseLock(ctx context.Context, lockKey string) error {
 		return fmt.Errorf("release lock: %w", err)
 	}
 	if resp.Succeeded {
-		_, _ = c.client.Lease.Revoke(ctx, leaseID)
+		_, _ = c.client.Revoke(ctx, leaseID)
 	}
 	return nil
 }
@@ -260,7 +260,7 @@ func (c *EtcdClient) LockIsValid(ctx context.Context, lockKey string) (bool, err
 
 	kv := resp.Kvs[0]
 	if kv.Lease > 0 {
-		leaseResp, lerr := c.client.Lease.TimeToLive(ctx, clientv3.LeaseID(kv.Lease))
+		leaseResp, lerr := c.client.TimeToLive(ctx, clientv3.LeaseID(kv.Lease))
 		if lerr != nil {
 			return false, fmt.Errorf("check lease TTL: %w", lerr)
 		}
@@ -405,7 +405,7 @@ func (c *EtcdClient) Close() error {
 	for key, cancel := range c.activeLocks {
 		cancel()
 		if leaseID, ok := c.lastLeaseIDs[key]; ok {
-			_, _ = c.client.Lease.Revoke(context.Background(), leaseID)
+			_, _ = c.client.Revoke(context.Background(), leaseID)
 		}
 		delete(c.activeLocks, key)
 		delete(c.lastLeaseIDs, key)

@@ -58,7 +58,7 @@ func OwnerRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request, v
 		server.RespondJSON(w, server.StatusResponse{Status: "owners deleted"})
 
 	default:
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 	}
 }
 

@@ -3,12 +3,23 @@ package restic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
+
+// exitStatusError returns an *exec.ExitError with the given exit code,
+// matching the error restic returns when it fails.
+func exitStatusError(code int) error {
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("exit %d", code))
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
+}
 
 // mockRunner implements runner for testing without real restic binary.
 type mockRunner struct {
@@ -19,18 +30,21 @@ type mockRunner struct {
 func (m *mockRunner) Init(ctx context.Context) ([]byte, error) {
 	return m.InitOutput(ctx)
 }
+
 func (m *mockRunner) InitOutput(ctx context.Context) ([]byte, error) {
 	if m.initFn != nil {
 		return m.initFn(ctx)
 	}
 	return nil, nil
 }
+
 func (m *mockRunner) RepoExists(ctx context.Context) ([]byte, error) {
 	if m.repoExistsFn != nil {
 		return m.repoExistsFn(ctx)
 	}
 	return nil, nil
 }
+
 func (m *mockRunner) Snapshots(ctx context.Context, opts *cli.ListSnapshotsOpts) ([]byte, error) {
 	return nil, nil
 }
@@ -50,15 +64,19 @@ func (m *mockRunner) Backup(ctx context.Context, path string, tags []string) err
 func (m *mockRunner) BackupInDir(ctx context.Context, path string, tags []string, workDir string) error {
 	return nil
 }
+
 func (m *mockRunner) BackupAt(ctx context.Context, path string, tags []string, t time.Time) error {
 	return nil
 }
+
 func (m *mockRunner) Ls(ctx context.Context, snapshotID, path string) ([]byte, error) {
 	return nil, nil
 }
+
 func (m *mockRunner) Dump(ctx context.Context, snapshotID, path string) ([]byte, error) {
 	return nil, nil
 }
+
 func (m *mockRunner) Diff(ctx context.Context, snapID1, snapID2 string) ([]byte, error) {
 	return nil, nil
 }
@@ -73,7 +91,7 @@ func TestRepoExists_NotFound(t *testing.T) {
 	m := NewManager("/test/repo")
 	m.runner = &mockRunner{
 		repoExistsFn: func(ctx context.Context) ([]byte, error) {
-			return []byte("Fatal: unable to open repository at /test/repo\n"), errors.New("exit status 1")
+			return nil, exitStatusError(exitCodeRepoDoesNotExist)
 		},
 	}
 	exists, err := m.RepoExists(context.Background())
@@ -99,17 +117,17 @@ func TestRepoExists_ExecError(t *testing.T) {
 	}
 }
 
-func TestRepoExists_BackendOutage(t *testing.T) {
+func TestRepoExists_OtherFailure(t *testing.T) {
 	t.Parallel()
 	m := NewManager("/test/repo")
 	m.runner = &mockRunner{
 		repoExistsFn: func(ctx context.Context) ([]byte, error) {
-			return []byte("Fatal: unable to open repository: AccessDenied\n"), errors.New("exit status 1")
+			return nil, exitStatusError(1)
 		},
 	}
 	_, err := m.RepoExists(context.Background())
 	if err == nil {
-		t.Fatal("expected error for backend outage (AccessDenied), got nil")
+		t.Fatal("expected error for non-zero exit code other than 10, got nil")
 	}
 }
 

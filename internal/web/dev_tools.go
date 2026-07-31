@@ -30,7 +30,7 @@ type devToolCreateResponse struct {
 
 func CreateDummyVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -90,7 +90,7 @@ func CreateDummyVolume(s *server.BLTService, w http.ResponseWriter, r *http.Requ
 
 func CreateDummySnapshot(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 

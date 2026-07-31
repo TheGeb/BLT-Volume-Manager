@@ -19,7 +19,7 @@ func RestorePointRouter(s *server.BLTService, w http.ResponseWriter, r *http.Req
 	case http.MethodDelete:
 		deleteRestorePoint(s, w, r, volumeName)
 	default:
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 	}
 }
 

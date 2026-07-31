@@ -20,11 +20,12 @@ type ErrorResponse struct {
 var (
 	ErrMethodNotAllowed = errors.New("method not allowed")
 	ErrMissingVolume    = errors.New("missing volume query parameter")
+	ErrNotFound         = errors.New("not found")
 )
 
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method != method {
-		http.Error(w, ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		RespondError(w, ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return false
 	}
 	return true
@@ -33,7 +34,7 @@ func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 func RequireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	vol := r.URL.Query().Get("volume")
 	if vol == "" {
-		http.Error(w, ErrMissingVolume.Error(), http.StatusBadRequest)
+		RespondError(w, ErrMissingVolume, http.StatusBadRequest)
 		return "", false
 	}
 	return vol, true

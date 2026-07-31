@@ -96,10 +96,8 @@ func TestGzipMiddleware_Negotiation(t *testing.T) {
 				if string(got) != "hello" {
 					t.Errorf("expected body 'hello', got %q", string(got))
 				}
-			} else {
-				if w.Body.String() != "hello" {
-					t.Errorf("expected body 'hello', got %q", w.Body.String())
-				}
+			} else if w.Body.String() != "hello" {
+				t.Errorf("expected body 'hello', got %q", w.Body.String())
 			}
 		})
 	}

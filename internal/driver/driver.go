@@ -17,7 +17,7 @@ import (
 type mountState int
 
 const (
-	mountStateIdle      mountState = iota
+	mountStateIdle mountState = iota
 	mountStateAcquiring
 	mountStateReady
 )

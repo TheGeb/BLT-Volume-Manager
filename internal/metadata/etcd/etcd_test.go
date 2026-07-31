@@ -62,7 +62,7 @@ func TestNewClient_WithEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewEtcdClient(%q) error: %v", addr, err)
 	}
-	defer cli.Close()
+	t.Cleanup(func() { _ = cli.Close() })
 }
 
 // --- AcquireLock tests ---
@@ -282,9 +282,9 @@ func TestNextVersion_Concurrent(t *testing.T) {
 
 	const workers = 20
 	var (
-		mu    sync.Mutex
-		tags  []string
-		wg    sync.WaitGroup
+		mu   sync.Mutex
+		tags []string
+		wg   sync.WaitGroup
 	)
 
 	wg.Add(workers)

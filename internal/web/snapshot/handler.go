@@ -3,6 +3,7 @@ package snapshot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,7 +14,7 @@ import (
 
 func SnapshotRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot/") {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 		return
 	}
 
@@ -23,25 +24,25 @@ func SnapshotRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	http.NotFound(w, r)
+	server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 }
 
 func SnapshotFileRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/snapshot-view/") {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, "/api/snapshot-view/")
 	parts := strings.Split(rest, "/")
 
 	if len(parts) < 2 {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 		return
 	}
 
 	volName := r.URL.Query().Get("volume")
 	if volName == "" {
-		http.Error(w, server.ErrMissingVolume.Error(), http.StatusBadRequest)
+		server.RespondError(w, server.ErrMissingVolume, http.StatusBadRequest)
 		return
 	}
 	rm := s.ResticManager(volName)
@@ -60,7 +61,7 @@ func SnapshotFileRouter(s *server.BLTService, w http.ResponseWriter, r *http.Req
 		dumpSnapshotFile(s, w, r, rm, rawID, fallbackHash)
 	case "diff":
 		if len(parts) < 3 {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		secondID := parts[2]
@@ -69,7 +70,7 @@ func SnapshotFileRouter(s *server.BLTService, w http.ResponseWriter, r *http.Req
 		secondID = ResolveSnapshotID(r.Context(), rm, secondID, diffVersion, volName)
 		diffSnapshots(s, w, r, rm, rawID, secondID, fallbackHash, diffFallback)
 	default:
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 	}
 }
 
@@ -94,7 +95,7 @@ func ListSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.Request)
 
 func SnapshotSizes(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {
@@ -102,11 +103,11 @@ func SnapshotSizes(s *server.BLTService, w http.ResponseWriter, r *http.Request)
 		IDs    []string `json:"ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("invalid JSON"), http.StatusBadRequest)
 		return
 	}
 	if req.Volume == "" || len(req.IDs) == 0 {
-		http.Error(w, "missing volume or ids", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("missing volume or ids"), http.StatusBadRequest)
 		return
 	}
 
@@ -164,11 +165,11 @@ func BatchDeleteSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.R
 		IDs    []string `json:"ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("invalid JSON"), http.StatusBadRequest)
 		return
 	}
 	if req.Volume == "" || len(req.IDs) == 0 {
-		http.Error(w, "missing volume or ids", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("missing volume or ids"), http.StatusBadRequest)
 		return
 	}
 
@@ -188,7 +189,7 @@ func BatchDeleteSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.R
 
 func listSnapshotFiles(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 	ctx := r.Context()
@@ -205,13 +206,13 @@ func listSnapshotFiles(s *server.BLTService, w http.ResponseWriter, r *http.Requ
 
 func dumpSnapshotFile(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, fallbackHash string) {
 	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 	ctx := r.Context()
 	path := r.URL.Query().Get("path")
 	if path == "" {
-		http.Error(w, "missing path", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("missing path"), http.StatusBadRequest)
 		return
 	}
 	data, err := withFallback(ctx, rm, rawID, fallbackHash, func(ctx context.Context, id string) ([]byte, error) {
@@ -228,7 +229,7 @@ func dumpSnapshotFile(s *server.BLTService, w http.ResponseWriter, r *http.Reque
 
 func diffSnapshots(s *server.BLTService, w http.ResponseWriter, r *http.Request, rm ResticManager, rawID, secondID, fallbackHash, diffFallback string) {
 	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 	ctx := r.Context()

@@ -13,6 +13,13 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
 
+// exitCodeRepoDoesNotExist is restic's exit code for a repository that does
+// not exist. restic has returned 10 for this case since v0.17.0; older
+// versions report all failures as exit code 1 and are not supported.
+// The repository images and CI install restic 0.19.1 (see Dockerfile and
+// .github/workflows/ci.yml).
+const exitCodeRepoDoesNotExist = 10
+
 type HostSnapshots struct {
 	Host      string     `json:"host"`
 	Snapshots []Snapshot `json:"snapshots"`
@@ -78,38 +85,20 @@ func (m *Manager) repositoryExists(ctx context.Context) (bool, error) {
 	checkCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	out, err := m.runner.RepoExists(checkCtx)
+	_, err := m.runner.RepoExists(checkCtx)
 	if err != nil {
 		var execErr *exec.Error
 		if errors.As(err, &execErr) {
 			return false, err
 		}
-		// Check if this is a "repo not found" situation.
-		// "unable to open repository" is restic's error for a non-existent repo.
-		if repositoryNotFoundOutput(out) {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == exitCodeRepoDoesNotExist {
 			return false, nil
 		}
-		// All other errors (auth, network, etc.) are real failures.
+		// All other failures (auth, network, corruption, etc.) are real errors.
 		return false, err
 	}
 	return true, nil
-}
-
-func repositoryNotFoundOutput(out []byte) bool {
-	lower := strings.ToLower(string(out))
-	if !strings.Contains(lower, "unable to open repository") {
-		return false
-	}
-	for _, marker := range []string{
-		"accessdenied", "access denied", "permission denied", "forbidden",
-		"unauthorized", "timeout", "timed out", "connection refused",
-		"network is unreachable",
-	} {
-		if strings.Contains(lower, marker) {
-			return false
-		}
-	}
-	return true
 }
 
 func (m *Manager) initRepository(ctx context.Context) error {
