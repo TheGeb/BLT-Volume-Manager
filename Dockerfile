@@ -54,8 +54,6 @@ ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
 # Plugin — requires root for Docker socket and volume mount access
 FROM base AS plugin
-# The plugin needs root for Docker socket and volume mount access.
-# hadolint ignore=DL3002
 USER root
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
 
