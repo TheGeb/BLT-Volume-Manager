@@ -19,11 +19,11 @@ fi
 case "${1:-}" in
   vendor)
     HASH_VAR="vendorHash"
-    BUILD_ATTR=".#blt-volume-manager"
+    BUILD_ATTR="blt-volume-manager"
     ;;
   npm)
     HASH_VAR="npmDepsHash"
-    BUILD_ATTR=".#ui"
+    BUILD_ATTR="ui"
     ;;
   *)
     echo "Usage: $0 {vendor|npm}" >&2
@@ -48,7 +48,7 @@ sed -i "s/${HASH_VAR} = \"[^\"]*\"/${HASH_VAR} = \"\"/" "$TMPREPO/flake.nix"
 # Build to get the computed hash
 echo "Building ${BUILD_ATTR} to compute hash..."
 set +e
-BUILD_OUTPUT="$(nix build "$BUILD_ATTR" --flake "$TMPREPO" 2>&1)"
+BUILD_OUTPUT="$(nix build "$TMPREPO#$BUILD_ATTR" 2>&1)"
 BUILD_STATUS=$?
 set -e
 mapfile -t HASHES < <(printf '%s\n' "$BUILD_OUTPUT" | grep -oP 'got:\s*\K\S+' | sort -u || true)
