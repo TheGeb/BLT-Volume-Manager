@@ -20,6 +20,7 @@ export function versionTag(tags: string[]): string | undefined {
 
 export function parseVersion(v: string): { major: number; minor: number } | null {
 	const cleaned = v.replace(/^v/, '');
+	if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
 	const parts = cleaned.split('.');
 	const major = parseInt(parts[0] ?? '');
 	const minor = parts[1] ? parseInt(parts[1]) : 0;
@@ -39,11 +40,13 @@ export function matchesVersionRange(
 	if (!sv) return false;
 	if (from) {
 		const fv = parseVersion(from);
-		if (fv && (sv.major < fv.major || (sv.major === fv.major && sv.minor < fv.minor))) return false;
+		if (!fv) throw new Error(`Invalid version range "from": ${from}`);
+		if (sv.major < fv.major || (sv.major === fv.major && sv.minor < fv.minor)) return false;
 	}
 	if (to) {
 		const tv = parseVersion(to);
-		if (tv && (sv.major > tv.major || (sv.major === tv.major && sv.minor > tv.minor))) return false;
+		if (!tv) throw new Error(`Invalid version range "to": ${to}`);
+		if (sv.major > tv.major || (sv.major === tv.major && sv.minor > tv.minor)) return false;
 	}
 	return true;
 }

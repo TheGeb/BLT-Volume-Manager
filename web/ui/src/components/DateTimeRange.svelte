@@ -274,11 +274,10 @@
                 <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromM} on:input={() => { fromM = handleMS(fromM); updateTimeRange(); }} on:focus={() => fromM === '00' && (fromM = '')} on:blur={() => { if (!fromM) fromM = '00'; updateTimeRange(); }}>
                 <span class="time-segment time-literal">:</span>
                 <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={fromS} on:input={() => { fromS = handleMS(fromS); updateTimeRange(); }} on:focus={() => fromS === '00' && (fromS = '')} on:blur={() => { if (!fromS) fromS = '00'; updateTimeRange(); }}>
-                <span class="time-ampm-toggle"
+                <button type="button" class="time-ampm-toggle"
                   on:click={() => { fromA = fromA === 'AM' ? 'PM' : 'AM'; updateTimeRange(); }}
-                  on:keydown={(e) => e.key === 'Enter' && (fromA = fromA === 'AM' ? 'PM' : 'AM', updateTimeRange())}
-                  tabindex="0" role="button"
-                >{fromA}</span>
+                  aria-pressed={fromA === 'PM' ? 'true' : 'false'}
+                >{fromA}</button>
               </div>
             </div>
             <div class="time-range-input-group">
@@ -289,11 +288,10 @@
                 <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toM} on:input={() => { toM = handleMS(toM); updateTimeRange(); }} on:focus={() => toM === '00' && (toM = '')} on:blur={() => { if (!toM) toM = '00'; updateTimeRange(); }}>
                 <span class="time-segment time-literal">:</span>
                 <input type="text" placeholder="00" maxlength="2" class="time-segment time-input" bind:value={toS} on:input={() => { toS = handleMS(toS); updateTimeRange(); }} on:focus={() => toS === '00' && (toS = '')} on:blur={() => { if (!toS) toS = '00'; updateTimeRange(); }}>
-                <span class="time-ampm-toggle"
+                <button type="button" class="time-ampm-toggle"
                   on:click={() => { toA = toA === 'AM' ? 'PM' : 'AM'; updateTimeRange(); }}
-                  on:keydown={(e) => e.key === 'Enter' && (toA = toA === 'AM' ? 'PM' : 'AM', updateTimeRange())}
-                  tabindex="0" role="button"
-                >{toA}</span>
+                  aria-pressed={toA === 'PM' ? 'true' : 'false'}
+                >{toA}</button>
               </div>
             </div>
           </div>
@@ -622,6 +620,7 @@
     border: none;
     color: inherit;
     cursor: pointer;
+    display: inline-flex;
     padding: 0 3px;
     border-radius: 3px;
     font-family: "SF Mono", "Fira Code", monospace;

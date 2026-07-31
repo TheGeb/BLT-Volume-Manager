@@ -37,13 +37,16 @@ export const hostsLoading = writable(false);
 export const versionFilterClearKey = writable(0);
 export const tableVersionFilterActive = writable(false);
 
+let snapGen = 0;
+let snapAbort: AbortController | null = null;
+
 export async function loadHosts(volume: string) {
 	hostsLoading.set(true);
 	try {
 		const hosts = await api.fetchSnapshotHosts(volume);
 		allHosts.set(hosts);
 	} catch (e: unknown) {
-		showToast((e as Error).message, true);
+		showToast(api.safeErrorMessage(e), true);
 	} finally {
 		hostsLoading.set(false);
   }
@@ -109,38 +112,45 @@ export function extractHosts(snapshots: Snapshot[]): string[] {
 
 export const hosts = derived(snapshots, $s => extractHosts($s));
 
-function reconcileViewerSnapshots() {
-  if (!get(viewerOpen) || !get(currentSnapshot)) return;
-}
-
 export async function loadSnapshots(volume: string, params?: SnapshotListParams) {
+  const gen = ++snapGen;
+  if (snapAbort) snapAbort.abort();
+  const controller = new AbortController();
+  snapAbort = controller;
   snapsLoading.set(true);
   try {
     const page = get(currentPage);
     const size = get(pageSize);
     const offset = (page - 1) * size;
     const p: SnapshotListParams = { offset, limit: size, ...params };
-    const result = await api.fetchSnapshots(volume, p);
+    const result = await api.fetchSnapshots(volume, p, controller.signal);
+    if (gen !== snapGen) return;
     snapshots.set(result.snapshots);
     restorePointID.set(result.restorePointID ?? '');
     hasMore.set(result.hasMore ?? false);
-  } catch {
+  } catch (e: unknown) {
+    if (gen !== snapGen) return;
+    if (e instanceof DOMException && e.name === 'AbortError') return;
     snapshots.set([]);
     restorePointID.set('');
     hasMore.set(false);
     showToast('Failed to load snapshots', true);
   } finally {
-    snapsLoading.set(false);
-    reconcileViewerSnapshots();
+    if (gen === snapGen) snapsLoading.set(false);
   }
 }
 
 async function goToLastPage() {
   const vol = get(selectedVolume);
   if (!vol) return;
+  const gen = ++snapGen;
+  if (snapAbort) snapAbort.abort();
+  const controller = new AbortController();
+  snapAbort = controller;
   snapsLoading.set(true);
   try {
-    const result = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset: 0, limit: 0 });
+    const result = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset: 0, limit: 0 }, controller.signal);
+    if (gen !== snapGen) return;
     const total = result.snapshots.length;
     totalCount.set(total);
     const size = get(pageSize);
@@ -149,15 +159,17 @@ async function goToLastPage() {
     hasMore.set(false);
     currentPage.set(lastPage);
 
-    const paged = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset, limit: size });
+    const paged = await api.fetchSnapshots(vol, { ...buildSnapshotParams(), offset, limit: size }, controller.signal);
+    if (gen !== snapGen) return;
     snapshots.set(paged.snapshots);
     restorePointID.set(paged.restorePointID ?? '');
     hasMore.set(false);
-  } catch {
+  } catch (e: unknown) {
+    if (gen !== snapGen) return;
+    if (e instanceof DOMException && e.name === 'AbortError') return;
     showToast('Failed to load snapshots', true);
   } finally {
-    snapsLoading.set(false);
-    reconcileViewerSnapshots();
+    if (gen === snapGen) snapsLoading.set(false);
   }
 }
 
@@ -259,9 +271,8 @@ async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<
     } else {
       await loadSnapshots(vol);
     }
-    reconcileViewerSnapshots();
-  } catch (e) {
-    showToast(`Failed to ${action} restore point: ${String(e)}`, true);
+  } catch (e: unknown) {
+    showToast(`Failed to ${action} restore point: ${api.safeErrorMessage(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -326,7 +337,7 @@ export async function confirmDeleteSnapshot() {
     }
     await loadSnapshots(vol);
   } catch (e: unknown) {
-    showToast((e as Error).message, true);
+    showToast(api.safeErrorMessage(e), true);
   }
 }
 

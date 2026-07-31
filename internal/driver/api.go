@@ -176,15 +176,42 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 	rm := d.ResticManager(name)
 
 	if needsLock {
+		d.mountMu.Lock()
+		ms, exists := d.mountStates[name]
+		if exists && ms.state == mountStateAcquiring {
+			d.mountMu.Unlock()
+			<-ms.done
+			if ms.acquireErr != nil {
+				d.mu.Lock()
+				vi.attached--
+				d.mu.Unlock()
+				return nil, ms.acquireErr
+			}
+			return &volume.MountResponse{Mountpoint: volPath}, nil
+		}
+		ms = &volMountState{state: mountStateAcquiring, done: make(chan struct{})}
+		d.mountStates[name] = ms
+		d.mountMu.Unlock()
+
 		lockKey, lockErr := d.ownerStore.LockVolume(context.Background(), name, ownerName(), time.Now().Add(time.Minute*time.Duration(d.ownerMaxMins+2)).Unix())
 		if lockErr != nil {
 			d.mu.Lock()
 			vi.attached--
 			d.mu.Unlock()
+
+			d.mountMu.Lock()
+			ms.acquireErr = lockErr
+			ms.state = mountStateReady
+			close(ms.done)
+			d.mountMu.Unlock()
+
 			log.Errorf("mount_owner_lock_failed", lockErr, "volume=%s", name)
 			return nil, fmt.Errorf("mount owner lock: %w", lockErr)
 		}
+
+		d.mu.Lock()
 		vi.LockKey = lockKey
+		d.mu.Unlock()
 
 		if vt := d.nextVersionTags(context.Background(), name, true); vt != nil {
 			if err := rm.Backup(context.Background(), volPath, restic.WithTags("cold", vt...)...); err != nil {
@@ -197,7 +224,10 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 			if err != nil {
 				log.Errorf("check_restore_point_failed", err, "volume=%s", name)
 			} else if snapID != "" {
-				valid, verr := d.ownerStore.LockIsValid(context.Background(), vi.LockKey)
+				d.mu.Lock()
+				lk := vi.LockKey
+				d.mu.Unlock()
+				valid, verr := d.ownerStore.LockIsValid(context.Background(), lk)
 				switch {
 				case verr != nil:
 					log.Errorf("owner_check_failed", verr, "volume=%s", name)
@@ -228,11 +258,20 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 			}
 		}
 
+		d.mu.Lock()
 		ctx2, cancel := context.WithCancel(context.Background())
 		vi.cancel = cancel
-		if vi.attached == 1 {
+		firstAttach := vi.attached == 1
+		d.mu.Unlock()
+
+		if firstAttach {
 			d.startHotSchedule(ctx2, name, volPath)
 		}
+
+		d.mountMu.Lock()
+		ms.state = mountStateReady
+		close(ms.done)
+		d.mountMu.Unlock()
 	}
 
 	return &volume.MountResponse{Mountpoint: volPath}, nil

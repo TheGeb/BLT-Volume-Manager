@@ -18,6 +18,13 @@ import (
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
+type volumePluginResponse struct {
+	Err        string           `json:"Err"`
+	Volumes    []map[string]any `json:"Volumes,omitempty"`
+	Volume     map[string]any   `json:"Volume,omitempty"`
+	Mountpoint string           `json:"Mountpoint,omitempty"`
+}
+
 func setupPluginTest(t *testing.T, backendType string) string {
 	t.Helper()
 
@@ -56,7 +63,7 @@ func setupPluginTest(t *testing.T, backendType string) string {
 	return socketPath
 }
 
-func pluginDo(t *testing.T, socketPath, endpoint string, req, resp any) {
+func pluginOK(t *testing.T, socketPath, endpoint string, req any) volumePluginResponse {
 	t.Helper()
 	var r io.Reader
 	if req != nil {
@@ -78,73 +85,38 @@ func pluginDo(t *testing.T, socketPath, endpoint string, req, resp any) {
 		t.Fatal(err)
 	}
 	defer httpResp.Body.Close()
-	if resp != nil {
-		if err := json.NewDecoder(httpResp.Body).Decode(resp); err != nil {
-			body, _ := io.ReadAll(httpResp.Body)
-			t.Fatalf("%s: decode error: %v\nbody: %s", endpoint, err, string(body))
-		}
-	}
-}
-
-func pluginOK(t *testing.T, socketPath, endpoint string, req any) map[string]any {
-	t.Helper()
-	var r io.Reader
-	if req != nil {
-		b, err := json.Marshal(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		r = bytes.NewReader(b)
-	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
-			},
-		},
-	}
-	httpResp, err := client.Post("http://unix/"+endpoint, "application/json", r)
+	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: read body: %v", endpoint, err)
 	}
-	defer httpResp.Body.Close()
-	body, _ := io.ReadAll(httpResp.Body)
-	var m map[string]any
+	var m volumePluginResponse
 	if err := json.Unmarshal(body, &m); err != nil {
 		t.Fatalf("%s: decode: %v\nbody: %s", endpoint, err, string(body))
 	}
-	if errStr, hasErr := m["Err"].(string); hasErr && errStr != "" {
-		t.Fatalf("%s: unexpected error: %s", endpoint, errStr)
+	if m.Err != "" {
+		t.Fatalf("%s: unexpected error: %s", endpoint, m.Err)
 	}
 	return m
 }
 
 func testPluginCreateVolume(t *testing.T, socket string) {
-	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "test-vol"})
-	if err, ok := m["Err"].(string); ok && err != "" {
-		t.Fatalf("create: %s", err)
-	}
+	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "test-vol"})
 }
 
 func testPluginCreateDuplicate(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
-	m := pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
-	if err, ok := m["Err"].(string); ok && err != "" {
-		t.Fatalf("duplicate create: %s", err)
-	}
+	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "dup-vol"})
 }
 
 func testPluginListVolumes(t *testing.T, socket string) {
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ := m["Volumes"].([]any)
-	initialCount := len(vols)
+	initialCount := len(m.Volumes)
 
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "list-vol-1"})
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "list-vol-2"})
 
 	m = pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ = m["Volumes"].([]any)
-	if got := len(vols); got != initialCount+2 {
+	if got := len(m.Volumes); got != initialCount+2 {
 		t.Fatalf("expected %d volumes, got %d", initialCount+2, got)
 	}
 }
@@ -153,8 +125,8 @@ func testPluginGetVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "get-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "get-vol"})
-	v, ok := m["Volume"].(map[string]any)
-	if !ok {
+	v := m.Volume
+	if v == nil {
 		t.Fatalf("get: no Volume in response: %v", m)
 	}
 	if v["Name"] != "get-vol" {
@@ -169,7 +141,7 @@ func testPluginGetVolume(t *testing.T, socket string) {
 func testPluginPathVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "path-vol"})
 	m := pluginOK(t, socket, "VolumeDriver.Path", volume.PathRequest{Name: "path-vol"})
-	if mp, _ := m["Mountpoint"].(string); mp == "" {
+	if m.Mountpoint == "" {
 		t.Fatal("expected mountpoint in path response")
 	}
 }
@@ -178,8 +150,7 @@ func testPluginMountUnmount(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "mount-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: "mount-vol", ID: "mount-1"})
-	mp, _ := m["Mountpoint"].(string)
-	if mp == "" {
+	if m.Mountpoint == "" {
 		t.Fatal("expected mountpoint after mount")
 	}
 
@@ -191,9 +162,8 @@ func testPluginRemoveVolume(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "remove-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.List", nil)
-	vols, _ := m["Volumes"].([]any)
-	for _, v := range vols {
-		if vm, ok := v.(map[string]any); ok && vm["Name"] == "remove-vol" {
+	for _, vm := range m.Volumes {
+		if vm["Name"] == "remove-vol" {
 			t.Fatal("volume should have been removed")
 		}
 	}
@@ -203,20 +173,19 @@ func testPluginFullLifecycle(t *testing.T, socket string) {
 	pluginOK(t, socket, "VolumeDriver.Create", volume.CreateRequest{Name: "lifecycle-vol"})
 
 	m := pluginOK(t, socket, "VolumeDriver.Mount", volume.MountRequest{Name: "lifecycle-vol", ID: "lifecycle-1"})
-	mp, _ := m["Mountpoint"].(string)
+	mp := m.Mountpoint
 	if mp == "" {
 		t.Fatal("expected mountpoint")
 	}
 
 	m = pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "lifecycle-vol"})
-	v, _ := m["Volume"].(map[string]any)
-	if v["Name"] != "lifecycle-vol" {
+	if m.Volume["Name"] != "lifecycle-vol" {
 		t.Fatal("wrong volume name on get")
 	}
 
 	m = pluginOK(t, socket, "VolumeDriver.Path", volume.PathRequest{Name: "lifecycle-vol"})
-	if m["Mountpoint"] != mp {
-		t.Fatalf("path returned different mountpoint: %v vs %v", m["Mountpoint"], mp)
+	if m.Mountpoint != mp {
+		t.Fatalf("path returned different mountpoint: %v vs %v", m.Mountpoint, mp)
 	}
 
 	pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: "lifecycle-vol", ID: "lifecycle-1"})
@@ -224,25 +193,17 @@ func testPluginFullLifecycle(t *testing.T, socket string) {
 }
 
 func testPluginEdgeCases(t *testing.T, socket string) {
-	m := pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})
-	if err, ok := m["Err"].(string); ok && err != "" {
-		t.Fatalf("remove non-existent: %s", err)
+	pluginOK(t, socket, "VolumeDriver.Remove", volume.RemoveRequest{Name: "no-such-vol"})
+
+	m := pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "no-such-vol"})
+	if m.Volume != nil && m.Volume["Name"] != "no-such-vol" {
+		t.Fatalf("expected name no-such-vol, got %v", m.Volume["Name"])
 	}
 
-	m = pluginOK(t, socket, "VolumeDriver.Get", volume.GetRequest{Name: "no-such-vol"})
-	if v, ok := m["Volume"].(map[string]any); ok {
-		if v["Name"] != "no-such-vol" {
-			t.Fatalf("expected name no-such-vol, got %v", v["Name"])
-		}
-	}
-
-	m = pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
-	if err, ok := m["Err"].(string); ok && err != "" {
-		t.Fatalf("unmount non-existent: %s", err)
-	}
+	pluginOK(t, socket, "VolumeDriver.Unmount", volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
 
 	m = pluginOK(t, socket, "VolumeDriver.Path", volume.PathRequest{Name: "no-such-vol"})
-	if mp, _ := m["Mountpoint"].(string); mp == "" {
+	if m.Mountpoint == "" {
 		t.Fatal("expected a mountpoint even for non-existent volume")
 	}
 

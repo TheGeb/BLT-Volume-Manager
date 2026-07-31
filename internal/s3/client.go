@@ -181,13 +181,35 @@ func (c *Client) DeleteObjectsWithPrefix(ctx context.Context, prefix string) err
 		if end > len(idents) {
 			end = len(idents)
 		}
-		_, err = c.raw.DeleteObjects(ctx, &s3sdk.DeleteObjectsInput{
+		result, err := c.raw.DeleteObjects(ctx, &s3sdk.DeleteObjectsInput{
 			Bucket: aws.String(c.bucket),
 			Delete: &types.Delete{Objects: idents[i:end]},
 		})
 		if err != nil {
 			return fmt.Errorf("batch delete objects (bucket=%q, prefix=%q): %w", c.bucket, prefix, err)
 		}
+		if err := checkDeleteObjectsResponse(result, c.bucket, prefix); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkDeleteObjectsResponse(result *s3sdk.DeleteObjectsOutput, bucket, prefix string) error {
+	if result != nil && len(result.Errors) > 0 {
+		failed := make([]string, 0, len(result.Errors))
+		for _, e := range result.Errors {
+			key := "(unknown)"
+			if e.Key != nil {
+				key = *e.Key
+			}
+			msg := "(unknown)"
+			if e.Message != nil {
+				msg = *e.Message
+			}
+			failed = append(failed, fmt.Sprintf("%s: %s", key, msg))
+		}
+		return fmt.Errorf("batch delete objects (bucket=%q, prefix=%q): partial failure: %s", bucket, prefix, strings.Join(failed, "; "))
 	}
 	return nil
 }

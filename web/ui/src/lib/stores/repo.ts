@@ -76,8 +76,8 @@ export async function loadOwnerStatus() {
   try {
     ownerStatus.set(await api.fetchOwnerStatus(vol));
   } catch (e: unknown) {
-    ownerStatus.set({ volume: vol, owner: '' });
-    showToast((e as Error).message, true);
+    ownerStatus.set(null);
+    showToast(api.safeErrorMessage(e), true);
   }
 }
 
@@ -88,7 +88,7 @@ export async function loadStats(volume: string) {
     stats.set(s);
   } catch (e: unknown) {
     stats.set(null);
-    showToast((e as Error).message, true);
+    showToast(api.safeErrorMessage(e), true);
   } finally {
     statsLoading.set(false);
   }
@@ -102,7 +102,7 @@ async function withRepoOp(loading: { set: (v: boolean) => void }, apiFn: () => P
   try {
     const msg = await apiFn();
     showToast(msg);
-  } catch (e: unknown) { showToast((e as Error).message, true); }
+  } catch (e: unknown) { showToast(api.safeErrorMessage(e), true); }
   finally { loading.set(false); }
 }
 

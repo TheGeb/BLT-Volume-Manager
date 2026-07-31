@@ -34,6 +34,7 @@
 
   let initialSyncDone = false;
   let refreshing = false;
+  $: busy = $loading;
   let showColorPicker = false;
   let colorPickerEl: HTMLDivElement;
   let showInfoModal = false;
@@ -271,6 +272,15 @@
     box-sizing: border-box;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    :global(*),
+    :global(*::before),
+    :global(*::after) {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   :global(.radio-item[data-state="checked"]::before) {
     border-color: var(--accent);
     background: var(--accent);
@@ -304,7 +314,7 @@
 </style>
 
 <svelte:window on:click={handleWindowClick}/>
-<div class="page-shell">
+<div class="page-shell" aria-busy={busy}>
   <header class="topbar">
     <h1>BLT Volume Manager</h1>
     <div class="topbar-actions">

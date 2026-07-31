@@ -40,8 +40,10 @@
   let loading = true;
   let error = '';
   let fileContent = '';
+  let fileContentError = '';
   let fileContentPath = '';
   let fileContentLoading = false;
+  let fileRequestGeneration = 0;
   let currentDiffResult: DiffResult | null = null;
   let sideBySide = false;
   let diffOtherId = '';
@@ -49,6 +51,7 @@
   let selectedCompareId = '';
 
   let diffLoading = false;
+  let diffRequestGeneration = 0;
   let treePanelStartWidth = 280;
   let selectedCompareSnap: Snapshot | undefined;
   let compareSnapshotList: Snapshot[] = [];
@@ -60,7 +63,7 @@
       compareSnapshotList = r.snapshots;
     } catch (e: unknown) {
       compareSnapshotList = [];
-      showToast((e as Error).message, true);
+      showToast(api.safeErrorMessage(e), true);
     }
   }
 
@@ -190,10 +193,13 @@
   $: if (diffOtherId) loadSnapSize(diffOtherId);
 
   async function open() {
+    fileRequestGeneration++;
+    diffRequestGeneration++;
     hasOpened = false;
     loading = true;
     error = '';
     fileContent = '';
+    fileContentError = '';
     fileContentPath = '';
     currentDiffResult = null;
     currentDiffHunks = [];
@@ -209,8 +215,8 @@
         loadCompareSnapshots(),
       ]);
       nodes = fetchedNodes;
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = api.safeErrorMessage(e);
     } finally {
       loading = false;
       hasOpened = true;
@@ -251,6 +257,7 @@
 
   async function doDiff(skipCallback = false) {
     if (!selectedCompareId) return;
+    const generation = ++diffRequestGeneration;
     const targetId = selectedCompareId;
     diffLoading = true;
     diffOtherId = targetId;
@@ -262,28 +269,33 @@
         snapB.fallbackHash
       ]);
       const result = await api.fetchDiff(snapshot.id, targetId, snapshot.volume!, hashA, hashB);
-      if (diffOtherId !== targetId) return;
+      if (generation !== diffRequestGeneration || diffOtherId !== targetId) return;
       // eslint-disable-next-line svelte/infinite-reactive-loop
       currentDiffResult = result;
       sideBySide = false;
       fileContent = '';
+      fileContentError = '';
       fileContentPath = '';
       if (!skipCallback) {
         onDiffChange(targetId);
       }
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      if (generation !== diffRequestGeneration) return;
+      error = api.safeErrorMessage(e);
     } finally {
       // eslint-disable-next-line svelte/infinite-reactive-loop
-      diffLoading = false;
+      if (generation === diffRequestGeneration) diffLoading = false;
     }
   }
 
   function clearDiff() {
+    fileRequestGeneration++;
+    diffRequestGeneration++;
     currentDiffResult = null;
     diffOtherId = '';
     currentDiffHunks = [];
     fileContent = '';
+    fileContentError = '';
     fileContentPath = '';
     diffLoading = false;
     selectedCompareId = '';
@@ -298,22 +310,28 @@
   }
 
   async function viewFile(path: string) {
+    const generation = ++fileRequestGeneration;
     fileContent = '';
+    fileContentError = '';
     fileContentLoading = true;
     fileContentPath = path;
     currentDiffHunks = [];
     error = '';
     try {
       fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, snapshot.fallbackHash);
-    } catch (e: any) {
-      fileContent = 'Error: ' + e.message;
+      if (generation !== fileRequestGeneration) return;
+    } catch (e: unknown) {
+      if (generation !== fileRequestGeneration) return;
+      fileContentError = api.safeErrorMessage(e);
     } finally {
-      fileContentLoading = false;
+      if (generation === fileRequestGeneration) fileContentLoading = false;
     }
   }
 
   async function viewFileFromId(path: string, id: string) {
+    const generation = ++fileRequestGeneration;
     fileContent = '';
+    fileContentError = '';
     fileContentLoading = true;
     fileContentPath = path;
     currentDiffHunks = [];
@@ -321,15 +339,19 @@
     try {
       const snap = compareSnapshotList.find(s => s.id === id)!;
       fileContent = await api.fetchFileContent(id, snapshot.volume!, path, snap.fallbackHash);
-    } catch (e: any) {
-      fileContent = 'Error: ' + e.message;
+      if (generation !== fileRequestGeneration) return;
+    } catch (e: unknown) {
+      if (generation !== fileRequestGeneration) return;
+      fileContentError = api.safeErrorMessage(e);
     } finally {
-      fileContentLoading = false;
+      if (generation === fileRequestGeneration) fileContentLoading = false;
     }
   }
 
   async function showFileDiff(path: string, otherId: string) {
+    const generation = ++fileRequestGeneration;
     fileContent = '';
+    fileContentError = '';
     fileContentPath = path;
     currentDiffHunks = [];
     fileContentLoading = true;
@@ -345,13 +367,15 @@
         api.fetchFileContent(snapshot.id, snapshot.volume!, path, hashA),
         api.fetchFileContent(otherId, snapshot.volume!, path, hashB),
       ]);
+      if (generation !== fileRequestGeneration) return;
       currentDiffHunks = computeDiff(oldContent.split('\n'), newContent.split('\n'));
       sideBySide = false;
       if (currentDiffHunks.length === 0) fileContent = newContent;
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      if (generation !== fileRequestGeneration) return;
+      error = api.safeErrorMessage(e);
     } finally {
-      fileContentLoading = false;
+      if (generation === fileRequestGeneration) fileContentLoading = false;
     }
   }
 
@@ -516,6 +540,10 @@
           {:else if fileContentLoading}
             <div style="text-align:center;padding:40px;">
               <Spinner />
+            </div>
+          {:else if fileContentError}
+            <div style="text-align:center;padding:40px;color:var(--red);font-size:0.9rem;">
+              {fileContentError}
             </div>
           {:else}
             <div style="text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">

@@ -3,6 +3,7 @@ package volume
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,19 +15,24 @@ import (
 )
 
 type mockBackend struct {
-	objects    []s3.Object
-	objectsErr error
+	objects         []s3.Object
+	objectsErr      error
+	deletePrefixErr error
 }
 
 func (m *mockBackend) PutObject(context.Context, string, []byte) error { return nil }
 func (m *mockBackend) ReadObject(context.Context, string) ([]byte, error) {
 	return nil, store.ErrKeyNotFound
 }
-func (m *mockBackend) DeleteObject(context.Context, string) error { return nil }
+func (m *mockBackend) DeleteObject(context.Context, string) error { return m.deletePrefixErr }
 func (m *mockBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return m.objects, m.objectsErr
 }
-func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error { return nil }
+func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error { return m.deletePrefixErr }
+
+type mockResticBackend struct{}
+
+func (m *mockResticBackend) DeleteRepo(_ context.Context, _ string) error { return nil }
 
 func mockStores(objects []s3.Object, objectsErr error) func(*server.BLTService) {
 	return func(s *server.BLTService) {
@@ -151,5 +157,54 @@ func TestValidVolumeName(t *testing.T) {
 				t.Errorf("validVolumeName(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func newTestService(deleteErr error) *server.BLTService {
+	b := &mockBackend{deletePrefixErr: deleteErr}
+	return server.New(cfg.Config{S3Bucket: "test-bucket"}, b,
+		server.WithResticBackend(&mockResticBackend{}),
+	)
+}
+
+func TestDeleteVolume_CleanupFailure(t *testing.T) {
+	t.Parallel()
+	s := newTestService(errors.New("simulated cleanup error"))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
+	rec := httptest.NewRecorder()
+	DeleteVolume(s, rec, req, "test-vol")
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for cleanup failure, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp server.ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if resp.Error == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+func TestDeleteVolume_Success(t *testing.T) {
+	t.Parallel()
+	s := newTestService(nil)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
+	rec := httptest.NewRecorder()
+	DeleteVolume(s, rec, req, "test-vol")
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for successful cleanup, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if resp.Status == "" {
+		t.Error("expected non-empty status message")
 	}
 }

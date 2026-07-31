@@ -97,7 +97,10 @@ func DeleteVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	ctx := r.Context()
-	CleanupVolumeData(ctx, s, volumeName)
+	if err := CleanupVolumeData(ctx, s, volumeName); err != nil {
+		server.RespondError(w, fmt.Errorf("cleanup volume data: %w", err), http.StatusInternalServerError)
+		return
+	}
 	s.RefreshStats(ctx)
 	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
 }

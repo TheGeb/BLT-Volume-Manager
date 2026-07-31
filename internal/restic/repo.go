@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
@@ -77,19 +78,50 @@ func (m *Manager) repositoryExists(ctx context.Context) (bool, error) {
 	checkCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
 	defer cancel()
 
-	_, err := m.runner.RepoExists(checkCtx)
+	out, err := m.runner.RepoExists(checkCtx)
 	if err != nil {
 		var execErr *exec.Error
 		if errors.As(err, &execErr) {
 			return false, err
 		}
-		return false, nil
+		// Check if this is a "repo not found" situation.
+		// "unable to open repository" is restic's error for a non-existent repo.
+		if repositoryNotFoundOutput(out) {
+			return false, nil
+		}
+		// All other errors (auth, network, etc.) are real failures.
+		return false, err
 	}
 	return true, nil
 }
 
+func repositoryNotFoundOutput(out []byte) bool {
+	lower := strings.ToLower(string(out))
+	if !strings.Contains(lower, "unable to open repository") {
+		return false
+	}
+	for _, marker := range []string{
+		"accessdenied", "access denied", "permission denied", "forbidden",
+		"unauthorized", "timeout", "timed out", "connection refused",
+		"network is unreachable",
+	} {
+		if strings.Contains(lower, marker) {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *Manager) initRepository(ctx context.Context) error {
-	return m.runner.Init(ctx)
+	out, err := m.runner.InitOutput(ctx)
+	if err != nil {
+		// "repository already initialized" is not an error for our use case.
+		if strings.Contains(strings.ToLower(string(out)), "already initialized") {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (m *Manager) Check(ctx context.Context, noLock bool) error {

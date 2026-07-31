@@ -22,7 +22,19 @@ type VersionCounter struct {
 	Minor int `json:"minor"`
 }
 
+// S3-only mode note: Version allocation is not safe across independent
+// writers unless a Coordinator (etcd) is configured. S3 operations cannot
+// provide an atomic compare-and-swap for distributed version counters.
+
+// NextTags returns the next version tags for a volume. When the backend
+// implements Coordinator (etcd), the increment is performed atomically
+// with an etcd CAS transaction. Otherwise the existing S3 read-then-write
+// is used, which is not safe across independent writers.
 func (s *VersionStore) NextTags(ctx context.Context, name string, major bool) ([]string, error) {
+	if coord, ok := s.b.(Coordinator); ok {
+		return coord.NextVersion(ctx, name, major)
+	}
+
 	v, err := s.ReadCounter(ctx, name)
 	if err != nil {
 		if !errors.Is(err, ErrKeyNotFound) {

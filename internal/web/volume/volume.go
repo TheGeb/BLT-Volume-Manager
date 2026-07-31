@@ -11,13 +11,11 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func CleanupVolumeData(ctx context.Context, s *server.BLTService, volumeName string) {
+func CleanupVolumeData(ctx context.Context, s *server.BLTService, volumeName string) error {
 	if volumeName == "" {
-		return
+		return nil
 	}
-	if err := s.DeleteVolumeData(ctx, volumeName); err != nil {
-		log.Error("cleanup_volume_data_failed", err)
-	}
+	return s.DeleteVolumeData(ctx, volumeName)
 }
 
 func validVolumeName(name string) bool {
@@ -55,6 +53,13 @@ func CopyVolumeData(ctx context.Context, s *server.BLTService, source, target st
 	if err != nil {
 		return nil, err
 	}
+	// If any subsequent step fails, clean up the target repo we just created.
+	initDone := true
+	defer func() {
+		if initDone {
+			_ = CleanupVolumeData(ctx, s, target)
+		}
+	}()
 
 	owned, ownerName, err := owner.IsVolumeOwned(ctx, s.OwnerStore(), source)
 	if err != nil {
@@ -83,6 +88,9 @@ func CopyVolumeData(ctx context.Context, s *server.BLTService, source, target st
 		return nil, fmt.Errorf("register volume: %w", err)
 	}
 
+	// Success - keep the target repo; disable deferred cleanup.
+	initDone = false
+
 	return &CopyVolumeResult{
 		SourceOwned:     owned,
 		OwnerName:       ownerName,
@@ -95,6 +103,13 @@ func RenameVolumeData(ctx context.Context, s *server.BLTService, source, target 
 	if err != nil {
 		return err
 	}
+	// If any subsequent step fails, clean up the target repo we just created.
+	initDone := true
+	defer func() {
+		if initDone {
+			_ = CleanupVolumeData(ctx, s, target)
+		}
+	}()
 
 	owned, ownerName, err := owner.IsVolumeOwned(ctx, s.OwnerStore(), source)
 	if err != nil {
@@ -124,6 +139,11 @@ func RenameVolumeData(ctx context.Context, s *server.BLTService, source, target 
 		return fmt.Errorf("register volume: %w", err)
 	}
 
-	CleanupVolumeData(ctx, s, source)
+	// Success - keep the target repo; disable deferred cleanup.
+	initDone = false
+
+	if err := CleanupVolumeData(ctx, s, source); err != nil {
+		return fmt.Errorf("cleanup source volume: %w", err)
+	}
 	return nil
 }

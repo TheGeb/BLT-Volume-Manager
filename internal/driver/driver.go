@@ -14,6 +14,20 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 )
 
+type mountState int
+
+const (
+	mountStateIdle      mountState = iota
+	mountStateAcquiring
+	mountStateReady
+)
+
+type volMountState struct {
+	state      mountState
+	done       chan struct{}
+	acquireErr error
+}
+
 type volumeConfig struct {
 	FsType string `json:"fs_type"`
 }
@@ -37,6 +51,8 @@ type Driver struct {
 	ownerStore        *store.OwnerStore
 	versionStore      *store.VersionStore
 	restorePointStore *store.RestorePointStore
+	mountStates       map[string]*volMountState
+	mountMu           sync.Mutex
 }
 
 func New(c appcfg.Config, ctx context.Context) *Driver {
@@ -54,9 +70,10 @@ func New(c appcfg.Config, ctx context.Context) *Driver {
 	snapshot.InitRoot(root)
 
 	drv := &Driver{
-		volumePath: root,
-		resticPath: c.ResticBase,
-		vols:       make(map[string]*VolumeInfo),
+		volumePath:  root,
+		resticPath:  c.ResticBase,
+		vols:        make(map[string]*VolumeInfo),
+		mountStates: make(map[string]*volMountState),
 	}
 	if b != nil {
 		drv.ownerMaxMins = c.OwnerMaxMins
