@@ -9,11 +9,20 @@
   "rebaseWhen": "behind-base-branch",
   "postUpdateOptions": ["gomodTidy"],
   "vulnerabilityAlerts": {
-    "enabled": true
+    "enabled": true,
+    "labels": ["security"],
+    "minimumReleaseAge": "1 day"
   },
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch"],
+      "matchManagers": ["nix"],
+      "groupName": "Nix non-major dependencies",
+      "groupSlug": "nix-minor-patch"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "excludeManagers": ["nix"],
       "groupName": "all non-major dependencies",
       "groupSlug": "all-minor-patch"
     },

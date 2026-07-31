@@ -89,6 +89,29 @@
         checks = {
           inherit (self.packages.${system}) blt-volume-manager blt-volume-manager-web;
           default = self.packages.${system}.default;
+
+          go-test = (self.packages.${system}.blt-volume-manager.overrideAttrs (old: {
+            doCheck = true;
+            preCheck = ''
+              mkdir -p internal/web/static
+              touch internal/web/static/.dummy
+            '';
+            installPhase = "touch $out";
+          })).overrideAttrs (old: { buildPhase = "true"; checkPhase = ''
+            runHook preCheck
+            go test ./... -short -count=1
+            runHook postCheck
+          ''; });
+
+          ui-test = ui.overrideAttrs (old: {
+            doCheck = true;
+            installPhase = "touch $out";
+            checkPhase = ''
+              runHook preCheck
+              npm test
+              runHook postCheck
+            '';
+          });
         };
       }
     ) // {
@@ -159,16 +182,26 @@
 
               serviceConfig = {
                 Type = "simple";
-                ExecStart = "${pkg}/bin/blt-volume-manager"
-                  + " --data-dir ${cfg.dataDir}"
-                  + " --socket ${cfg.socketPath}"
-                  + optionalString (cfg.httpAddr != "") " --http-addr ${cfg.httpAddr}";
+                ExecStart =
+                  [ "${pkg}/bin/blt-volume-manager"
+                    "--data-dir" cfg.dataDir
+                    "--socket" cfg.socketPath
+                  ] ++ optional (cfg.httpAddr != "") [
+                    "--http-addr" cfg.httpAddr
+                  ];
                 EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
                 Restart = "always";
                 RestartSec = "5";
                 RuntimeDirectory = [ "docker/plugins" ];
                 RuntimeDirectoryMode = "0755";
                 NoNewPrivileges = true;
+                ProtectSystem = "full";
+                PrivateTmp = true;
+                ProtectKernelTunables = true;
+                ProtectKernelModules = true;
+                ProtectControlGroups = true;
+                SystemCallArchitectures = "native";
+                LockPersonality = true;
               };
             };
           };

@@ -1,5 +1,6 @@
 .git/
 .gitignore
+.github/
 coverage.*
 *.out
 *.coverprofile
@@ -16,3 +17,13 @@ blt-volume-manager-plugin
 !README.md
 .DS_Store
 *.log
+.editorconfig
+flake.nix
+flake.lock
+result/
+result-*
+renovate.json
+VERSION
+Makefile
+scripts/
+docs/

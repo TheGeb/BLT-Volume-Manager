@@ -1,0 +1,60 @@
+name: Nix Hash Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - go.mod
+      - go.sum
+      - web/ui/package.json
+      - web/ui/package-lock.json
+      - flake.nix
+      - flake.lock
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-hashes:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update dependency hashes
+        run: |
+          if [ -f scripts/update-nix-hashes.sh ]; then
+            bash scripts/update-nix-hashes.sh vendor
+            bash scripts/update-nix-hashes.sh npm
+          else
+            make nix-vendor-hash nix-npm-hash
+          fi
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if [ -z "$(git diff --stat flake.nix)" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate flake
+        run: nix flake check --log-format raw
+
+      - name: Commit and push hash updates
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flake.nix flake.lock
+          git diff --cached --quiet || git commit -m "chore: update nix dependency hashes"
+          git push
