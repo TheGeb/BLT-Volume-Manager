@@ -10,6 +10,10 @@ on:
         description: 'Release version (overrides VERSION file)'
         required: false
 
+concurrency:
+  group: ${{ github.workflow }}-release
+  cancel-in-progress: false
+
 jobs:
   release:
     permissions:
@@ -23,42 +27,59 @@ jobs:
 
       - name: Read version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version || '' }}
         run: |
-          VERSION="${{ inputs.version || '' }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="$(cat VERSION)"
+          RAW_VERSION="$INPUT_VERSION"
+          if [ -z "$RAW_VERSION" ]; then
+            RAW_VERSION="$(cat VERSION)"
           fi
           # Validate version format to prevent injection
-          if ! echo "$VERSION" | grep -qP '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'; then
-            echo "Invalid version format: $VERSION" >&2
+          if ! echo "$RAW_VERSION" | grep -qP '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'; then
+            echo "Invalid version format: $RAW_VERSION" >&2
             exit 1
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          # Strip optional leading v; store bare version and tag version separately
+          BARE="${RAW_VERSION#v}"
+          echo "VERSION=$BARE" >> $GITHUB_OUTPUT
+          echo "TAG_VERSION=v$BARE" >> $GITHUB_OUTPUT
+          echo "Bare version: $BARE"
+          echo "Tag version: v$BARE"
 
-      - name: Check if tag exists
+      - name: Check existing tag
         id: tag_check
         run: |
-          if git rev-parse "v${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
-            echo "skipped=true" >> $GITHUB_OUTPUT
+          TAG="v${{ steps.version.outputs.VERSION }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TAG_COMMIT=$(git rev-parse "$TAG"^{commit})
+            THIS_COMMIT="${{ github.sha }}"
+            if [ "$TAG_COMMIT" != "$THIS_COMMIT" ]; then
+              echo "Tag $TAG exists but points to $TAG_COMMIT, not $THIS_COMMIT" >&2
+              echo "Resolve by deleting the remote tag or bumping the version" >&2
+              exit 1
+            fi
+            echo "exists_at_current=true" >> $GITHUB_OUTPUT
           else
-            echo "skipped=false" >> $GITHUB_OUTPUT
+            echo "exists_at_current=false" >> $GITHUB_OUTPUT
           fi
 
+      # ---- Build phase (no publishing) ----
+
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
         with:
           go-version-file: go.mod
           cache: true
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: web/ui/package-lock.json
 
       - name: Build UI
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
         run: |
           npm ci
           npm run build
@@ -66,27 +87,9 @@ jobs:
           cp -r dist/* ../../internal/web/static/
         working-directory: web/ui
 
-      - name: Login to GitHub Container Registry
-        if: steps.tag_check.outputs.skipped == 'false'
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        if: steps.tag_check.outputs.skipped == 'false'
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
-
-      - name: Build and push all images
-        if: steps.tag_check.outputs.skipped == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          COMMIT: ${{ github.sha }}
-        run: docker buildx bake -f docker-bake.hcl --push
-
       - name: Build binaries
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
+        id: build_binaries
         run: |
           for name in driver web; do
             binary="blt-volume-manager-${name}"
@@ -101,23 +104,52 @@ jobs:
             done
           done
 
+      - name: Generate checksums
+        if: steps.tag_check.outputs.exists_at_current != 'true'
+        run: |
+          sha256sum blt-volume-manager-*-linux-* > checksums.txt
+          cat checksums.txt
+
+      # ---- Publish phase ----
+
+      - name: Login to GitHub Container Registry
+        if: steps.tag_check.outputs.exists_at_current != 'true'
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: steps.tag_check.outputs.exists_at_current != 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Build and push all images
+        if: steps.tag_check.outputs.exists_at_current != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          COMMIT: ${{ github.sha }}
+        run: docker buildx bake -f docker-bake.hcl --push
+
       - name: Create git tag
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git tag "v${{ steps.version.outputs.VERSION }}" ${{ github.sha }}
-          git push origin "v${{ steps.version.outputs.VERSION }}"
+          TAG="${{ steps.version.outputs.TAG_VERSION }}"
+          git tag "$TAG" ${{ github.sha }}
+          git push origin "$TAG"
 
       - name: Create Release
-        if: steps.tag_check.outputs.skipped == 'false'
+        if: steps.tag_check.outputs.exists_at_current != 'true'
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.TAG_VERSION }}
           target_commitish: ${{ github.sha }}
           draft: true
           files: |
-            blt-volume-manager-plugin-linux-amd64
-            blt-volume-manager-plugin-linux-arm64
+            blt-volume-manager-driver-linux-amd64
+            blt-volume-manager-driver-linux-arm64
             blt-volume-manager-web-linux-amd64
             blt-volume-manager-web-linux-arm64
+            checksums.txt

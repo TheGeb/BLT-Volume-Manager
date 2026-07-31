@@ -1,0 +1,84 @@
+name: Release Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - VERSION
+      - docker-bake.hcl
+      - Dockerfile
+      - Makefile
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Read and normalize version
+        id: version
+        run: |
+          RAW_VERSION="$(cat VERSION)"
+          if ! echo "$RAW_VERSION" | grep -qP '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'; then
+            echo "Invalid version format: $RAW_VERSION" >&2
+            exit 1
+          fi
+          BARE="${RAW_VERSION#v}"
+          echo "VERSION=$BARE" >> $GITHUB_OUTPUT
+          echo "Raw version: $RAW_VERSION"
+          echo "Normalized: $BARE"
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: web/ui/package-lock.json
+
+      - name: Build UI
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../../internal/web/static
+          cp -r dist/* ../../internal/web/static/
+        working-directory: web/ui
+
+      - name: Validate Docker Bake metadata
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          docker buildx bake -f docker-bake.hcl --print 2>&1
+
+      - name: Build binaries
+        run: |
+          for name in driver web; do
+            binary="blt-volume-manager-${name}"
+            pkg="./cmd/${name}"
+            for arch in amd64 arm64; do
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch \
+                go build -ldflags "-s -w \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=${{ steps.version.outputs.VERSION }} \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Commit=${GITHUB_SHA} \
+                  -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                -o "${binary}-linux-${arch}" "${pkg}"
+            done
+          done
+          ls -la blt-volume-manager-*-linux-*
+
+      - name: Generate checksums
+        run: sha256sum blt-volume-manager-*-linux-* > checksums.txt && cat checksums.txt
