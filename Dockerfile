@@ -10,7 +10,7 @@ WORKDIR /src
 RUN apk add --no-cache \
     git=2.54.0-r0 \
     ca-certificates=20260611-r0 \
-    nodejs=24.17.0-r0 \
+    nodejs=24.18.1-r0 \
     npm=11.12.1-r0 \
     make=4.4.1-r4
 
@@ -54,6 +54,8 @@ ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
 # Plugin — requires root for Docker socket and volume mount access
 FROM base AS plugin
+# The plugin needs root for Docker socket and volume mount access.
+# hadolint ignore=DL3002
 USER root
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
 
