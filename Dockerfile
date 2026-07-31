@@ -10,7 +10,7 @@ WORKDIR /src
 RUN apk add --no-cache \
     git=2.54.0-r0 \
     ca-certificates=20260611-r0 \
-    nodejs=24.17.0-r0 \
+    nodejs=24.18.1-r0 \
     npm=11.12.1-r0 \
     make=4.4.1-r4
 
