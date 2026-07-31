@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   go-lint:
     runs-on: ubuntu-latest
@@ -25,10 +29,12 @@ jobs:
 
       - uses: golangci/golangci-lint-action@db9de0fc1a667e1a49d2291a1a042dff081d78f6 # v9
         with:
-          version: latest
+          version: v2.0.2
 
-      - name: Tidy
-        run: go mod tidy
+      - name: Tidy and check for diff
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
 
   go-test:
     runs-on: ubuntu-latest
@@ -79,8 +85,14 @@ jobs:
       - name: Create dummy UI files for embed
         run: mkdir -p internal/web/static && touch internal/web/static/.dummy
 
-      - name: Install restic
-        run: sudo apt-get update && sudo apt-get install -y restic
+      - name: Install restic 0.19.1
+        run: |
+          RESTIC_VERSION=0.19.1
+          curl -fsSL "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_amd64.bz2" -o /tmp/restic.bz2
+          sha256sum -c - <<< "67d7614c3ebfa8a144f5a91c74754da1e9d19a70a07ab577c8e8fb4645ef176d  /tmp/restic.bz2"
+          bunzip2 /tmp/restic.bz2
+          sudo mv /tmp/restic /usr/local/bin/restic
+          sudo chmod +x /usr/local/bin/restic
 
       - name: Integration tests (${{ matrix.backend }})
         run: go test -tags integration -v -count=1 -run '/${{ matrix.backend }}' ./test/integration/
@@ -108,7 +120,7 @@ jobs:
       - name: Svelte check
         run: npx svelte-check
 
-  ui-build:
+  ui-check:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -125,43 +137,54 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ui-build
-          path: internal/web/static
+          path: web/ui/dist
 
-  nix-flake:
+  nix-check:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
 
       - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update and push dependency hashes
-        run: |
-          make nix-vendor-hash nix-npm-hash
-          if [ -z "$(git diff --stat flake.nix)" ]; then
-            echo "Hashes are current"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.nix
-          git commit -m "chore: update nix dependency hashes"
-          git push
-
       - name: Validate flake and build packages
         run: nix flake check --log-format raw
+
+  docker-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Build plugin image (no push)
+        uses: docker/build-push-action@7f9587830b9da08e12f8c8c9efc9ee3b5f2aa05a # v7
+        with:
+          target: plugin
+          platforms: linux/amd64
+          load: true
+          cache-from: type=gha,scope=plugin
+          cache-to: type=gha,mode=max,scope=plugin
+
+      - name: Build web image (no push)
+        uses: docker/build-push-action@7f9587830b9da08e12f8c8c9efc9ee3b5f2aa05a # v7
+        with:
+          target: web
+          platforms: linux/amd64
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   hadolint:
     runs-on: ubuntu-latest

@@ -2,9 +2,12 @@
 # Usage: make [target]
 # Override args: make dev-driver ARGS="--http-addr :9090"
 
-.PHONY: all dev-driver dev-web build test lint lint-go format clean coverage check hadolint ui ui-dev-build run-driver tidy
+.PHONY: all dev-driver dev-web build-release test lint lint-go format hadolint check
 .PHONY: nix-vendor-hash nix-npm-hash nix-hashes
-.PHONY: build-driver build-web docker-driver docker-web
+.PHONY: build-driver build-web ui run-web test-go test-ui
+.PHONY: docker-driver docker-web docker-bake-plugin docker-bake-web
+.PHONY: staticcheck golangci-lint-check coverage clean clean-cache tidy fix
+.PHONY: npm-install lint-ui ui-dev-build
 
 # Configurable run arguments (override from command line)
 ARGS ?=
@@ -13,7 +16,8 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
 
-STATICCHECK ?= $(shell command -v staticcheck >/dev/null 2>&1 && echo staticcheck || echo 'GOTOOLCHAIN=go1.26.3 go run honnef.co/go/tools/cmd/staticcheck@latest')
+STATICCHECK_VERSION ?= v0.6.0
+STATICCHECK ?= $(shell command -v staticcheck >/dev/null 2>&1 && echo staticcheck || echo 'GOTOOLCHAIN=go1.26.3 go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)')
 
 LDFLAGS = -s -w \
 	-X 'github.com/TheGeb/BLT-Volume-Manager/internal/app.Version=$(VERSION)' \
@@ -33,14 +37,40 @@ tidy:
 
 clean:
 	rm -f blt-volume-manager blt-volume-manager-web blt-volume-manager-plugin
-	go clean -cache
 	rm -rf web/ui/node_modules 2>/dev/null || true
 	rm -f web/ui/node_modules/.install-stamp
 	rm -rf internal/web/static/*
 
+clean-cache:
+	go clean -cache
+	rm -rf ~/.cache/go-build 2>/dev/null || true
+
+fix: format
+	$(STATICCHECK) -fix ./...
+	cd web/ui && npm run lint:fix
+
 # === Nix hashes ===
 
 nix-vendor-hash:
+	@if [ -f scripts/update-nix-hashes.sh ]; then \
+		bash scripts/update-nix-hashes.sh vendor; \
+	else \
+		echo "scripts/update-nix-hashes.sh not found — falling back to inline logic"; \
+		$(MAKE) _nix-vendor-hash-legacy; \
+	fi
+
+nix-npm-hash:
+	@if [ -f scripts/update-nix-hashes.sh ]; then \
+		bash scripts/update-nix-hashes.sh npm; \
+	else \
+		echo "scripts/update-nix-hashes.sh not found — falling back to inline logic"; \
+		$(MAKE) _nix-npm-hash-legacy; \
+	fi
+
+nix-hashes: nix-vendor-hash nix-npm-hash
+
+# Legacy inline implementations (used when script is absent)
+_nix-vendor-hash-legacy:
 	@OLD=$$(grep -oP 'vendorHash = "\K[^"]+' flake.nix); \
 	cp flake.nix flake.nix.bak; \
 	sed -i 's/vendorHash = "[^"]*"/vendorHash = ""/' flake.nix; \
@@ -60,7 +90,7 @@ nix-vendor-hash:
 	fi; \
 	rm -f flake.nix.bak
 
-nix-npm-hash:
+_nix-npm-hash-legacy:
 	@OLD=$$(grep -oP 'npmDepsHash = "\K[^"]+' flake.nix); \
 	cp flake.nix flake.nix.bak; \
 	sed -i 's/npmDepsHash = "[^"]*"/npmDepsHash = ""/' flake.nix; \
@@ -80,22 +110,20 @@ nix-npm-hash:
 	fi; \
 	rm -f flake.nix.bak
 
-nix-hashes: nix-vendor-hash nix-npm-hash
-
-# === Lint ===
+# === Lint (read-only) ===
 
 staticcheck:
 	$(STATICCHECK) ./...
 
 golangci-lint-check:
-	golangci-lint fmt ./...
 	golangci-lint run ./...
 
-lint-go: format
-	@$(MAKE) -j2 golangci-lint-check staticcheck
+lint-go: golangci-lint-check staticcheck
 
-lint: format
-	@$(MAKE) -j2 golangci-lint-check staticcheck
+lint: lint-go
+	cd web/ui && npm run lint
+
+lint-ui:
 	cd web/ui && npm run lint
 
 hadolint:
@@ -120,7 +148,7 @@ test-ui:
 	cd web/ui && npm test
 
 coverage:
-	golangci-lint fmt ./...
+	go build ./...
 	$(MAKE) staticcheck
 	go test ./... -coverprofile=coverage.out -short
 	go tool cover -html=coverage.out -o coverage.html
@@ -128,8 +156,11 @@ coverage:
 
 # === Build ===
 
-ui:
+npm-install:
 	cd web/ui && npm install
+
+ui:
+	cd web/ui && npm ci
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 	cp -r web/ui/dist/* internal/web/static/
@@ -138,12 +169,11 @@ run-web:
 	go run ./cmd/web $(ARGS)
 
 web/ui/node_modules/.install-stamp: web/ui/package.json web/ui/package-lock.json
-	cd web/ui && npm install
+	cd web/ui && npm ci
 	touch $@
 
 ui-dev-build: web/ui/node_modules/.install-stamp
 	cd web/ui && npx svelte-check
-	cd web/ui && npm run lint:fix
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
 
@@ -161,6 +191,15 @@ build-release:
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-web ./cmd/web
 
 # === Docker ===
+# Local targets use direct docker buildx for simplicity.
+# Release builds use docker buildx bake (see docker-bake.hcl) for
+# multi-platform, metadata tagging, and cache scoping.
+
+docker-bake-web:
+	docker buildx bake -f docker-bake.hcl --load web
+
+docker-bake-plugin:
+	docker buildx bake -f docker-bake.hcl --load plugin
 
 docker-web:
 	docker build --target web -t blt-volume-manager-web:local .
