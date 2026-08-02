@@ -122,6 +122,12 @@ func (r *Runner) Init(ctx context.Context) error {
 	return err
 }
 
+// InitOutput runs restic init and returns its combined output for callers that
+// need to distinguish an already initialized repository from other failures.
+func (r *Runner) InitOutput(ctx context.Context) ([]byte, error) {
+	return r.combinedCapture(ctx, "init")
+}
+
 func (r *Runner) Copy(ctx context.Context, destRepo string, snapshotIDs ...string) error {
 	args := []string{fmt.Sprintf("--from-repo=%s", r.Repo), "copy"}
 	args = append(args, snapshotIDs...)

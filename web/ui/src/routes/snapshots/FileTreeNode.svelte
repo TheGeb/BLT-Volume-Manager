@@ -131,11 +131,11 @@
       {onViewFile} {onViewFileFromId} {onShowFileDiff} {expanded} {expandKey} {activePath} {searchResults} {searchActivePath} {searchAncestorPaths} />
   {/each}
     {:else if node.type === 'dir' || node.children}
-<div role="button" tabindex="0" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;
+<button type="button" class="tree-row" class:highlighted={!!dirBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{dirDiffColor || 'var(--text)'};white-space:nowrap;position:relative;
 
 --hl-indent:{hlIndent}px;"
     on:click={handleClick}
-    on:keydown={(e) => e.key === 'Enter' && handleClick()}>
+    aria-expanded={localExpanded ? 'true' : 'false'}>
     {#if dirBg}
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{dirBg};border:{dirBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
@@ -149,7 +149,7 @@
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
     </svg>
     {node.name}
-  </div>
+  </button>
   {#if localExpanded || everExpanded}
   <div
     class="slide-grid"
@@ -166,11 +166,10 @@
   </div>
   {/if}
 {:else}
-  <div role="button" tabindex="0" data-tree-path={node.full_path || node.path} class="tree-row" class:highlighted={!!fileBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};white-space:nowrap;position:relative;
+  <button type="button" data-tree-path={node.full_path || node.path} class="tree-row" class:highlighted={!!fileBg} style="cursor:pointer;padding:2px 4px;border-radius:4px;font-size:0.9rem;display:flex;align-items:center;gap:4px;color:{fileColor};font-weight:{fileWeight};white-space:nowrap;position:relative;
 
 --hl-indent:{hlIndent}px;"
-    on:click={handleClick}
-    on:keydown={(e) => e.key === 'Enter' && handleClick()}>
+    on:click={handleClick}>
     {#if fileBg}
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{fileBg};border:{fileBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
@@ -183,7 +182,7 @@
       <span style="color:var(--muted);font-size:0.75rem;margin-left:auto;">{formatBytes(node.size)}</span>
     {/if}
 
-  </div>
+  </button>
 {/if}
 
 <style>
@@ -207,6 +206,14 @@
 
   .slide-inner {
     min-height: 0;
+  }
+
+  .tree-row {
+    background: none;
+    border: none;
+    font: inherit;
+    text-align: inherit;
+    color: inherit;
   }
 
   .tree-row::before {

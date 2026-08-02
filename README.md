@@ -63,7 +63,7 @@ S3 owner (optional)
 
 Next steps
 
-- Ensure `restic` is installed in the runtime image and environment variables `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) are set for S3.
+- Ensure `restic` **v0.17.0 or newer** is installed in the runtime image (the shipped Docker image pins restic 0.19.1). BLT-Volume-Manager relies on restic's documented exit code `10` for "repository does not exist", which restic only reports since v0.17.0. Set `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) for S3. When `RESTIC_FROM_PASSWORD` is unset it defaults to `RESTIC_PASSWORD` (used by volume copy/rename).
 - Optionally set `RESTIC_AUTO_INIT=1` or `RESTIC_INIT_IF_MISSING=1` to automatically initialize the repository when it does not exist.
 
 A browser-based UI is available when you start the binary with `--http-addr`, for example `--http-addr ":8080"`.

@@ -6,7 +6,8 @@
   import type { SnapshotListParams } from '$lib/api';
   import * as api from '$lib/api';
   import { showToast } from '$lib/stores/toast';
-  import { versionTag, parseVersion } from '$lib/util';
+  import { versionTag, parseVersion, safeErrorMessage } from '$lib/util';
+  import { computeDateLabel, computeVersionLabel } from '$lib/format';
   import HostDropdown from './HostDropdown.svelte';
   import VersionRangeInputs from './VersionRangeInputs.svelte';
   import DateTimeRange from './DateTimeRange.svelte';
@@ -59,39 +60,50 @@
   let pickerHasMore = $state(false);
   let pickerLoading = $state(false);
   let pickerRestorePointID = $state('');
+  let pickerGeneration = $state(0);
+  let pickerController: AbortController | null = $state(null);
 
   async function fetchPickerData() {
+    pickerGeneration++;
+    const currentGen = pickerGeneration;
+
+    if (pickerController) pickerController.abort();
+    const controller = new AbortController();
+    pickerController = controller;
+    pickerLoading = true;
     if (!volume) {
       pickerSnapshots = [];
       pickerHasMore = false;
       pickerLoading = false;
       return;
     }
-    pickerLoading = true;
-    const p: SnapshotListParams = {
-      offset: (pickerPage - 1) * pickerPageSize,
-      limit: pickerPageSize,
-    };
-    if (hostFilter) p.host = hostFilter;
-    if (typeFilter !== 'all') p.tag = typeFilter;
-    if (localTimeFrom !== undefined) p.timeFrom = localTimeFrom;
-    if (localTimeTo !== undefined) p.timeTo = localTimeTo;
-    if (localTimeOfDayFrom !== undefined) p.timeOfDayFrom = localTimeOfDayFrom;
-    if (localTimeOfDayTo !== undefined) p.timeOfDayTo = localTimeOfDayTo;
-    if (versionFrom) p.versionFrom = versionFrom;
-    if (versionTo) p.versionTo = versionTo;
-    if (searchDebounced) p.query = searchDebounced;
     try {
-      const r = await api.fetchSnapshots(volume, p);
-      pickerSnapshots = r.snapshots;
-      pickerHasMore = r.hasMore ?? false;
-      pickerRestorePointID = r.restorePointID ?? '';
+      const params: SnapshotListParams = {
+        offset: (pickerPage - 1) * pickerPageSize,
+        limit: pickerPageSize,
+      };
+      if (hostFilter) params.host = hostFilter;
+      if (typeFilter !== 'all') params.tag = typeFilter;
+      if (localTimeFrom !== undefined) params.timeFrom = localTimeFrom;
+      if (localTimeTo !== undefined) params.timeTo = localTimeTo;
+      if (localTimeOfDayFrom !== undefined) params.timeOfDayFrom = localTimeOfDayFrom;
+      if (localTimeOfDayTo !== undefined) params.timeOfDayTo = localTimeOfDayTo;
+      if (versionFrom) params.versionFrom = versionFrom;
+      if (versionTo) params.versionTo = versionTo;
+      if (searchDebounced) params.query = searchDebounced;
+      const data = await api.fetchSnapshots(volume, params, controller.signal);
+      if (currentGen !== pickerGeneration) return;
+      pickerSnapshots = data.snapshots;
+      pickerHasMore = data.hasMore ?? false;
+      pickerRestorePointID = data.restorePointID ?? '';
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      if (currentGen !== pickerGeneration) return;
       pickerSnapshots = [];
       pickerHasMore = false;
-      showToast((e as Error).message, true);
+      showToast(safeErrorMessage(e), true);
     } finally {
-      pickerLoading = false;
+      if (currentGen === pickerGeneration) pickerLoading = false;
     }
   }
 
@@ -128,90 +140,6 @@
       tick().then(() => versionInputs?.loadFields());
     }
   });
-
-  function computeDateLabel(tf: number | undefined, tt: number | undefined, tdf: number | undefined, tdt: number | undefined): string {
-    if (tdf !== undefined || tdt !== undefined) {
-      return fmtSOT(tdf) + '\u2013' + fmtSOT(tdt);
-    }
-    if (tf !== undefined || tt !== undefined) {
-      const from = fmtTS(tf);
-      const to = fmtTS(tt);
-      if (tf && tt && sameUTCDay(tf, tt)) {
-        const ft = timePart(tf);
-        const ttPart = timePart(tt);
-        if (!ft && !ttPart) return from;
-        return from.split(' (')[0] + ' (' + (ft || '12 AM') + ' \u2013 ' + (ttPart || '12 AM') + ')';
-      }
-      return from + ' \u2013 ' + to;
-    }
-    return 'Any date';
-  }
-
-  function sameUTCDay(a: number, b: number): boolean {
-    const da = new Date(a);
-    const db = new Date(b);
-    return da.getUTCFullYear() === db.getUTCFullYear() && da.getUTCMonth() === db.getUTCMonth() && da.getUTCDate() === db.getUTCDate();
-  }
-
-  function timePart(ts: number | undefined): string {
-    if (ts === undefined) return '';
-    const d = new Date(ts);
-    const h = d.getUTCHours();
-    const m = d.getUTCMinutes();
-    const s = d.getUTCSeconds();
-    if (h === 0 && m === 0 && s === 0) return '';
-    if (h === 23 && m === 59 && s === 59) return '';
-    return formatTime(h, m, s);
-  }
-
-  function fmtTS(ts: number | undefined): string {
-    if (ts === undefined) return '\u2026';
-    const d = new Date(ts);
-    const date = String(d.getUTCMonth() + 1) + '/' + String(d.getUTCDate());
-    const h = d.getUTCHours();
-    const m = d.getUTCMinutes();
-    const s = d.getUTCSeconds();
-    const isDefault = (h === 0 && m === 0 && s === 0) || (h === 23 && m === 59 && s === 59);
-    if (isDefault) return date;
-    return date + ' (' + formatTime(h, m, s) + ')';
-  }
-
-  function fmtSOT(s: number | undefined): string {
-    if (s === undefined) return '--:--';
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return formatTime(h, m, sec);
-  }
-
-  function formatTime(h: number, m: number, s: number): string {
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    let result = String(h12);
-    if (m !== 0 || s !== 0) result += ':' + String(m).padStart(2, '0');
-    if (s !== 0) result += ':' + String(s).padStart(2, '0');
-    return result + ' ' + ampm;
-  }
-
-  function computeVersionLabel(fm: string, fn: string, tm: string, tn: string): string {
-    const from = fmtVersion(fm, fn);
-    const to = fmtVersion(tm, tn);
-    const fromEmpty = !from || from === '0';
-    const toEmpty = !to || to === '0';
-    if (!fromEmpty && !toEmpty) return `v${from} - v${to}`;
-    if (!fromEmpty) return `v${from}`;
-    if (!toEmpty) return `v${to}`;
-    return 'Any version';
-  }
-
-  function fmtVersion(major: string, minor: string): string {
-    const mNum = parseInt(major || '0', 10);
-    const nStr = minor || '0';
-    const nNum = parseInt(nStr, 10);
-    if (nNum === 0) return String(mNum);
-    const trimmed = nStr.replace(/0+$/, '');
-    return trimmed ? `${mNum}.${trimmed}` : String(mNum);
-  }
 
   function commitVersion(from: string, to: string) {
     const f = parseVersion(from);
@@ -274,6 +202,11 @@
   async function goToLastPickerPage() {
     if (!volume || lastPageFetching) return;
     lastPageFetching = true;
+    pickerGeneration++;
+    const currentGen = pickerGeneration;
+    if (pickerController) pickerController.abort();
+    const controller = new AbortController();
+    pickerController = controller;
     try {
       const countParams: SnapshotListParams = { offset: 0, limit: 0 };
       if (hostFilter) countParams.host = hostFilter;
@@ -285,12 +218,15 @@
       if (versionFrom) countParams.versionFrom = versionFrom;
       if (versionTo) countParams.versionTo = versionTo;
       if (searchDebounced) countParams.query = searchDebounced;
-      const r = await api.fetchSnapshots(volume, countParams);
+      const r = await api.fetchSnapshots(volume, countParams, controller.signal);
+      if (currentGen !== pickerGeneration) return;
       const total = r.snapshots.length;
       const lastPage = Math.max(1, Math.ceil(total / pickerPageSize));
       pickerPage = lastPage;
     } catch (e: unknown) {
-      showToast((e as Error).message, true);
+      if (currentGen !== pickerGeneration) return;
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      showToast(safeErrorMessage(e), true);
     } finally {
       lastPageFetching = false;
     }

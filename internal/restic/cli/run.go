@@ -32,6 +32,14 @@ func (r *Runner) commandForRepo(ctx context.Context, repo string, args ...string
 	//nolint:gosec
 	cmd := exec.CommandContext(ctx, "restic", global...)
 	cmd.Env = os.Environ()
+	if _, ok := os.LookupEnv("RESTIC_FROM_PASSWORD"); !ok {
+		// restic copy reads the source repo password from RESTIC_FROM_PASSWORD.
+		// For copies between the manager's own repos the passwords are the
+		// same, so default it to RESTIC_PASSWORD when the user did not set it.
+		if pw := os.Getenv("RESTIC_PASSWORD"); pw != "" {
+			cmd.Env = append(cmd.Env, "RESTIC_FROM_PASSWORD="+pw)
+		}
+	}
 	return cmd, nil
 }
 

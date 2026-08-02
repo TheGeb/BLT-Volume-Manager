@@ -1,5 +1,31 @@
 import type { Snapshot, OwnerStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
+function validateSnapshotsResponse(data: unknown): SnapshotsResponse {
+	if (!data || typeof data !== 'object') throw new Error('invalid snapshots response');
+	const d = data as Record<string, unknown>;
+	if (!Array.isArray(d.snapshots)) throw new Error('invalid snapshots response');
+	return {
+		snapshots: d.snapshots as Snapshot[],
+		restorePointID: typeof d.restorePointID === 'string' ? d.restorePointID : '',
+		hasMore: typeof d.hasMore === 'boolean' ? d.hasMore : false,
+	};
+}
+
+function validateOwnerStatus(data: unknown): OwnerStatus {
+	if (!data || typeof data !== 'object') throw new Error('invalid owner status response');
+	const d = data as Record<string, unknown>;
+	if (typeof d.volume !== 'string') throw new Error('invalid owner status');
+	if (typeof d.owner !== 'string') throw new Error('invalid owner status');
+	const result: OwnerStatus = { volume: d.volume, owner: d.owner };
+	if (typeof d.expiry === 'number') result.expiry = d.expiry;
+	return result;
+}
+
+function validateFileTree(data: unknown): FileNode[] {
+	if (!Array.isArray(data)) throw new Error('invalid file tree response');
+	return data as FileNode[];
+}
+
 export interface SnapshotListParams {
   host?: string;
   hosts?: string[];
@@ -24,7 +50,7 @@ export async function fetchVolumes(): Promise<string[]> {
 	return data.volumes ?? [];
 }
 
-export async function fetchSnapshots(volume: string, params?: SnapshotListParams): Promise<SnapshotsResponse> {
+export async function fetchSnapshots(volume: string, params?: SnapshotListParams, signal?: AbortSignal): Promise<SnapshotsResponse> {
 	const p = new URLSearchParams();
 	p.set('volume', volume);
 	if (params) {
@@ -63,14 +89,14 @@ export async function fetchSnapshots(volume: string, params?: SnapshotListParams
 			p.set('query', params.query);
 		}
 	}
-	const resp = await fetch(`/api/snapshots?${p.toString()}`);
-	if (!resp.ok) {
-		const d = await resp.json() as { error?: string };
-		throw new Error(d.error ?? 'failed to fetch snapshots');
-	}
-	const data = await resp.json() as SnapshotsResponse;
-	const snapshots = data.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
-	return { snapshots, restorePointID: data.restorePointID ?? '', hasMore: data.hasMore ?? false };
+	const resp = await fetch(`/api/snapshots?${p.toString()}`, { signal: signal ?? null });
+	const data = await parseResponse<SnapshotsResponse>(resp);
+	const validated = validateSnapshotsResponse(data);
+	const snapshots = validated.snapshots.map((sn: Snapshot) => ({ ...sn, tags: sn.tags }));
+	const result: SnapshotsResponse = { snapshots };
+	if (validated.restorePointID) result.restorePointID = validated.restorePointID;
+	if (validated.hasMore) result.hasMore = validated.hasMore;
+	return result;
 }
 
 export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<string[]> {
@@ -83,26 +109,32 @@ export async function fetchSnapshotHosts(volume: string, latest = 1): Promise<st
 	return data;
 }
 
-export async function fetchOwnerStatus(volume: string): Promise<OwnerStatus> {
+export async function fetchOwnerStatus(volume: string, signal?: AbortSignal): Promise<OwnerStatus> {
   const controller = new AbortController();
   const timer = setTimeout(() => { controller.abort(); }, 10000);
+  if (signal) {
+    if (signal.aborted) { controller.abort(signal.reason); }
+    else { signal.addEventListener('abort', () => { controller.abort(signal.reason); }, { once: true }); }
+  }
   try {
     const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/owners`, { signal: controller.signal });
-    if (!resp.ok) throw new Error(resp.statusText);
-    const result = await resp.json() as OwnerStatus;
-    return result;
+    const data = await parseResponse<OwnerStatus>(resp);
+    return validateOwnerStatus(data);
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function fetchAllOwnerStatus(): Promise<Record<string, OwnerStatus>> {
+export async function fetchAllOwnerStatus(signal?: AbortSignal): Promise<Record<string, OwnerStatus>> {
   const controller = new AbortController();
   const timer = setTimeout(() => { controller.abort(); }, 10000);
+  if (signal) {
+    if (signal.aborted) { controller.abort(signal.reason); }
+    else { signal.addEventListener('abort', () => { controller.abort(signal.reason); }, { once: true }); }
+  }
   try {
     const resp = await fetch('/api/volumes/owners', { signal: controller.signal });
-    if (!resp.ok) throw new Error(resp.statusText);
-    const data = await resp.json() as { owners?: Record<string, OwnerStatus> };
+    const data = await parseResponse<{ owners?: Record<string, OwnerStatus> }>(resp);
     return data.owners ?? {};
   } finally {
     clearTimeout(timer);
@@ -153,24 +185,29 @@ export async function fetchSnapshotSizes(volume: string, ids: string[]): Promise
   return resp.json() as Promise<Record<string, number>>;
 }
 
-export async function fetchFileTree(snapshotId: string, volume: string, path?: string, fallbackHash?: string): Promise<FileNode[]> {
+export async function fetchFileTree(snapshotId: string, volume: string, path?: string, fallbackHash?: string, signal?: AbortSignal): Promise<FileNode[]> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/ls?volume=${encodeURIComponent(volume)}`;
   if (path) url += `&path=${encodeURIComponent(path)}`;
   if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Failed to list snapshot');
-  return resp.json() as Promise<FileNode[]>;
+  const resp = await fetch(url, { signal: signal ?? null });
+  const data = await parseResponse<FileNode[]>(resp);
+  return validateFileTree(data);
 }
 
-export async function fetchFileContent(snapshotId: string, volume: string, path: string, fallbackHash?: string): Promise<string> {
+export async function fetchFileContent(snapshotId: string, volume: string, path: string, fallbackHash?: string, signal?: AbortSignal): Promise<string> {
   let url = `/api/snapshot-view/${encodeURIComponent(snapshotId)}/dump?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`;
   if (fallbackHash) url += `&fallbackHash=${encodeURIComponent(fallbackHash)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => { controller.abort(); }, 30000);
+  if (signal) {
+    if (signal.aborted) { controller.abort(signal.reason); }
+    else { signal.addEventListener('abort', () => { controller.abort(signal.reason); }, { once: true }); }
+  }
   try {
     const resp = await fetch(url, { signal: controller.signal });
-    if (!resp.ok) throw new Error('Failed to read file');
-    return await resp.text();
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(text || 'Failed to read file');
+    return text;
   } finally {
     clearTimeout(timer);
   }
@@ -251,7 +288,7 @@ export async function copyVolume(source: string, target: string, preserveHistory
   return parseResponse(resp);
 }
 
-export async function renameVolume(source: string, target: string): Promise<{ status: string }> {
+export async function renameVolume(source: string, target: string): Promise<{ status: string; warning?: string }> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(source)}/rename`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -261,17 +298,20 @@ export async function renameVolume(source: string, target: string): Promise<{ st
 }
 
 async function parseResponse<T>(resp: Response): Promise<T> {
-  let body: Record<string, unknown>;
+  const text = await resp.text();
+  let body: unknown;
   try {
-    body = await resp.json() as Record<string, unknown>;
+    body = JSON.parse(text);
   } catch {
-    const text = await resp.text();
-    throw new Error(text || `HTTP ${String(resp.status)}`);
+    if (!resp.ok) throw new Error(text || `HTTP ${String(resp.status)}`);
+    return text as T;
   }
   if (!resp.ok) {
-    const err = body.error;
-    if (typeof err === 'string') throw new Error(err);
-    if (typeof err === 'number') throw new Error(String(err));
+    if (body && typeof body === 'object') {
+      const errObj = body as Record<string, unknown>;
+      if (typeof errObj.error === 'string') throw new Error(errObj.error);
+      if (typeof errObj.error === 'number') throw new Error(String(errObj.error));
+    }
     throw new Error(`HTTP ${String(resp.status)}`);
   }
   return body as T;

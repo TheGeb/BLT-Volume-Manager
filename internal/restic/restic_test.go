@@ -2,9 +2,158 @@ package restic
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 	"time"
+
+	"github.com/TheGeb/BLT-Volume-Manager/internal/restic/cli"
 )
+
+// exitStatusError returns an *exec.ExitError with the given exit code,
+// matching the error restic returns when it fails.
+func exitStatusError(code int) error {
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("exit %d", code))
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// mockRunner implements runner for testing without real restic binary.
+type mockRunner struct {
+	initFn       func(ctx context.Context) ([]byte, error)
+	repoExistsFn func(ctx context.Context) ([]byte, error)
+}
+
+func (m *mockRunner) InitOutput(ctx context.Context) ([]byte, error) {
+	if m.initFn != nil {
+		return m.initFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRunner) RepoExists(ctx context.Context) ([]byte, error) {
+	if m.repoExistsFn != nil {
+		return m.repoExistsFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRunner) Snapshots(ctx context.Context, opts *cli.ListSnapshotsOpts) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockRunner) Forget(ctx context.Context, ids ...string) error        { return nil }
+func (m *mockRunner) Stats(ctx context.Context, mode string) ([]byte, error) { return nil, nil }
+func (m *mockRunner) StatsSnapshot(ctx context.Context, snapshotID string) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockRunner) Check(ctx context.Context, noLock bool) error { return nil }
+func (m *mockRunner) Repair(ctx context.Context) error             { return nil }
+func (m *mockRunner) Copy(ctx context.Context, destRepo string, snapshotIDs ...string) error {
+	return nil
+}
+func (m *mockRunner) Unlock(ctx context.Context) error                             { return nil }
+func (m *mockRunner) HostSnapshots(ctx context.Context) ([]byte, error)            { return nil, nil }
+func (m *mockRunner) Backup(ctx context.Context, path string, tags []string) error { return nil }
+func (m *mockRunner) BackupInDir(ctx context.Context, path string, tags []string, workDir string) error {
+	return nil
+}
+
+func (m *mockRunner) BackupAt(ctx context.Context, path string, tags []string, t time.Time) error {
+	return nil
+}
+
+func (m *mockRunner) Ls(ctx context.Context, snapshotID, path string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockRunner) Dump(ctx context.Context, snapshotID, path string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockRunner) Diff(ctx context.Context, snapID1, snapID2 string) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockRunner) TagAdd(ctx context.Context, snapshotID, tag string) error    { return nil }
+func (m *mockRunner) TagRemove(ctx context.Context, snapshotID, tag string) error { return nil }
+func (m *mockRunner) Restore(ctx context.Context, snapshotID, target string, tags ...string) error {
+	return nil
+}
+
+func TestRepoExists_NotFound(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/test/repo")
+	m.runner = &mockRunner{
+		repoExistsFn: func(ctx context.Context) ([]byte, error) {
+			return nil, exitStatusError(exitCodeRepoDoesNotExist)
+		},
+	}
+	exists, err := m.RepoExists(context.Background())
+	if err != nil {
+		t.Fatalf("expected nil error for not-found, got: %v", err)
+	}
+	if exists {
+		t.Error("expected exists=false for unknown repository")
+	}
+}
+
+func TestRepoExists_ExecError(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/test/repo")
+	m.runner = &mockRunner{
+		repoExistsFn: func(ctx context.Context) ([]byte, error) {
+			return nil, &exec.Error{Name: "restic", Err: errors.New("not found")}
+		},
+	}
+	_, err := m.RepoExists(context.Background())
+	if err == nil {
+		t.Fatal("expected error for exec failure")
+	}
+}
+
+func TestRepoExists_OtherFailure(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/test/repo")
+	m.runner = &mockRunner{
+		repoExistsFn: func(ctx context.Context) ([]byte, error) {
+			return nil, exitStatusError(1)
+		},
+	}
+	_, err := m.RepoExists(context.Background())
+	if err == nil {
+		t.Fatal("expected error for non-zero exit code other than 10, got nil")
+	}
+}
+
+func TestInitRepo_AlreadyInitialized(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/test/repo")
+	m.runner = &mockRunner{
+		initFn: func(ctx context.Context) ([]byte, error) {
+			return []byte("Fatal: create repository at /test/repo failed: config file already exists\n"), errors.New("exit status 1")
+		},
+	}
+	err := m.Init(context.Background())
+	if err != nil {
+		t.Fatalf("expected nil for already initialized, got: %v", err)
+	}
+}
+
+func TestInitRepo_RealError(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/test/repo")
+	m.runner = &mockRunner{
+		initFn: func(ctx context.Context) ([]byte, error) {
+			return []byte("Fatal: create repository at /test/repo failed: PermissionDenied\n"), errors.New("exit status 1")
+		},
+	}
+	err := m.Init(context.Background())
+	if err == nil {
+		t.Fatal("expected error for init failure, got nil")
+	}
+}
 
 func TestCommonPathPrefix(t *testing.T) {
 	t.Parallel()

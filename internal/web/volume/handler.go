@@ -19,7 +19,7 @@ const OwnersDir = "owners"
 
 func ListVolumes(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, server.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 	volumes := s.VolumeNames(r.Context())
@@ -32,7 +32,7 @@ func ListVolumes(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) {
 	escapedPath := r.URL.EscapedPath()
 	if !strings.HasPrefix(escapedPath, "/api/volume/") {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 		return
 	}
 
@@ -41,7 +41,7 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 	if strings.HasSuffix(rawPath, "/copy") {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/copy"))
 		if err != nil || !validVolumeName(volumeName) {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		CopyVolume(s, w, r, volumeName)
@@ -51,7 +51,7 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 	if strings.HasSuffix(rawPath, "/rename") {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/rename"))
 		if err != nil || !validVolumeName(volumeName) {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		RenameVolume(s, w, r, volumeName)
@@ -61,7 +61,7 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 	if strings.HasSuffix(rawPath, "/"+OwnersDir) {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/"+OwnersDir))
 		if err != nil || !validVolumeName(volumeName) {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		owner.OwnerRouter(s, w, r, volumeName)
@@ -71,7 +71,7 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 	if strings.HasSuffix(rawPath, "/restore-point") {
 		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/restore-point"))
 		if err != nil || !validVolumeName(volumeName) {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		RestorePointRouter(s, w, r, volumeName)
@@ -80,24 +80,28 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 
 	path, err := url.PathUnescape(rawPath)
 	if err != nil || !validVolumeName(path) {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 		return
 	}
 
 	if r.Method == http.MethodDelete {
 		DeleteVolume(s, w, r, path)
 	} else {
-		http.NotFound(w, r)
+		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 	}
 }
 
 func DeleteVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
 	if !validVolumeName(volumeName) {
-		http.Error(w, "invalid volume name", http.StatusBadRequest)
+		server.RespondError(w, fmt.Errorf("invalid volume name"), http.StatusBadRequest)
 		return
 	}
 	ctx := r.Context()
-	CleanupVolumeData(ctx, s, volumeName)
+	if err := CleanupVolumeData(ctx, s, volumeName); err != nil {
+		s.RefreshStats(ctx)
+		server.RespondError(w, fmt.Errorf("cleanup volume data: %w", err), http.StatusInternalServerError)
+		return
+	}
 	s.RefreshStats(ctx)
 	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
 }
@@ -174,7 +178,7 @@ func RenameVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 	}
 
 	ctx := r.Context()
-	err := RenameVolumeData(ctx, s, volumeName, req.Target)
+	warning, err := RenameVolumeData(ctx, s, volumeName, req.Target)
 	if err != nil {
 		server.RespondError(w, err, errorStatus(err))
 		return
@@ -183,9 +187,14 @@ func RenameVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 	s.RefreshStats(ctx)
 
 	type renameResponse struct {
-		Status string `json:"status"`
+		Status  string `json:"status"`
+		Warning string `json:"warning,omitempty"`
 	}
-	server.RespondJSON(w, renameResponse{
+	resp := renameResponse{
 		Status: fmt.Sprintf("Volume %q renamed to %q", volumeName, req.Target),
-	})
+	}
+	if warning != "" {
+		resp.Warning = warning
+	}
+	server.RespondJSON(w, resp)
 }

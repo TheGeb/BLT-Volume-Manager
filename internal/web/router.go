@@ -149,7 +149,7 @@ func registerUIRoutes(inner *http.ServeMux, uiFS fs.FS) {
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			http.NotFound(w, r)
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
 			return
 		}
 		rootFileServer.ServeHTTP(w, r)

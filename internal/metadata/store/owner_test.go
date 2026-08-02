@@ -34,6 +34,14 @@ func (b *orderedBackend) PutObject(ctx context.Context, key string, data []byte)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.clock++
+	// Replace existing entry with the same key to avoid stale reads
+	for i, e := range b.entries {
+		if e.key == key {
+			b.entries[i].data = data
+			b.entries[i].clock = b.clock
+			return nil
+		}
+	}
 	b.entries = append(b.entries, orderedEntry{key: key, data: data, clock: b.clock})
 	return nil
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -39,11 +40,28 @@ func NewOwnerStore(b Backend) *OwnerStore {
 }
 
 func (s *OwnerStore) LockVolume(ctx context.Context, volumeName, ownerName string, expiry int64) (string, error) {
+	coord, ok := s.b.(Coordinator)
+	if ok {
+		var ttl int64
+		if expiry > 0 {
+			ttl = expiry - time.Now().Unix()
+			if ttl <= 0 {
+				return "", fmt.Errorf("expiry must be in the future")
+			}
+		} else {
+			ttl = 365 * 24 * 3600 * 10
+		}
+		return coord.AcquireLock(ctx, volumeName, ownerName, ttl)
+	}
 	folder := OwnerPrefix(volumeName)
 	return AcquireOwnerLock(ctx, s.b, folder, ownerName, expiry)
 }
 
 func (s *OwnerStore) LockIsValid(ctx context.Context, key string) (bool, error) {
+	coord, ok := s.b.(Coordinator)
+	if ok {
+		return coord.LockIsValid(ctx, key)
+	}
 	_, _, _, expiry, err := ParseOwnerKey(key)
 	if err != nil {
 		return false, fmt.Errorf("parse lock key: %w", err)
@@ -53,19 +71,36 @@ func (s *OwnerStore) LockIsValid(ctx context.Context, key string) (bool, error) 
 	}
 	_, err = s.b.ReadObject(ctx, key)
 	if err != nil {
-		return false, nil
+		if errors.Is(err, ErrKeyNotFound) {
+			return false, nil
+		}
+		return false, classifyErr(err, "read lock object")
 	}
 	return true, nil
 }
 
 func (s *OwnerStore) ReleaseLock(ctx context.Context, key string) error {
+	coord, ok := s.b.(Coordinator)
+	if ok {
+		return coord.ReleaseLock(ctx, key)
+	}
 	return s.b.DeleteObject(ctx, key)
 }
 
 func (s *OwnerStore) FindForVolume(ctx context.Context, volumeName string) (*VolumeOwner, error) {
+	if coord, ok := s.b.(Coordinator); ok {
+		_, owner, creation, expiry, err := coord.FindLock(ctx, volumeName)
+		if err != nil {
+			if errors.Is(err, ErrKeyNotFound) {
+				return &VolumeOwner{Volume: volumeName}, nil
+			}
+			return nil, classifyErr(err, "find lock")
+		}
+		return &VolumeOwner{Volume: volumeName, Owner: owner, Creation: creation, Expiry: expiry}, nil
+	}
 	objects, err := s.b.ListObjects(ctx, OwnerPrefix(volumeName))
 	if err != nil {
-		return nil, fmt.Errorf("list owner objects: %w", err)
+		return nil, fmt.Errorf("list owner objects: %w", classifyErr(err, "list owner objects"))
 	}
 
 	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
@@ -78,9 +113,13 @@ func (s *OwnerStore) FindForVolume(ctx context.Context, volumeName string) (*Vol
 }
 
 func (s *OwnerStore) ListAllGrouped(ctx context.Context) (map[string]VolumeOwner, error) {
+	coord, ok := s.b.(Coordinator)
+	if ok {
+		return coord.ListAllLocks(ctx)
+	}
 	objects, err := s.b.ListObjects(ctx, OwnerKeyspace)
 	if err != nil {
-		return nil, err
+		return nil, classifyErr(err, "list owner keyspace")
 	}
 
 	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
@@ -108,6 +147,17 @@ func (s *OwnerStore) ListAllGrouped(ctx context.Context) (map[string]VolumeOwner
 }
 
 func (s *OwnerStore) DeleteForVolume(ctx context.Context, volumeName string) error {
+	if coord, ok := s.b.(Coordinator); ok {
+		lockKey, _, _, _, fErr := coord.FindLock(ctx, volumeName)
+		if fErr != nil && !errors.Is(fErr, ErrKeyNotFound) {
+			return fmt.Errorf("find lock for volume: %w", fErr)
+		}
+		if fErr == nil {
+			if err := coord.ReleaseLock(ctx, lockKey); err != nil {
+				return fmt.Errorf("release lock for volume: %w", err)
+			}
+		}
+	}
 	return s.b.DeleteObjectsWithPrefix(ctx, OwnerPrefix(volumeName))
 }
 
@@ -156,7 +206,7 @@ func AcquireOwnerLock(ctx context.Context, store Backend, folder, owner string, 
 	}
 
 	if err := store.PutObject(ctx, newKey, data); err != nil {
-		return "", fmt.Errorf("create proposal: %w", err)
+		return "", fmt.Errorf("create proposal: %w", classifyErr(err, "put proposal"))
 	}
 	defer func() {
 		if err != nil {
@@ -166,13 +216,12 @@ func AcquireOwnerLock(ctx context.Context, store Backend, folder, owner string, 
 
 	objects, err := store.ListObjects(ctx, folder)
 	if err != nil {
-		return "", fmt.Errorf("list proposals: %w", err)
+		return "", fmt.Errorf("list proposals: %w", classifyErr(err, "list proposals"))
 	}
 
-	// TODO: Delete any expired locks, or any old locks with your own hostname (Should that be here or at some other point, like a background cleanup task?)
 	winner, _, _, _ := determineOwner(objects)
 	if winner != newKey {
-		return "", fmt.Errorf("another owner proposal was earlier")
+		return "", ErrLockConflict
 	}
 
 	myKey = newKey
@@ -285,7 +334,6 @@ func determineOwner(objects []s3.Object) (firstKey string, firstOwner string, fi
 			return true
 		}
 
-		// If modification timestamps are equal, sort by creation time (earliest wins)
 		_, _, ci, _, erri := ParseOwnerKey(*objects[i].Key)
 		_, _, cj, _, errj := ParseOwnerKey(*objects[j].Key)
 		if erri == nil && errj == nil && ci != cj {

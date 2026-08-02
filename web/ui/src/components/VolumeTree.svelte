@@ -342,9 +342,10 @@
                     <span class="tree-name">{item.name}</span>
                   </button>
                 {:else}
-                  <button class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
+                  <div role="button" tabindex="0" class="tree-volume" title={item.path} style="padding-left:{20 + item.depth * 20}px;"
                     onclick={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) { onSelect(item.path); } }}
-                    onmousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}>
+                    onmousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}
+                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item.path); } }}>
                     <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
                       <ellipse cx="12" cy="5" rx="9" ry="3"/>
@@ -354,22 +355,22 @@
                     <span class="tree-name">{item.name}</span>
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <span class="vol-actions" onmouseenter={onActionsEnter} onmouseleave={onActionsLeave}>
-                      <span class="vol-action-btn" title="Copy volume" role="button" tabindex="0"
+                      <button type="button" class="vol-action-btn" aria-label="Copy volume" title="Copy volume"
                         onclick={(e) => { e.stopPropagation(); if (actionsReady) openCopyVolModal(item.path); }}
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openCopyVolModal(item.path); } }}>
+                        onkeydown={(e) => { e.stopPropagation(); }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
-                      </span>
-                      <span class="vol-action-btn" title="Rename volume" role="button" tabindex="0"
+                      </button>
+                      <button type="button" class="vol-action-btn" aria-label="Rename volume" title="Rename volume"
                         onclick={(e) => { e.stopPropagation(); if (actionsReady) openRenameVolModal(item.path); }}
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (actionsReady) openRenameVolModal(item.path); } }}>
+                        onkeydown={(e) => { e.stopPropagation(); }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
                         </svg>
-                      </span>
+                      </button>
                     </span>
-                  </button>
+                  </div>
                 {/if}
               </div>
               {#if item.isGroup}

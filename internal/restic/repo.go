@@ -7,10 +7,18 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 )
+
+// exitCodeRepoDoesNotExist is restic's exit code for a repository that does
+// not exist. restic has returned 10 for this case since v0.17.0; older
+// versions report all failures as exit code 1 and are not supported.
+// The repository images and CI install restic 0.19.1 (see Dockerfile and
+// .github/workflows/ci.yml).
+const exitCodeRepoDoesNotExist = 10
 
 type HostSnapshots struct {
 	Host      string     `json:"host"`
@@ -83,13 +91,28 @@ func (m *Manager) repositoryExists(ctx context.Context) (bool, error) {
 		if errors.As(err, &execErr) {
 			return false, err
 		}
-		return false, nil
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == exitCodeRepoDoesNotExist {
+			return false, nil
+		}
+		// All other failures (auth, network, corruption, etc.) are real errors.
+		return false, err
 	}
 	return true, nil
 }
 
 func (m *Manager) initRepository(ctx context.Context) error {
-	return m.runner.Init(ctx)
+	out, err := m.runner.InitOutput(ctx)
+	if err != nil {
+		// "repository already initialized" is not an error for our use case.
+		// restic 0.19.x prints "config file already exists" on a re-init.
+		lower := strings.ToLower(string(out))
+		if strings.Contains(lower, "already initialized") || strings.Contains(lower, "config file already exists") {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (m *Manager) Check(ctx context.Context, noLock bool) error {

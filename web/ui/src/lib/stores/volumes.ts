@@ -146,10 +146,14 @@ export async function confirmRenameVolume() {
   copyRenameLoading.set(true);
   copyRenameError.set('');
   try {
-    await api.renameVolume(src, target);
+    const result = await api.renameVolume(src, target);
     renameVolModal.set(false);
     await loadVolumes();
-    showToast(`Volume "${src}" renamed to "${target}"`);
+    if (result.warning) {
+      showToast(result.warning, true);
+    } else {
+      showToast(`Volume "${src}" renamed to "${target}"`);
+    }
   } catch (err: unknown) {
     copyRenameError.set(err instanceof Error ? err.message : 'Rename failed');
   } finally {

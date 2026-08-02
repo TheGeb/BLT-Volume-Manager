@@ -83,6 +83,19 @@ describe('parseVersion', () => {
   it('returns null for invalid', () => {
     expect(parseVersion('abc')).toBeNull();
   });
+
+  it('rejects partially valid strings like "12x"', () => {
+    expect(parseVersion('12x')).toBeNull();
+    expect(parseVersion('v12x')).toBeNull();
+  });
+
+  it('rejects extra version parts', () => {
+    expect(parseVersion('1.2.3')).toBeNull();
+  });
+
+  it('parses major-only', () => {
+    expect(parseVersion('5')).toEqual({ major: 5, minor: 0 });
+  });
 });
 
 describe('matchesVersionRange', () => {
@@ -117,5 +130,13 @@ describe('matchesVersionRange', () => {
     expect(matchesVersionRange(['v2.5'], 'v2.6')).toBe(false);
     expect(matchesVersionRange(['v2.5'], undefined, 'v2.4')).toBe(false);
     expect(matchesVersionRange(['v2.5'], undefined, 'v2.5')).toBe(true);
+  });
+
+  it('ignores invalid "from" bound', () => {
+    expect(matchesVersionRange(['v2.5'], '12x')).toBe(false);
+  });
+
+  it('ignores invalid "to" bound', () => {
+    expect(matchesVersionRange(['v2.5'], undefined, 'x.1')).toBe(false);
   });
 });

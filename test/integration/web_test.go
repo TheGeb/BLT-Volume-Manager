@@ -77,7 +77,9 @@ func DoErr(t *testing.T, baseURL, method, path string, body any, wantCode int) m
 		t.Fatalf("%s %s: expected %d, got %d: %s", method, path, wantCode, resp.StatusCode, string(b))
 	}
 	var m map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&m)
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
 	return m
 }
 

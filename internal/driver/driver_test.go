@@ -2,14 +2,88 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	"github.com/docker/go-plugins-helpers/volume"
 )
+
+// recordingBackend implements store.Backend for testing, tracking call counts.
+type recordingBackend struct {
+	mu         sync.Mutex
+	entries    map[string][]byte
+	order      []string
+	putCallCnt int
+}
+
+func newRecordingBackend() *recordingBackend {
+	return &recordingBackend{entries: make(map[string][]byte)}
+}
+
+func (b *recordingBackend) PutObject(_ context.Context, key string, data []byte) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.putCallCnt++
+	b.entries[key] = data
+	b.order = append(b.order, key)
+	return nil
+}
+
+func (b *recordingBackend) ReadObject(_ context.Context, key string) ([]byte, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	data, ok := b.entries[key]
+	if !ok {
+		return nil, store.ErrKeyNotFound
+	}
+	return data, nil
+}
+
+func (b *recordingBackend) DeleteObject(_ context.Context, key string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.entries, key)
+	return nil
+}
+
+func (b *recordingBackend) ListObjects(_ context.Context, prefix string) ([]s3.Object, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var objs []s3.Object
+	for i, k := range b.order {
+		if strings.HasPrefix(k, prefix) {
+			key := k
+			mc := int64(i + 1)
+			objs = append(objs, s3.Object{Key: &key, ModificationCounter: &mc})
+		}
+	}
+	return objs, nil
+}
+
+func (b *recordingBackend) DeleteObjectsWithPrefix(_ context.Context, prefix string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for k := range b.entries {
+		if strings.HasPrefix(k, prefix) {
+			delete(b.entries, k)
+		}
+	}
+	return nil
+}
+
+func (b *recordingBackend) PutCallCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.putCallCnt
+}
 
 func TestVolumeConfigReadWrite(t *testing.T) {
 	t.Parallel()
@@ -27,7 +101,6 @@ func TestVolumeConfigReadWrite(t *testing.T) {
 	read := d.readVolumeConfig(volPath)
 	if read == nil {
 		t.Fatal("readVolumeConfig returned nil")
-		return
 	}
 	if read.FsType != "btrfs" {
 		t.Errorf("FsType = %q, want %q", read.FsType, "btrfs")
@@ -57,7 +130,6 @@ func TestVolumeConfigDefaultFsType(t *testing.T) {
 	read := d.readVolumeConfig(volPath)
 	if read == nil {
 		t.Fatal("expected non-nil config")
-		return
 	}
 	if read.FsType != "" {
 		t.Errorf("expected empty FsType, got %q", read.FsType)
@@ -216,7 +288,6 @@ func TestNewDriverDefaults(t *testing.T) {
 	d := New(cfg.Config{DataDir: t.TempDir(), ResticBase: "/tmp/restic"}, context.Background())
 	if d == nil {
 		t.Fatal("expected non-nil driver")
-		return
 	}
 	if d.volumePath == "" {
 		t.Error("expected non-empty root")
@@ -250,7 +321,6 @@ func TestList(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
-		return
 	}
 	if len(resp.Volumes) != 3 {
 		t.Fatalf("expected 3 volumes, got %d", len(resp.Volumes))
@@ -279,7 +349,6 @@ func TestListEmpty(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
-		return
 	}
 	if len(resp.Volumes) != 0 {
 		t.Errorf("expected 0 volumes, got %d", len(resp.Volumes))
@@ -292,7 +361,6 @@ func TestCapabilities(t *testing.T) {
 	cap := d.Capabilities()
 	if cap == nil {
 		t.Fatal("expected non-nil capabilities")
-		return
 	}
 	if cap.Capabilities.Scope != "local" {
 		t.Errorf("expected 'local', got %q", cap.Capabilities.Scope)
@@ -331,7 +399,6 @@ func TestGetNonExistent(t *testing.T) {
 	}
 	if resp == nil || resp.Volume == nil {
 		t.Fatal("expected non-nil response with Volume")
-		return
 	}
 	if resp.Volume.Name != "no-such-vol" {
 		t.Errorf("Name = %q, want %q", resp.Volume.Name, "no-such-vol")
@@ -350,5 +417,65 @@ func TestUnmountNonExistent(t *testing.T) {
 	err := d.Unmount(&volume.UnmountRequest{Name: "no-such-vol", ID: "test"})
 	if err != nil {
 		t.Fatalf("Unmount on non-existent volume: %v", err)
+	}
+}
+
+func TestConcurrentMountSingleVolume(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:   dir,
+		resticPath:   dir,
+		ownerMaxMins: 10,
+		vols:         make(map[string]*VolumeInfo),
+		mountStates:  make(map[string]*volMountState),
+		ownerStore:   store.NewOwnerStore(b),
+	}
+
+	volPath := VolumePath(dir, "concurrent-test")
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var mountErr error
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := d.Mount(&volume.MountRequest{Name: "concurrent-test", ID: "test"})
+			if err != nil {
+				mu.Lock()
+				mountErr = err
+				mu.Unlock()
+				return
+			}
+			if resp == nil || resp.Mountpoint != volPath {
+				mu.Lock()
+				mountErr = fmt.Errorf("unexpected mount response: %v", resp)
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+
+	if mountErr != nil {
+		t.Fatalf("Mount error: %v", mountErr)
+	}
+
+	if n := b.PutCallCount(); n != 1 {
+		t.Errorf("expected 1 owner lock acquisition (PutObject), got %d", n)
+	}
+
+	// Fully unmount both references so the hot-backup schedule goroutine is
+	// cancelled and the mount-state entry is cleaned up.
+	for i := 0; i < 2; i++ {
+		if err := d.Unmount(&volume.UnmountRequest{Name: "concurrent-test", ID: "test"}); err != nil {
+			t.Fatalf("Unmount: %v", err)
+		}
 	}
 }

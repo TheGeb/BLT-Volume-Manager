@@ -176,18 +176,44 @@ func (c *Client) DeleteObjectsWithPrefix(ctx context.Context, prefix string) err
 		}
 	}
 	const maxBatch = 1000
+	var failed []string
 	for i := 0; i < len(idents); i += maxBatch {
 		end := i + maxBatch
 		if end > len(idents) {
 			end = len(idents)
 		}
-		_, err = c.raw.DeleteObjects(ctx, &s3sdk.DeleteObjectsInput{
+		result, err := c.raw.DeleteObjects(ctx, &s3sdk.DeleteObjectsInput{
 			Bucket: aws.String(c.bucket),
 			Delete: &types.Delete{Objects: idents[i:end]},
 		})
 		if err != nil {
 			return fmt.Errorf("batch delete objects (bucket=%q, prefix=%q): %w", c.bucket, prefix, err)
 		}
+		failed = append(failed, deleteObjectsErrors(result)...)
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("batch delete objects (bucket=%q, prefix=%q): partial failure: %s", c.bucket, prefix, strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+// deleteObjectsErrors describes the per-key failures in a DeleteObjects
+// response. Remaining batches are still deleted when some keys fail.
+func deleteObjectsErrors(result *s3sdk.DeleteObjectsOutput) []string {
+	var failed []string
+	if result == nil {
+		return failed
+	}
+	for _, e := range result.Errors {
+		key := "(unknown)"
+		if e.Key != nil {
+			key = *e.Key
+		}
+		msg := "(unknown)"
+		if e.Message != nil {
+			msg = *e.Message
+		}
+		failed = append(failed, fmt.Sprintf("%s: %s", key, msg))
+	}
+	return failed
 }

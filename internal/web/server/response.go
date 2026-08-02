@@ -20,11 +20,12 @@ type ErrorResponse struct {
 var (
 	ErrMethodNotAllowed = errors.New("method not allowed")
 	ErrMissingVolume    = errors.New("missing volume query parameter")
+	ErrNotFound         = errors.New("not found")
 )
 
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method != method {
-		http.Error(w, ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+		RespondError(w, ErrMethodNotAllowed, http.StatusMethodNotAllowed)
 		return false
 	}
 	return true
@@ -33,22 +34,28 @@ func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 func RequireVolumeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
 	vol := r.URL.Query().Get("volume")
 	if vol == "" {
-		http.Error(w, ErrMissingVolume.Error(), http.StatusBadRequest)
+		RespondError(w, ErrMissingVolume, http.StatusBadRequest)
 		return "", false
 	}
 	return vol, true
 }
+
+// errInternalServerError is the client-facing body for 5xx responses. The
+// underlying error is logged server-side but not exposed, since it can
+// contain backend internals (repo paths, S3/restic error strings).
+const errInternalServerError = "internal server error"
 
 func RespondError(w http.ResponseWriter, err error, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	msg := "unknown error"
 	if err != nil {
-		msg = err.Error()
 		if status >= 500 {
 			log.Error("request_error", err)
+			msg = errInternalServerError
 		} else {
 			slog.Warn("request_error", "error", err)
+			msg = err.Error()
 		}
 	}
 	if encodeErr := json.NewEncoder(w).Encode(ErrorResponse{Error: msg}); encodeErr != nil {
