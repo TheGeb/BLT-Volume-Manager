@@ -51,6 +51,11 @@ RESTIC_PASSWORD=changeme
 # Enable dummy/test volume creation via the web UI
 # BLT_TEST_MODE=1
 
+# Path to a KEY=VALUE config file loaded as a fallback for any environment
+# variable that isn't already set (real env vars always win). Useful for
+# docker plugin install, where env is baked in at install time.
+# BLT_CONFIG_FILE=/etc/blt-volume-manager.env
+
 # Log level: debug, info, warn, error (default: info)
 # LOG_LEVEL=info
 ```
@@ -66,6 +71,11 @@ Next steps
 - Ensure `restic` **v0.17.0 or newer** is installed in the runtime image (the shipped Docker image pins restic 0.19.1). BLT-Volume-Manager relies on restic's documented exit code `10` for "repository does not exist", which restic only reports since v0.17.0. Set `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) for S3. When `RESTIC_FROM_PASSWORD` is unset it defaults to `RESTIC_PASSWORD` (used by volume copy/rename).
 
 A browser-based UI is available when you start the binary with `--http-addr`, for example `--http-addr ":8080"`.
+
+Installation
+
+Full install instructions for rooted and rootless Docker, using the host
+binary, the container image, docker plugin, or Nix, are in [docs/installation.md](docs/installation.md).
 
 Example run
 

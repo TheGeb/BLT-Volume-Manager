@@ -137,6 +137,37 @@
               description = "Unix socket path for the Docker/Podman volume plugin";
             };
 
+            user = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = ''
+                Run the service as this unprivileged user instead of root.
+                Recommended for plain volumes (no filesystem snapshots):
+                systemd creates /run/docker/plugins owned by this user and the
+                data directory must be writable by it. Set to null to run as
+                root (required for filesystem snapshots).
+              '';
+            };
+
+            filesystemSnapshots = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Enable btrfs/ZFS filesystem snapshots. Requires running as
+                root (CAP_SYS_ADMIN), so this forces user = null, and adds
+                snapshotTools to the service PATH.
+              '';
+            };
+
+            snapshotTools = mkOption {
+              type = types.listOf types.package;
+              default = [ pkgs.btrfs-progs ];
+              description = ''
+                CLI tools made available to the service for btrfs/ZFS
+                snapshots. Add pkgs.zfs on ZFS hosts.
+              '';
+            };
+
             httpAddr = mkOption {
               type = types.str;
               default = "";
@@ -161,6 +192,9 @@
                 Path to a file with secret environment variables (KEY=VALUE lines).
                 Use this for RESTIC_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, etc.
                 The file lives outside the Nix store and is read at runtime.
+                It is read by the service manager (root), so keep it root-owned
+                with restricted permissions, e.g.
+                install -m 600 -o root -g root /path/to/file.
                 Example content:
                   RESTIC_PASSWORD=hunter2
                   AWS_ACCESS_KEY_ID=root
@@ -170,41 +204,60 @@
           };
 
           config = mkIf cfg.enable {
+            assertions = [{
+              assertion = !cfg.filesystemSnapshots || cfg.user == null;
+              message = "services.blt-volume-manager.filesystemSnapshots requires running as root (set user to null)";
+            }];
+
             systemd.services.blt-volume-manager = {
               description = "S3 Volume Plugin (blt-volume-manager)";
               wants = [ "network-online.target" ];
               after = [ "network-online.target" ];
               wantedBy = [ "multi-user.target" ];
 
-              path = [ pkgs.restic ];
+              path = [ pkgs.restic ] ++ optionals cfg.filesystemSnapshots cfg.snapshotTools;
 
               environment = cfg.environment;
 
-              serviceConfig = {
-                Type = "simple";
-                ExecStart =
-                  [ "${pkg}/bin/blt-volume-manager"
-                    "--data-dir" cfg.dataDir
-                    "--socket" cfg.socketPath
-                  ] ++ optional (cfg.httpAddr != "") [
-                    "--http-addr" cfg.httpAddr
-                  ];
-                EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
-                Restart = "always";
-                RestartSec = "5";
-                RuntimeDirectory = [ "docker/plugins" ];
-                RuntimeDirectoryMode = "0755";
-                NoNewPrivileges = true;
-                ProtectSystem = "full";
-                PrivateTmp = true;
-                ProtectKernelTunables = true;
-                ProtectKernelModules = true;
-                ProtectControlGroups = true;
-                SystemCallArchitectures = "native";
-                LockPersonality = true;
-              };
+              serviceConfig =
+                {
+                  Type = "simple";
+                  ExecStart =
+                    [ "${pkg}/bin/blt-volume-manager"
+                      "--data-dir" cfg.dataDir
+                      "--socket" cfg.socketPath
+                    ] ++ optional (cfg.httpAddr != "") [
+                      "--http-addr" cfg.httpAddr
+                    ];
+                  EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
+                  Restart = "always";
+                  RestartSec = "5";
+                  RuntimeDirectory = [ "docker/plugins" ];
+                  RuntimeDirectoryMode = "0755";
+                  NoNewPrivileges = true;
+                  ProtectSystem = "full";
+                  PrivateTmp = true;
+                  ProtectKernelTunables = true;
+                  ProtectKernelModules = true;
+                  ProtectControlGroups = true;
+                  SystemCallArchitectures = "native";
+                  LockPersonality = true;
+                  LimitCORE = 0;
+                }
+                // optionalAttrs (cfg.user != null) {
+                  User = cfg.user;
+                  Group = cfg.user;
+                  CapabilityBoundingSet = [ ];
+                  PrivateDevices = true;
+                };
             };
           };
         };
+
+      # Snapshots variant — same module with filesystemSnapshots enabled.
+      nixosModules.blt-volume-manager-snapshots = { lib, ... }: {
+        imports = [ self.nixosModules.blt-volume-manager ];
+        services.blt-volume-manager.filesystemSnapshots = lib.mkDefault true;
+      };
     };
 }
