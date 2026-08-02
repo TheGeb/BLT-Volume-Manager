@@ -6,7 +6,7 @@
   import type { SnapshotListParams } from '$lib/api';
   import * as api from '$lib/api';
   import { showToast } from '$lib/stores/toast';
-  import { versionTag, parseVersion } from '$lib/util';
+  import { versionTag, parseVersion, safeErrorMessage } from '$lib/util';
   import { computeDateLabel, computeVersionLabel } from '$lib/format';
   import HostDropdown from './HostDropdown.svelte';
   import VersionRangeInputs from './VersionRangeInputs.svelte';
@@ -101,7 +101,7 @@
       if (currentGen !== pickerGeneration) return;
       pickerSnapshots = [];
       pickerHasMore = false;
-      showToast(api.safeErrorMessage(e), true);
+      showToast(safeErrorMessage(e), true);
     } finally {
       if (currentGen === pickerGeneration) pickerLoading = false;
     }
@@ -202,6 +202,11 @@
   async function goToLastPickerPage() {
     if (!volume || lastPageFetching) return;
     lastPageFetching = true;
+    pickerGeneration++;
+    const currentGen = pickerGeneration;
+    if (pickerController) pickerController.abort();
+    const controller = new AbortController();
+    pickerController = controller;
     try {
       const countParams: SnapshotListParams = { offset: 0, limit: 0 };
       if (hostFilter) countParams.host = hostFilter;
@@ -213,12 +218,15 @@
       if (versionFrom) countParams.versionFrom = versionFrom;
       if (versionTo) countParams.versionTo = versionTo;
       if (searchDebounced) countParams.query = searchDebounced;
-      const r = await api.fetchSnapshots(volume, countParams);
+      const r = await api.fetchSnapshots(volume, countParams, controller.signal);
+      if (currentGen !== pickerGeneration) return;
       const total = r.snapshots.length;
       const lastPage = Math.max(1, Math.ceil(total / pickerPageSize));
       pickerPage = lastPage;
     } catch (e: unknown) {
-      showToast((e as Error).message, true);
+      if (currentGen !== pickerGeneration) return;
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      showToast(safeErrorMessage(e), true);
     } finally {
       lastPageFetching = false;
     }

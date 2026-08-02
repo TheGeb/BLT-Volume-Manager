@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -126,15 +127,12 @@ func (c *EtcdClient) DeleteObjectsWithPrefix(ctx context.Context, prefix string)
 func (c *EtcdClient) AcquireLock(ctx context.Context, volumeName, ownerID string, ttlSeconds int64) (string, error) {
 	lockKey := lockKeyFor(volumeName)
 
-	now := time.Now()
-	var expiry int64
-	if ttlSeconds > 0 {
-		expiry = now.Unix() + ttlSeconds
-	}
-
 	entry := store.OwnerEntry{
-		Name:       ownerID,
-		ExpiryTime: expiry,
+		Name: ownerID,
+		// The lease is kept alive until ReleaseLock, so the lock does not
+		// expire while this process is alive; report it as permanent (0).
+		// The granted TTL below still acts as a safety net if keepalive fails.
+		ExpiryTime: 0,
 	}
 	data, err := json.Marshal(entry)
 	if err != nil {
@@ -194,6 +192,10 @@ func (c *EtcdClient) ReleaseLock(ctx context.Context, lockKey string) error {
 	c.mu.Unlock()
 
 	if !hasLease {
+		// We do not track this lock (e.g. after a process restart or once the
+		// keepalive monitor dropped it). If the key still exists, its lease
+		// self-expires, so there is nothing safe for us to revoke.
+		log.Debugf("release_lock_untracked", "lock=%s", lockKey)
 		return nil
 	}
 	if hasCancel {
@@ -204,15 +206,18 @@ func (c *EtcdClient) ReleaseLock(ctx context.Context, lockKey string) error {
 	// prevents a stale owner from deleting a lock acquired after expiry.
 	delCtx, delCancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
 	defer delCancel()
-	resp, err := c.client.Txn(delCtx).
+	_, err := c.client.Txn(delCtx).
 		If(clientv3.Compare(clientv3.LeaseValue(lockKey), "=", int64(leaseID))).
 		Then(clientv3.OpDelete(lockKey)).
 		Commit()
 	if err != nil {
 		return fmt.Errorf("release lock: %w", err)
 	}
-	if resp.Succeeded {
-		_, _ = c.client.Revoke(ctx, leaseID)
+	// Always revoke our lease. On success it is required to free the key; if
+	// the CAS failed the key was deleted concurrently and the lease may be
+	// orphaned. Revoking our own lease is always safe.
+	if _, rerr := c.client.Revoke(delCtx, leaseID); rerr != nil {
+		log.Debugf("release_lock_revoke_failed", "lock=%s error=%v", lockKey, rerr)
 	}
 	return nil
 }
@@ -376,15 +381,15 @@ func (c *EtcdClient) NextVersion(ctx context.Context, volumeName string, major b
 			return nil, fmt.Errorf("marshal version: %w", jErr)
 		}
 
-		txn := c.client.Txn(ctx)
+		txnCtx, txnCancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
+		txn := c.client.Txn(txnCtx)
 		if modRev > 0 {
 			txn = txn.If(clientv3.Compare(clientv3.ModRevision(key), "=", modRev))
 		} else {
 			txn = txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0))
 		}
-		txn = txn.Then(clientv3.OpPut(key, string(nextData)))
-
-		tresp, terr := txn.Commit()
+		tresp, terr := txn.Then(clientv3.OpPut(key, string(nextData))).Commit()
+		txnCancel()
 		if terr != nil {
 			return nil, fmt.Errorf("cas version: %w", terr)
 		}
@@ -402,10 +407,12 @@ func (c *EtcdClient) NextVersion(ctx context.Context, volumeName string, major b
 // Close releases all active locks and closes the underlying etcd client.
 func (c *EtcdClient) Close() error {
 	c.mu.Lock()
+	revokeCtx, revokeCancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+	defer revokeCancel()
 	for key, cancel := range c.activeLocks {
 		cancel()
 		if leaseID, ok := c.lastLeaseIDs[key]; ok {
-			_, _ = c.client.Revoke(context.Background(), leaseID)
+			_, _ = c.client.Revoke(revokeCtx, leaseID)
 		}
 		delete(c.activeLocks, key)
 		delete(c.lastLeaseIDs, key)

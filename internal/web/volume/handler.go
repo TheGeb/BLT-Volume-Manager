@@ -98,6 +98,7 @@ func DeleteVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 	}
 	ctx := r.Context()
 	if err := CleanupVolumeData(ctx, s, volumeName); err != nil {
+		s.RefreshStats(ctx)
 		server.RespondError(w, fmt.Errorf("cleanup volume data: %w", err), http.StatusInternalServerError)
 		return
 	}
@@ -177,7 +178,7 @@ func RenameVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 	}
 
 	ctx := r.Context()
-	err := RenameVolumeData(ctx, s, volumeName, req.Target)
+	warning, err := RenameVolumeData(ctx, s, volumeName, req.Target)
 	if err != nil {
 		server.RespondError(w, err, errorStatus(err))
 		return
@@ -186,9 +187,14 @@ func RenameVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 	s.RefreshStats(ctx)
 
 	type renameResponse struct {
-		Status string `json:"status"`
+		Status  string `json:"status"`
+		Warning string `json:"warning,omitempty"`
 	}
-	server.RespondJSON(w, renameResponse{
+	resp := renameResponse{
 		Status: fmt.Sprintf("Volume %q renamed to %q", volumeName, req.Target),
-	})
+	}
+	if warning != "" {
+		resp.Warning = warning
+	}
+	server.RespondJSON(w, resp)
 }

@@ -27,10 +27,6 @@ type mockRunner struct {
 	repoExistsFn func(ctx context.Context) ([]byte, error)
 }
 
-func (m *mockRunner) Init(ctx context.Context) ([]byte, error) {
-	return m.InitOutput(ctx)
-}
-
 func (m *mockRunner) InitOutput(ctx context.Context) ([]byte, error) {
 	if m.initFn != nil {
 		return m.initFn(ctx)
@@ -136,7 +132,7 @@ func TestInitRepo_AlreadyInitialized(t *testing.T) {
 	m := NewManager("/test/repo")
 	m.runner = &mockRunner{
 		initFn: func(ctx context.Context) ([]byte, error) {
-			return []byte("Fatal: repository already initialized\n"), errors.New("exit status 1")
+			return []byte("Fatal: create repository at /test/repo failed: config file already exists\n"), errors.New("exit status 1")
 		},
 	}
 	err := m.Init(context.Background())

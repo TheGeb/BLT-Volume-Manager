@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -455,7 +456,7 @@ func TestConcurrentMountSingleVolume(t *testing.T) {
 			}
 			if resp == nil || resp.Mountpoint != volPath {
 				mu.Lock()
-				mountErr = err
+				mountErr = fmt.Errorf("unexpected mount response: %v", resp)
 				mu.Unlock()
 			}
 		}()
@@ -468,5 +469,13 @@ func TestConcurrentMountSingleVolume(t *testing.T) {
 
 	if n := b.PutCallCount(); n != 1 {
 		t.Errorf("expected 1 owner lock acquisition (PutObject), got %d", n)
+	}
+
+	// Fully unmount both references so the hot-backup schedule goroutine is
+	// cancelled and the mount-state entry is cleaned up.
+	for i := 0; i < 2; i++ {
+		if err := d.Unmount(&volume.UnmountRequest{Name: "concurrent-test", ID: "test"}); err != nil {
+			t.Fatalf("Unmount: %v", err)
+		}
 	}
 }

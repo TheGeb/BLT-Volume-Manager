@@ -105,7 +105,9 @@ func (m *Manager) initRepository(ctx context.Context) error {
 	out, err := m.runner.InitOutput(ctx)
 	if err != nil {
 		// "repository already initialized" is not an error for our use case.
-		if strings.Contains(strings.ToLower(string(out)), "already initialized") {
+		// restic 0.19.x prints "config file already exists" on a re-init.
+		lower := strings.ToLower(string(out))
+		if strings.Contains(lower, "already initialized") || strings.Contains(lower, "config file already exists") {
 			return nil
 		}
 		return err

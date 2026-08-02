@@ -13,7 +13,6 @@ vi.mock('../api', () => ({
   deleteSnapshots: vi.fn(),
   setRestorePoint: vi.fn(),
   deleteRestorePoint: vi.fn(),
-  safeErrorMessage: vi.fn((e) => (e instanceof Error ? e.message : String(e))),
 }));
 
 vi.mock('./toast', () => ({

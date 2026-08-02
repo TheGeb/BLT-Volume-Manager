@@ -4,7 +4,7 @@ import type { SnapshotListParams } from '../api';
 import * as api from '../api';
 import { showToast } from './toast';
 import { selectedVolume } from './volumes';
-import { formatBytes, matchesVersionRange } from '../util';
+import { formatBytes, matchesVersionRange, safeErrorMessage } from '../util';
 
 export const snapshots = writable<Snapshot[]>([]);
 export const query = writable('');
@@ -46,7 +46,7 @@ export async function loadHosts(volume: string) {
 		const hosts = await api.fetchSnapshotHosts(volume);
 		allHosts.set(hosts);
 	} catch (e: unknown) {
-		showToast(api.safeErrorMessage(e), true);
+		showToast(safeErrorMessage(e), true);
 	} finally {
 		hostsLoading.set(false);
   }
@@ -272,7 +272,7 @@ async function withRestorePointOp(id: string, vol: string, apiFn: () => Promise<
       await loadSnapshots(vol);
     }
   } catch (e: unknown) {
-    showToast(`Failed to ${action} restore point: ${api.safeErrorMessage(e)}`, true);
+    showToast(`Failed to ${action} restore point: ${safeErrorMessage(e)}`, true);
     await loadSnapshots(vol);
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -337,7 +337,7 @@ export async function confirmDeleteSnapshot() {
     }
     await loadSnapshots(vol);
   } catch (e: unknown) {
-    showToast(api.safeErrorMessage(e), true);
+    showToast(safeErrorMessage(e), true);
   }
 }
 

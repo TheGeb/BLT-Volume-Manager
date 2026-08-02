@@ -149,8 +149,13 @@ func (s *OwnerStore) ListAllGrouped(ctx context.Context) (map[string]VolumeOwner
 func (s *OwnerStore) DeleteForVolume(ctx context.Context, volumeName string) error {
 	if coord, ok := s.b.(Coordinator); ok {
 		lockKey, _, _, _, fErr := coord.FindLock(ctx, volumeName)
+		if fErr != nil && !errors.Is(fErr, ErrKeyNotFound) {
+			return fmt.Errorf("find lock for volume: %w", fErr)
+		}
 		if fErr == nil {
-			_ = coord.ReleaseLock(ctx, lockKey)
+			if err := coord.ReleaseLock(ctx, lockKey); err != nil {
+				return fmt.Errorf("release lock for volume: %w", err)
+			}
 		}
 	}
 	return s.b.DeleteObjectsWithPrefix(ctx, OwnerPrefix(volumeName))

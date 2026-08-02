@@ -11,7 +11,6 @@ vi.mock('../api', () => ({
   checkRepo: vi.fn(),
   repairRepo: vi.fn(),
   fetchDevMode: vi.fn(),
-  safeErrorMessage: vi.fn((e) => (e instanceof Error ? e.message : String(e))),
 }));
 
 describe('themeDark', () => {

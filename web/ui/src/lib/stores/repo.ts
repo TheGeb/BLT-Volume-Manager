@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import type { StatsResponse, OwnerStatus } from '../types';
 import * as api from '../api';
 import { showToast } from './toast';
+import { safeErrorMessage } from '../util';
 import { selectedVolume } from './volumes';
 import { snapshots, loadSnapshots } from './snapshots';
 
@@ -77,7 +78,7 @@ export async function loadOwnerStatus() {
     ownerStatus.set(await api.fetchOwnerStatus(vol));
   } catch (e: unknown) {
     ownerStatus.set(null);
-    showToast(api.safeErrorMessage(e), true);
+    showToast(safeErrorMessage(e), true);
   }
 }
 
@@ -88,7 +89,7 @@ export async function loadStats(volume: string) {
     stats.set(s);
   } catch (e: unknown) {
     stats.set(null);
-    showToast(api.safeErrorMessage(e), true);
+    showToast(safeErrorMessage(e), true);
   } finally {
     statsLoading.set(false);
   }
@@ -102,7 +103,7 @@ async function withRepoOp(loading: { set: (v: boolean) => void }, apiFn: () => P
   try {
     const msg = await apiFn();
     showToast(msg);
-  } catch (e: unknown) { showToast(api.safeErrorMessage(e), true); }
+  } catch (e: unknown) { showToast(safeErrorMessage(e), true); }
   finally { loading.set(false); }
 }
 

@@ -1,12 +1,5 @@
 import type { Snapshot, OwnerStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
 
-export function safeErrorMessage(err: unknown): string {
-	if (err instanceof Error) return err.message;
-	if (typeof err === 'string') return err;
-	if (err && typeof err === 'object' && 'message' in err && typeof (err as Record<string, unknown>).message === 'string') return (err as Record<string, unknown>).message as string;
-	return String(err);
-}
-
 function validateSnapshotsResponse(data: unknown): SnapshotsResponse {
 	if (!data || typeof data !== 'object') throw new Error('invalid snapshots response');
 	const d = data as Record<string, unknown>;
@@ -212,7 +205,9 @@ export async function fetchFileContent(snapshotId: string, volume: string, path:
   }
   try {
     const resp = await fetch(url, { signal: controller.signal });
-    return await parseResponse<string>(resp);
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(text || 'Failed to read file');
+    return text;
   } finally {
     clearTimeout(timer);
   }
@@ -293,7 +288,7 @@ export async function copyVolume(source: string, target: string, preserveHistory
   return parseResponse(resp);
 }
 
-export async function renameVolume(source: string, target: string): Promise<{ status: string }> {
+export async function renameVolume(source: string, target: string): Promise<{ status: string; warning?: string }> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(source)}/rename`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

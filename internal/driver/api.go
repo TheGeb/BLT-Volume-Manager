@@ -189,6 +189,13 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 			}
 			return &volume.MountResponse{Mountpoint: volPath}, nil
 		}
+		if exists && ms.state == mountStateReady && ms.acquireErr == nil {
+			// A previous mount already acquired the lock while this goroutine
+			// was waiting to take mountMu (we read needsLock before the leader
+			// set LockKey). Treat this mount as a follower: nothing left to do.
+			d.mountMu.Unlock()
+			return &volume.MountResponse{Mountpoint: volPath}, nil
+		}
 		ms = &volMountState{state: mountStateAcquiring, done: make(chan struct{})}
 		d.mountStates[name] = ms
 		d.mountMu.Unlock()
@@ -258,13 +265,17 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 			}
 		}
 
+		var ctx2 context.Context
+		var cancel context.CancelFunc
 		d.mu.Lock()
-		ctx2, cancel := context.WithCancel(context.Background())
-		vi.cancel = cancel
-		firstAttach := vi.attached == 1
+		if vi.cancel == nil {
+			ctx2, cancel = context.WithCancel(context.Background())
+			vi.cancel = cancel
+		}
+		startSchedule := vi.cancel != nil
 		d.mu.Unlock()
 
-		if firstAttach {
+		if startSchedule {
 			d.startHotSchedule(ctx2, name, volPath)
 		}
 
@@ -292,7 +303,11 @@ func (d *Driver) Unmount(r *volume.UnmountRequest) (err error) {
 			}
 			if vi.cancel != nil {
 				vi.cancel()
+				vi.cancel = nil
 			}
+			d.mountMu.Lock()
+			delete(d.mountStates, name)
+			d.mountMu.Unlock()
 		}
 	}
 	d.mu.Unlock()

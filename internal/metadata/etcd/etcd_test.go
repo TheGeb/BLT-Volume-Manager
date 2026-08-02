@@ -467,11 +467,10 @@ func TestVersionStore_EtcdBackend(t *testing.T) {
 
 // --- Lease expiration tests ---
 
-func TestLeaseExpiration(t *testing.T) {
-	addr := etcdAddr(t)
-	cli := newEtcdClient(t, addr)
+func TestLeaseKeepAliveHeldUntilRelease(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
-
+	cli := newEtcdClient(t, etcdAddr(t))
 	cleanKeys(t, cli, lockKeyFor(t.Name()))
 	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
 
@@ -490,15 +489,26 @@ func TestLeaseExpiration(t *testing.T) {
 		t.Fatal("expected lock to be valid immediately")
 	}
 
-	// Wait for lease to expire
+	// The automatic keepalive renews the lease, so it must remain valid
+	// well past the original TTL.
 	time.Sleep(4 * time.Second)
-
-	// Should be expired now
 	valid, err = cli.LockIsValid(ctx, key)
 	if err != nil {
-		t.Fatalf("LockIsValid after expiry error: %v", err)
+		t.Fatalf("LockIsValid after TTL error: %v", err)
+	}
+	if !valid {
+		t.Fatal("expected keepalive to hold the lock past its original TTL")
+	}
+
+	// Releasing revokes the lease and invalidates the lock.
+	if err := cli.ReleaseLock(ctx, key); err != nil {
+		t.Fatalf("ReleaseLock() error: %v", err)
+	}
+	valid, err = cli.LockIsValid(ctx, key)
+	if err != nil {
+		t.Fatalf("LockIsValid after release error: %v", err)
 	}
 	if valid {
-		t.Fatal("expected lock to be expired")
+		t.Fatal("expected lock to be invalid after release")
 	}
 }

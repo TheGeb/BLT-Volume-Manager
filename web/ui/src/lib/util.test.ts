@@ -132,11 +132,11 @@ describe('matchesVersionRange', () => {
     expect(matchesVersionRange(['v2.5'], undefined, 'v2.5')).toBe(true);
   });
 
-  it('throws on invalid "from" bound', () => {
-    expect(() => matchesVersionRange(['v2.5'], '12x')).toThrow('Invalid version range "from"');
+  it('ignores invalid "from" bound', () => {
+    expect(matchesVersionRange(['v2.5'], '12x')).toBe(false);
   });
 
-  it('throws on invalid "to" bound', () => {
-    expect(() => matchesVersionRange(['v2.5'], undefined, 'x.1')).toThrow('Invalid version range "to"');
+  it('ignores invalid "to" bound', () => {
+    expect(matchesVersionRange(['v2.5'], undefined, 'x.1')).toBe(false);
   });
 });

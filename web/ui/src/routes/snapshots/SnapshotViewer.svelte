@@ -5,7 +5,7 @@
   import type { Snapshot, FileNode, DiffResult } from '$lib/types';
   import { computeDiff } from '$lib/diff';
   import type { DiffHunk, DiffLine } from '$lib/diff';
-  import { formatBytes, versionTag } from '$lib/util';
+  import { formatBytes, versionTag, safeErrorMessage } from '$lib/util';
   import { collectAllPaths, buildDiffMap, buildTree } from '$lib/tree-utils';
   import { colResize, rowResize } from '$lib/resize';
   import * as api from '$lib/api';
@@ -63,7 +63,7 @@
       compareSnapshotList = r.snapshots;
     } catch (e: unknown) {
       compareSnapshotList = [];
-      showToast(api.safeErrorMessage(e), true);
+      showToast(safeErrorMessage(e), true);
     }
   }
 
@@ -216,7 +216,7 @@
       ]);
       nodes = fetchedNodes;
     } catch (e: unknown) {
-      error = api.safeErrorMessage(e);
+      error = safeErrorMessage(e);
     } finally {
       loading = false;
       hasOpened = true;
@@ -281,7 +281,7 @@
       }
     } catch (e: unknown) {
       if (generation !== diffRequestGeneration) return;
-      error = api.safeErrorMessage(e);
+      error = safeErrorMessage(e);
     } finally {
       // eslint-disable-next-line svelte/infinite-reactive-loop
       if (generation === diffRequestGeneration) diffLoading = false;
@@ -318,11 +318,12 @@
     currentDiffHunks = [];
     error = '';
     try {
-      fileContent = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, snapshot.fallbackHash);
+      const content = await api.fetchFileContent(snapshot.id, snapshot.volume!, path, snapshot.fallbackHash);
       if (generation !== fileRequestGeneration) return;
+      fileContent = content;
     } catch (e: unknown) {
       if (generation !== fileRequestGeneration) return;
-      fileContentError = api.safeErrorMessage(e);
+      fileContentError = safeErrorMessage(e);
     } finally {
       if (generation === fileRequestGeneration) fileContentLoading = false;
     }
@@ -338,11 +339,12 @@
     error = '';
     try {
       const snap = compareSnapshotList.find(s => s.id === id)!;
-      fileContent = await api.fetchFileContent(id, snapshot.volume!, path, snap.fallbackHash);
+      const content = await api.fetchFileContent(id, snapshot.volume!, path, snap.fallbackHash);
       if (generation !== fileRequestGeneration) return;
+      fileContent = content;
     } catch (e: unknown) {
       if (generation !== fileRequestGeneration) return;
-      fileContentError = api.safeErrorMessage(e);
+      fileContentError = safeErrorMessage(e);
     } finally {
       if (generation === fileRequestGeneration) fileContentLoading = false;
     }
@@ -373,7 +375,7 @@
       if (currentDiffHunks.length === 0) fileContent = newContent;
     } catch (e: unknown) {
       if (generation !== fileRequestGeneration) return;
-      error = api.safeErrorMessage(e);
+      error = safeErrorMessage(e);
     } finally {
       if (generation === fileRequestGeneration) fileContentLoading = false;
     }
