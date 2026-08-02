@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
@@ -18,24 +20,40 @@ type mockBackend struct {
 	objects         []s3.Object
 	objectsErr      error
 	deletePrefixErr error
+	calls           []string
+	mu              sync.Mutex
 }
 
 func (m *mockBackend) PutObject(context.Context, string, []byte) error { return nil }
 func (m *mockBackend) ReadObject(context.Context, string) ([]byte, error) {
 	return nil, store.ErrKeyNotFound
 }
-func (m *mockBackend) DeleteObject(context.Context, string) error { return m.deletePrefixErr }
+func (m *mockBackend) DeleteObject(_ context.Context, key string) error {
+	return m.record("DeleteObject", key)
+}
 func (m *mockBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return m.objects, m.objectsErr
 }
+func (m *mockBackend) DeleteObjectsWithPrefix(_ context.Context, prefix string) error {
+	return m.record("DeleteObjectsWithPrefix", prefix)
+}
 
-func (m *mockBackend) DeleteObjectsWithPrefix(context.Context, string) error {
+func (m *mockBackend) record(op, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls = append(m.calls, op+":"+key)
 	return m.deletePrefixErr
 }
 
-type mockResticBackend struct{}
+type mockResticBackend struct {
+	callCount int
+	deleteErr error
+}
 
-func (m *mockResticBackend) DeleteRepo(_ context.Context, _ string) error { return nil }
+func (m *mockResticBackend) DeleteRepo(_ context.Context, _ string) error {
+	m.callCount++
+	return m.deleteErr
+}
 
 func mockStores(objects []s3.Object, objectsErr error) func(*server.BLTService) {
 	return func(s *server.BLTService) {
@@ -163,16 +181,17 @@ func TestValidVolumeName(t *testing.T) {
 	}
 }
 
-func newTestService(deleteErr error) *server.BLTService {
-	b := &mockBackend{deletePrefixErr: deleteErr}
+func newTestService(b *mockBackend, restic *mockResticBackend) *server.BLTService {
 	return server.New(cfg.Config{S3Bucket: "test-bucket"}, b,
-		server.WithResticBackend(&mockResticBackend{}),
+		server.WithResticBackend(restic),
 	)
 }
 
 func TestDeleteVolume_CleanupFailure(t *testing.T) {
 	t.Parallel()
-	s := newTestService(errors.New("simulated cleanup error"))
+	b := &mockBackend{deletePrefixErr: errors.New("simulated cleanup error")}
+	restic := &mockResticBackend{}
+	s := newTestService(b, restic)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
 	rec := httptest.NewRecorder()
@@ -188,11 +207,27 @@ func TestDeleteVolume_CleanupFailure(t *testing.T) {
 	if resp.Error == "" {
 		t.Error("expected non-empty error message")
 	}
+
+	// The volume delete fails first, so owners/restic deletes must not run.
+	b.mu.Lock()
+	got := append([]string(nil), b.calls...)
+	b.mu.Unlock()
+	if len(got) != 1 {
+		t.Errorf("expected only the volume delete to run, got calls %q", got)
+	}
+	if got[0] != "DeleteObject:"+store.RegisteredVolumeKeyspace+"test-vol.json" {
+		t.Errorf("expected volume DeleteObject to run first, got %q", got[0])
+	}
+	if restic.callCount != 0 {
+		t.Errorf("expected no restic repo delete when cleanup fails, got %d", restic.callCount)
+	}
 }
 
 func TestDeleteVolume_Success(t *testing.T) {
 	t.Parallel()
-	s := newTestService(nil)
+	b := &mockBackend{}
+	restic := &mockResticBackend{}
+	s := newTestService(b, restic)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
 	rec := httptest.NewRecorder()
@@ -209,5 +244,49 @@ func TestDeleteVolume_Success(t *testing.T) {
 	}
 	if resp.Status == "" {
 		t.Error("expected non-empty status message")
+	}
+
+	b.mu.Lock()
+	got := append([]string(nil), b.calls...)
+	b.mu.Unlock()
+	want := []string{
+		"DeleteObject:" + store.RegisteredVolumeKeyspace + "test-vol.json",
+		"DeleteObjectsWithPrefix:" + store.OwnerPrefix("test-vol"),
+		"DeleteObject:" + store.RestorePointKeyspace + "test-vol.json",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("backend calls = %q, want %q", got, want)
+	}
+	if restic.callCount != 1 {
+		t.Errorf("expected restic repo delete to run once, got %d", restic.callCount)
+	}
+}
+
+func TestDeleteVolume_ResticCleanupError(t *testing.T) {
+	t.Parallel()
+	b := &mockBackend{}
+	s := newTestService(b, &mockResticBackend{deleteErr: errors.New("repo delete failed")})
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
+	rec := httptest.NewRecorder()
+	DeleteVolume(s, rec, req, "test-vol")
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when repo cleanup fails, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDeleteVolume_InvalidName(t *testing.T) {
+	t.Parallel()
+	s := &server.BLTService{Config: cfg.Config{S3Bucket: "test-bucket"}}
+	mockStores(nil, nil)(s)
+
+	for _, name := range []string{"../etc", "bad\\name"} {
+		req := httptest.NewRequest(http.MethodDelete, "/api/volume/"+name, nil)
+		rec := httptest.NewRecorder()
+		DeleteVolume(s, rec, req, name)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("DeleteVolume(%q) = %d, want 400", name, rec.Code)
+		}
 	}
 }

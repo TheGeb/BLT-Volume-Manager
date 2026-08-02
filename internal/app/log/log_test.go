@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"testing"
 )
@@ -27,10 +28,12 @@ func TestLogLevelFiltering(t *testing.T) {
 
 	SetLevel(LevelError)
 
-	slog.Info("test_event")
-
-	if buf.Len() != 0 {
-		t.Error("expected no log output when level is Error")
+	for _, level := range []slog.Level{slog.LevelInfo, slog.LevelDebug} {
+		buf.Reset()
+		slog.Log(context.Background(), level, "test_event")
+		if buf.Len() != 0 {
+			t.Errorf("expected no log output for level %v when configured level is Error", level)
+		}
 	}
 }
 
@@ -47,40 +50,4 @@ func TestLogLevelNames(t *testing.T) {
 			t.Errorf("levelNames[%q] = %d, want %d", name, v, expected)
 		}
 	}
-}
-
-func TestLogJSONBelowLevel(t *testing.T) {
-	t.Parallel()
-	oldLevel := logLevel()
-	oldHandler := slog.Default().Handler()
-	defer func() {
-		levelVar.Set(oldLevel)
-		slog.SetDefault(slog.New(oldHandler))
-	}()
-
-	var buf bytes.Buffer
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: levelVar})))
-
-	SetLevel(LevelError)
-
-	slog.Debug("should_not_appear")
-
-	if buf.Len() != 0 {
-		t.Error("expected no log output when level is Error")
-	}
-}
-
-func TestLogInfo(t *testing.T) {
-	t.Parallel()
-	Info("test_info_event")
-}
-
-func TestLogError(t *testing.T) {
-	t.Parallel()
-	Error("test_error_event", nil)
-}
-
-func TestS3Call(t *testing.T) {
-	t.Parallel()
-	S3Call("PutObject", "bucket", "key", 0, nil)
 }

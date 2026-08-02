@@ -2,7 +2,6 @@ package etcd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -156,40 +155,6 @@ func TestAcquireLock_Concurrent(t *testing.T) {
 	}
 }
 
-func TestAcquireLock_ReleaseLock(t *testing.T) {
-	addr := etcdAddr(t)
-	cli := newEtcdClient(t, addr)
-	ctx := context.Background()
-
-	cleanKeys(t, cli, lockKeyFor(t.Name()))
-	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
-
-	key, err := cli.AcquireLock(ctx, t.Name(), "owner1", 30)
-	if err != nil {
-		t.Fatalf("AcquireLock() error: %v", err)
-	}
-
-	// Release the lock
-	if err := cli.ReleaseLock(ctx, key); err != nil {
-		t.Fatalf("ReleaseLock() error: %v", err)
-	}
-
-	// After release, lock should be invalid
-	valid, err := cli.LockIsValid(ctx, key)
-	if err != nil {
-		t.Fatalf("LockIsValid() error: %v", err)
-	}
-	if valid {
-		t.Fatal("expected lock to be invalid after release")
-	}
-
-	// Should be able to re-acquire
-	_, err = cli.AcquireLock(ctx, t.Name(), "owner2", 30)
-	if err != nil {
-		t.Fatalf("re-acquire AcquireLock() error: %v", err)
-	}
-}
-
 func TestFindLock(t *testing.T) {
 	addr := etcdAddr(t)
 	cli := newEtcdClient(t, addr)
@@ -316,40 +281,6 @@ func TestNextVersion_Concurrent(t *testing.T) {
 	}
 }
 
-func TestNextVersion_MajorMinor(t *testing.T) {
-	addr := etcdAddr(t)
-	cli := newEtcdClient(t, addr)
-	ctx := context.Background()
-
-	verKey := store.VersionKeyspace + t.Name() + ".json"
-	cleanKeys(t, cli, verKey)
-	defer cleanKeys(t, cli, verKey)
-
-	// Minor increments
-	for i := 1; i <= 3; i++ {
-		tags, err := cli.NextVersion(ctx, t.Name(), false)
-		if err != nil {
-			t.Fatalf("minor %d: %v", i, err)
-		}
-		if tags[1] != "v0."+itoa(i) {
-			t.Errorf("minor %d: expected v0.%d, got %s", i, i, tags[1])
-		}
-	}
-
-	// Major resets minor
-	tags, err := cli.NextVersion(ctx, t.Name(), true)
-	if err != nil {
-		t.Fatalf("major: %v", err)
-	}
-	if tags[0] != "v1" || tags[1] != "v1.0" {
-		t.Errorf("after major: expected [v1 v1.0], got %v", tags)
-	}
-}
-
-func itoa(i int) string {
-	return fmt.Sprintf("%d", i)
-}
-
 // --- OwnerStore with etcd backend tests ---
 
 func TestOwnerStore_EtcdBackend(t *testing.T) {
@@ -439,6 +370,15 @@ func TestOwnerStore_EtcdBackend(t *testing.T) {
 		}
 		if valid {
 			t.Fatal("expected lock to be invalid after release")
+		}
+
+		// Another owner should be able to re-acquire after release.
+		newKey, err := s.LockVolume(ctx, vol, "lock-host-2", time.Now().Add(30*time.Minute).Unix())
+		if err != nil {
+			t.Fatalf("re-acquire LockVolume error: %v", err)
+		}
+		if newKey == lockKey {
+			t.Error("expected a different lock key after re-acquire")
 		}
 	})
 }

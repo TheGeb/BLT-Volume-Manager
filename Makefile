@@ -4,7 +4,7 @@
 
 .PHONY: all dev-driver dev-web build-release test lint lint-go format hadolint check
 .PHONY: nix-vendor-hash nix-npm-hash nix-hashes
-.PHONY: build-driver build-web ui run-web test-go test-ui
+.PHONY: build-driver build-web ui run-web test-go test-ui test-integration
 .PHONY: docker-driver docker-web
 .PHONY: staticcheck golangci-lint-check coverage clean clean-cache tidy fix
 .PHONY: npm-install lint-ui ui-dev-build
@@ -137,9 +137,22 @@ hadolint:
 
 # === Test ===
 
+# Run Go unit tests, integration tests, and the Svelte test suite.
+# Integration tests need docker (auto-skipped otherwise) and spin up
+# Garage + etcd via Testcontainers.
 test:
 	go test -race ./... -short
+	$(MAKE) test-integration
 	cd web/ui && npm test
+
+# Recreate the build-time UI embed dir that the integration-test built
+# binaries require (matches what CI does).
+internal/web/static/.dummy:
+	@mkdir -p internal/web/static
+	@touch internal/web/static/.dummy
+
+test-integration: internal/web/static/.dummy
+	go test -tags integration -v -count=1 ./test/integration/
 
 test-go:
 	go test -race ./... -short

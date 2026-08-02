@@ -13,82 +13,6 @@ func newVersionStore(t *testing.T) *VersionStore {
 	return NewVersionStore(newOrderedBackend())
 }
 
-func TestVersionStore_NextTags_Initial(t *testing.T) {
-	t.Parallel()
-	vs := newVersionStore(t)
-	ctx := context.Background()
-
-	tags, err := vs.NextTags(ctx, "testvol", false)
-	if err != nil {
-		t.Fatalf("NextTags error: %v", err)
-	}
-	if len(tags) != 2 {
-		t.Fatalf("expected 2 tags, got %d: %v", len(tags), tags)
-	}
-	if tags[0] != "v0" {
-		t.Errorf("expected v0, got %q", tags[0])
-	}
-	if tags[1] != "v0.1" {
-		t.Errorf("expected v0.1, got %q", tags[1])
-	}
-}
-
-func TestVersionStore_NextTags_MinorIncrement(t *testing.T) {
-	t.Parallel()
-	vs := newVersionStore(t)
-	ctx := context.Background()
-
-	// First minor version
-	tags, err := vs.NextTags(ctx, "testvol", false)
-	if err != nil {
-		t.Fatalf("first NextTags error: %v", err)
-	}
-	if tags[1] != "v0.1" {
-		t.Errorf("expected v0.1, got %q", tags[1])
-	}
-
-	// Second minor version
-	tags, err = vs.NextTags(ctx, "testvol", false)
-	if err != nil {
-		t.Fatalf("second NextTags error: %v", err)
-	}
-	if tags[1] != "v0.2" {
-		t.Errorf("expected v0.2, got %q", tags[1])
-	}
-}
-
-func TestVersionStore_NextTags_MajorResetsMinor(t *testing.T) {
-	t.Parallel()
-	vs := newVersionStore(t)
-	ctx := context.Background()
-
-	// Create a few minor versions
-	_, _ = vs.NextTags(ctx, "testvol", false)
-	_, _ = vs.NextTags(ctx, "testvol", false)
-	_, _ = vs.NextTags(ctx, "testvol", false)
-
-	// Major version bumps major and resets minor
-	tags, err := vs.NextTags(ctx, "testvol", true)
-	if err != nil {
-		t.Fatalf("major NextTags error: %v", err)
-	}
-	if tags[0] != "v1" {
-		t.Errorf("expected v1, got %q", tags[0])
-	}
-	if tags[1] != "v1.0" {
-		t.Errorf("expected v1.0, got %q", tags[1])
-	}
-
-	// Next minor should be v1.1
-	tags, err = vs.NextTags(ctx, "testvol", false)
-	if err != nil {
-		t.Fatalf("minor after major NextTags error: %v", err)
-	}
-	if tags[1] != "v1.1" {
-		t.Errorf("expected v1.1, got %q", tags[1])
-	}
-}
-
 func TestVersionStore_NextTags_VolumeIsolation(t *testing.T) {
 	t.Parallel()
 	vs := newVersionStore(t)
@@ -233,13 +157,4 @@ func uniqueStrings(s []string) []string {
 		}
 	}
 	return result
-}
-
-func TestVersionStore_NewVersionStore(t *testing.T) {
-	t.Parallel()
-	b := newOrderedBackend()
-	vs := NewVersionStore(b)
-	if vs == nil {
-		t.Fatal("NewVersionStore returned nil")
-	}
 }

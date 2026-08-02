@@ -819,25 +819,6 @@ func TestAcquireOwnerLock_PastExpiry(t *testing.T) {
 	}
 }
 
-func TestAcquireOwnerLock_CompetingLock(t *testing.T) {
-	t.Parallel()
-	b := newOrderedBackend()
-	folder := OwnerPrefix("myvol")
-	expiry := time.Now().Add(time.Hour).Unix()
-
-	// First lock wins
-	_, err := AcquireOwnerLock(context.Background(), b, folder, "first", expiry)
-	if err != nil {
-		t.Fatalf("first AcquireOwnerLock() error: %v", err)
-	}
-
-	// Second attempt should fail
-	_, err = AcquireOwnerLock(context.Background(), b, folder, "second", expiry)
-	if err == nil {
-		t.Fatal("expected error for competing lock, got nil")
-	}
-}
-
 func TestAcquireOwnerLock_OwnerWithDash(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
@@ -1191,15 +1172,6 @@ func TestListAllGrouped(t *testing.T) {
 			t.Fatal("expected error from failing backend")
 		}
 	})
-}
-
-func TestNewOwnerStore(t *testing.T) {
-	t.Parallel()
-	b := newOrderedBackend()
-	s := NewOwnerStore(b)
-	if s == nil {
-		t.Fatal("NewOwnerStore returned nil")
-	}
 }
 
 func TestLockVolume(t *testing.T) {

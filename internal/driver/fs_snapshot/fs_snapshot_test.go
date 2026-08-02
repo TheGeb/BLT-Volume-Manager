@@ -140,14 +140,6 @@ func TestResolveType_DetectNonExistent(t *testing.T) {
 	}
 }
 
-func TestInfoZeroValue(t *testing.T) {
-	t.Parallel()
-	info := &Info{}
-	if info.Subtype != TypeNone {
-		t.Errorf("expected TypeNone, got %d", info.Subtype)
-	}
-}
-
 func TestRemove_NoneType(t *testing.T) {
 	t.Parallel()
 	err := Remove(&Info{Subtype: TypeNone})

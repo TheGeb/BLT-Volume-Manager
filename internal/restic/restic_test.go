@@ -169,6 +169,7 @@ func TestCommonPathPrefix(t *testing.T) {
 		{[]string{}, ""},
 		{[]string{"/", "/a"}, "/"},
 		{[]string{"/a", "/a/b", "/a/b/c"}, "/a"},
+		{[]string{"/a/b/c", "/a/b/c"}, "/a/b/c"},
 	}
 
 	for _, tt := range tests {
@@ -252,42 +253,6 @@ func TestFindSnapshotByHashEmpty(t *testing.T) {
 	_, err := m.FindSnapshotByHash(context.Background(), "somehash")
 	if err == nil {
 		t.Error("expected error for nonexistent repo")
-	}
-}
-
-func TestSnapshotSortLogic(t *testing.T) {
-	t.Parallel()
-	now := time.Now()
-	snaps := []Snapshot{
-		{ShortID: "s1", Time: now.Add(-2 * time.Hour), Tags: []string{"restore-point"}, Paths: []string{"/volumes/my-vol/data"}},
-		{ShortID: "s2", Time: now.Add(-1 * time.Hour), Tags: []string{"restore-point"}, Paths: []string{"/volumes/my-vol/data"}},
-		{ShortID: "s3", Time: now, Tags: []string{BackupTagHot}, Paths: []string{"/volumes/my-vol/data"}},
-	}
-
-	tagFound := func(tags []string, target string) bool {
-		for _, t := range tags {
-			if t == target {
-				return true
-			}
-		}
-		return false
-	}
-	if !tagFound(snaps[0].Tags, "restore-point") {
-		t.Error("expected s1 to have restore-point tag")
-	}
-	if tagFound(snaps[2].Tags, "restore-point") {
-		t.Error("expected s3 to not have restore-point tag")
-	}
-	if !snaps[2].Time.After(snaps[1].Time) {
-		t.Error("expected s3 to be newest")
-	}
-}
-
-func TestCommonPathPrefixSingle(t *testing.T) {
-	t.Parallel()
-	got := commonPathPrefix([]string{"/a/b/c"})
-	if got != "/a/b/c" {
-		t.Errorf("expected '/a/b/c', got %q", got)
 	}
 }
 

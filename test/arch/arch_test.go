@@ -31,6 +31,10 @@ func TestNoWebDriverDependency(t *testing.T) {
 
 func TestBackendOnlyInMetadata(t *testing.T) {
 	t.Parallel()
+	// The raw metadata backend (etcd client) must only be constructed inside the
+	// metadata package or by cfg (which wires it into the service). web, driver,
+	// and restic must never import it directly and instead go through the
+	// store/Coordinator abstraction in internal/metadata/store.
 	backendPath := "github.com/TheGeb/BLT-Volume-Manager/internal/metadata/etcd"
 	allowedPrefixes := []string{
 		"github.com/TheGeb/BLT-Volume-Manager/internal/metadata",
