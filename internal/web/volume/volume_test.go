@@ -28,12 +28,15 @@ func (m *mockBackend) PutObject(context.Context, string, []byte) error { return 
 func (m *mockBackend) ReadObject(context.Context, string) ([]byte, error) {
 	return nil, store.ErrKeyNotFound
 }
+
 func (m *mockBackend) DeleteObject(_ context.Context, key string) error {
 	return m.record("DeleteObject", key)
 }
+
 func (m *mockBackend) ListObjects(context.Context, string) ([]s3.Object, error) {
 	return m.objects, m.objectsErr
 }
+
 func (m *mockBackend) DeleteObjectsWithPrefix(_ context.Context, prefix string) error {
 	return m.record("DeleteObjectsWithPrefix", prefix)
 }
