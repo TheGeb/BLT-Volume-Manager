@@ -1,7 +1,7 @@
 ARG VERSION=dev
 ARG COMMIT=unknown
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:111d79159b2326f7e80c4a4706e1ba166acb0e2611df853955f3621828cd49e8 AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS build
 ARG VERSION
 ARG COMMIT
 ARG TARGETARCH
@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -o blt-volume-manager-web ./cmd/web
 
 # Runtime base — provides a shared non-root user for targets that support it
-FROM restic/restic:0.19.1@sha256:08916bcda4a4435f9d9828ebb4e91bb7ada3d2c8a53699788930e0ae1bd4fa67 AS base
+FROM restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 AS base
 RUN adduser -D -u 1001 appuser
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 USER appuser

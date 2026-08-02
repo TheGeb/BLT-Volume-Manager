@@ -5,7 +5,7 @@
 .PHONY: all dev-driver dev-web build-release test lint lint-go format hadolint check
 .PHONY: nix-vendor-hash nix-npm-hash nix-hashes
 .PHONY: build-driver build-web ui run-web test-go test-ui
-.PHONY: docker-driver docker-web docker-bake-plugin docker-bake-web
+.PHONY: docker-driver docker-web
 .PHONY: staticcheck golangci-lint-check coverage clean clean-cache tidy fix
 .PHONY: npm-install lint-ui ui-dev-build
 
@@ -194,12 +194,6 @@ build-release:
 # Local targets use direct docker buildx for simplicity.
 # Release builds use docker buildx bake (see docker-bake.hcl) for
 # multi-platform, metadata tagging, and cache scoping.
-
-docker-bake-web:
-	docker buildx bake -f docker-bake.hcl --load web
-
-docker-bake-plugin:
-	docker buildx bake -f docker-bake.hcl --load plugin
 
 docker-web:
 	docker build --target web -t blt-volume-manager-web:local .
