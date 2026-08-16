@@ -406,7 +406,7 @@
     content: '';
     width: 22px; height: 22px;
     background-color: currentcolor;
-    mask: url('/info-circle.svg') no-repeat center / contain;
+    mask: url('/info.svg') no-repeat center / contain;
   }
 
   .restore-point-info:hover::after {

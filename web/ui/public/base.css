@@ -138,3 +138,15 @@ h1 {
   animation: spin 1s linear infinite;
   vertical-align: middle;
 }
+
+/* Renders a Material Symbols icon from a file (see /public/*.svg) using the
+   current text color. Set mask-image inline (e.g. url('/sync.svg')). */
+.material-icon {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-color: currentcolor;
+  mask: none no-repeat center / contain;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
