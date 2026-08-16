@@ -140,12 +140,12 @@
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{dirBg};border:{dirBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
     <div style="width:22px; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
+      <svg role="img" aria-label="Toggle directory" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
         style={chevronStyle}>
         <path d="M7 10l5 5 5-5H7z"/>
       </svg>
     </div>
-    <span class="material-icon" aria-hidden="true" style="mask: url('/folder.svg') no-repeat center / contain; width:16px;height:16px;flex-shrink:0;opacity:0.7;"></span>
+    <span class="material-icon" aria-hidden="true" style="mask: url('/material/folder.svg') no-repeat center / contain; width:18px;height:18px;flex-shrink:0;opacity:0.7;"></span>
     {node.name}
   </button>
   {#if localExpanded || everExpanded}
@@ -172,7 +172,7 @@
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{fileBg};border:{fileBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
     <div style="width:16px; flex-shrink:0;"></div>
-    <span class="material-icon" aria-hidden="true" style="mask: url('/draft.svg') no-repeat center / contain; width:16px;height:16px;flex-shrink:0;opacity:0.7;"></span>
+    <span class="material-icon" aria-hidden="true" style="mask: url('/material/draft.svg') no-repeat center / contain; width:16px;height:16px;flex-shrink:0;opacity:0.7;"></span>
     <span>{node.name}</span>
     {#if node.size != null}
       <span style="color:var(--muted);font-size:0.75rem;margin-left:auto;">{formatBytes(node.size)}</span>

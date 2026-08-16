@@ -79,7 +79,7 @@
           <th>
             <button type="button" class="sort-btn" onclick={onToggleSort}>
               Date
-              <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
+              <svg role="img" aria-label="Sort by date" width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
                 <path d="M3 2l5 6 5-6H3z"/>
               </svg>
             </button>
@@ -100,14 +100,14 @@
                  <td style="text-align:center">
                    {#if restorePointLoading[sn.id]}
                       <span class="rp-loader">
-                        <svg width="20" height="20" viewBox="0 0 20 20" class="spin">
+                        <svg role="img" aria-label="Loading" width="20" height="20" viewBox="0 0 20 20" class="spin">
                           <circle cx="10" cy="10" r="8" fill="none" stroke-width="2" stroke="var(--accent)" stroke-opacity="0.3"/>
                           <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
                         </svg>
                       </span>
                    {:else}
                       <button type="button" class="rp-btn" title="Toggle restore point" onclick={(e) => { e.stopPropagation(); handleRPClick(sn); }} disabled={restorePointLoading[sn.id]}>
-                        <svg width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
+                        <svg role="img" aria-label="Restore point" width="20" height="20" viewBox="0 0 20 20" style="vertical-align:middle;">
                           <circle cx="10" cy="10" r="8" fill="none" stroke-width="2"
                             stroke={(sn.id === restorePointID || sn.short_id === restorePointID) ? 'var(--accent)' : 'var(--muted)'} />
                           {#if sn.id === restorePointID || sn.short_id === restorePointID}
@@ -137,16 +137,7 @@
                    {:else}
                      <button type="button" class="size-btn" title="Compute size"
                        onclick={() => onSizeLoaded(sn.id)}>
-                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                         <rect x="4" y="2" width="16" height="20" rx="2"/>
-                         <line x1="8" y1="6" x2="16" y2="6"/>
-                         <line x1="8" y1="11" x2="10" y2="11"/>
-                         <line x1="14" y1="11" x2="16" y2="11"/>
-                         <line x1="8" y1="15" x2="10" y2="15"/>
-                         <line x1="14" y1="15" x2="16" y2="15"/>
-                         <line x1="8" y1="19" x2="10" y2="19"/>
-                         <line x1="14" y1="19" x2="16" y2="19"/>
-                       </svg>
+<span class="material-icon" role="img" aria-label="Compute size" style="mask: url('/material/calculate.svg') no-repeat center / contain; width:14px;height:14px;"></span>
                      </button>
                    {/if}
                  </td>
@@ -406,7 +397,7 @@
     content: '';
     width: 22px; height: 22px;
     background-color: currentcolor;
-    mask: url('/info.svg') no-repeat center / contain;
+    mask: url('/material/info.svg') no-repeat center / contain;
   }
 
   .restore-point-info:hover::after {

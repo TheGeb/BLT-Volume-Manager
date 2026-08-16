@@ -198,7 +198,7 @@
   <div class="filter-wrap">
     <button class="th-label sort-btn" on:click={onToggleSort}>
       Date
-      <svg width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
+      <svg role="img" aria-label="Sort by date" width="14" height="8" viewBox="0 0 16 10" fill="currentColor" class="sort-chevron" class:sort-desc={sortNewestFirst}>
         <path d="M3 2l5 6 5-6H3z"/>
       </svg>
     </button>
@@ -208,7 +208,7 @@
       on:click={toggle}
       aria-label="Filter by date"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg role="img" aria-label="Filter by date" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
       </svg>
     </button>
@@ -228,13 +228,13 @@
         {#snippet children({ months, weekdays })}
           <RangeCalendar.Header class="cal-header">
             <RangeCalendar.PrevButton class="cal-nav-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg role="img" aria-label="Previous month" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </RangeCalendar.PrevButton>
             <RangeCalendar.Heading class="cal-heading" />
             <RangeCalendar.NextButton class="cal-nav-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg role="img" aria-label="Next month" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </RangeCalendar.NextButton>

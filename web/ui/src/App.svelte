@@ -325,14 +325,14 @@
         <DevTools volume={$selectedVolume} onAction={doRefresh} />
       {/if}
       <button class="button-icon" title="Refresh" on:click={doRefresh} disabled={refreshing}>
-        <span class="material-icon" class:spin={refreshing} style="mask: url('/sync.svg') no-repeat center / contain;"></span>
+        <span class="material-icon" class:spin={refreshing} style="mask: url('/material/sync.svg') no-repeat center / contain; width:28px;height:28px;"></span>
       </button>
       <button class="button-icon" title="Migrate metadata between S3 and etcd backends" on:click={openMigrateModal}>
-        <span class="material-icon" style="mask: url('/swap_horiz.svg') no-repeat center / contain;"></span>
+        <span class="material-icon" style="mask: url('/material/swap_horiz.svg') no-repeat center / contain; width:28px;height:28px;"></span>
       </button>
       <div class="color-picker-wrapper">
         <button class="button-icon" title="Choose accent color" on:click|stopPropagation={() => showColorPicker = !showColorPicker}>
-          <span class="material-icon" style="mask: url('/palette.svg') no-repeat center / contain;"></span>
+          <span class="material-icon" style="mask: url('/material/palette.svg') no-repeat center / contain;"></span>
         </button>
         {#if showColorPicker}
           <div class="color-picker-popover" bind:this={colorPickerEl}>
@@ -355,10 +355,10 @@
         {/if}
       </div>
       <button class="button-icon" title="Toggle light/dark mode" on:click={toggleTheme}>
-        <span class="material-icon" style="mask: url('/routine.svg') no-repeat center / contain;"></span>
+        <span class="material-icon" style="mask: url('/material/routine.svg') no-repeat center / contain;"></span>
       </button>
       <button class="button-icon" title="About" on:click={() => { showInfoModal = true; loadVersionInfo(); }}>
-        <span class="material-icon" style="mask: url('/info.svg') no-repeat center / contain;"></span>
+        <span class="material-icon" style="mask: url('/material/info.svg') no-repeat center / contain;"></span>
       </button>
     </div>
   </header>

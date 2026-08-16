@@ -46,9 +46,9 @@
             ? 'Permanent lock - held from volume creation until the volume is removed from the host.'
             : 'Temporary lock - re-acquired on each container mount; expires by lock TTL (S3) or is held via keepalive while the owner renews (etcd).'}>
             {#if isPermLock}
-              <span class="material-icon" aria-hidden="true" style="mask: url('/all_inclusive.svg') no-repeat center / contain;"></span>
+              <span class="material-icon" aria-hidden="true" style="mask: url('/material/all_inclusive.svg') no-repeat center / contain;"></span>
             {:else}
-              <span class="material-icon" aria-hidden="true" style="mask: url('/lock.svg') no-repeat center / contain;"></span>
+              <span class="material-icon" aria-hidden="true" style="mask: url('/material/lock_reset.svg') no-repeat center / contain;"></span>
             {/if}
           </span>
           <span>({lockMode})</span>

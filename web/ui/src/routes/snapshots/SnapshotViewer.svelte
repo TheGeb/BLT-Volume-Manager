@@ -489,13 +489,13 @@
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" onclick={() => toggleAll(true)}>
             <span style="position:absolute;left:8px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+              <svg role="img" aria-label="Expand all" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
             </span>
             <span style="flex:1;text-align:center;">Expand</span>
           </button>
           <button class="button button-secondary button-xs btn-icon-sm" style="flex:1 0 auto;min-width:70px;position:relative;" onclick={() => toggleAll(false)}>
             <span style="position:absolute;left:8px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+              <svg role="img" aria-label="Collapse all" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
             </span>
             <span style="flex:1;text-align:center;">Collapse</span>
           </button>

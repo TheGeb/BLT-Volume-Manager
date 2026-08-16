@@ -276,7 +276,7 @@
       class:filter-active={hasActiveFilters}
       onclick={() => filtersExpanded = !filtersExpanded}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg role="img" aria-label="Filters" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
       </svg>
       Filters
@@ -310,7 +310,7 @@
               <Popover.Root bind:open={versionOpen}>
                 <Popover.Trigger class="filter-trigger {versionActive ? 'filter-trigger-active' : ''}">
                   {versionLabel}
-                  <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+                  <svg role="img" aria-label="Open version filter" class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
                 </Popover.Trigger>
                 <Popover.Content class="filter-popover">
                   <VersionRangeInputs
@@ -328,7 +328,7 @@
               <Popover.Root bind:open={dateOpen}>
                 <Popover.Trigger class="filter-trigger {dateActive ? 'filter-trigger-active' : ''}">
                   {dateLabel}
-                  <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+                  <svg role="img" aria-label="Open date filter" class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
                 </Popover.Trigger>
                 <Popover.Content class="filter-popover-date">
                   <DateTimeRange

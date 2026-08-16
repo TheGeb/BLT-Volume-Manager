@@ -1,10 +1,11 @@
 <script lang="ts">
-  let { value = $bindable(''), fullPath = $bindable(false), placeholder = 'Filter...', fill = false, onEnter }: {
+  let { value = $bindable(''), fullPath = $bindable(false), placeholder = 'Filter...', fill = false, onEnter, databaseIcon = false }: {
     value?: string;
     fullPath?: boolean;
     placeholder?: string;
     fill?: boolean;
     onEnter?: () => void;
+    databaseIcon?: boolean;
   } = $props();
 </script>
 
@@ -15,9 +16,9 @@
   data-tip={fullPath ? 'Full path search (on)' : 'Full path search (off)'}
   onclick={() => fullPath = !fullPath}>
   {#if fullPath}
-    <span class="material-icon" aria-hidden="true" style="mask: url('/manage_search.svg') no-repeat center / contain; width:16px;height:16px;"></span>
+    <span class="material-icon" aria-hidden="true" style="mask: url('/material/manage_search.svg') no-repeat center / contain; width:18px;height:18px;"></span>
   {:else}
-    <span class="material-icon" aria-hidden="true" style="mask: url('/document_search.svg') no-repeat center / contain; width:16px;height:16px;"></span>
+    <span class="material-icon" aria-hidden="true" style="mask: url('{databaseIcon ? '/material/database_search.svg' : '/material/document_search.svg'}') no-repeat center / contain; width:18px;height:18px;"></span>
   {/if}
 </button>
 

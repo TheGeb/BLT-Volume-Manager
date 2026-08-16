@@ -139,8 +139,8 @@ h1 {
   vertical-align: middle;
 }
 
-/* Renders a Material Symbols icon from a file (see /public/*.svg) using the
-   current text color. Set mask-image inline (e.g. url('/sync.svg')). */
+/* Renders a Material Symbols icon from a file (see /public/material/*.svg) using
+   the current text color. Set mask-image inline (e.g. url('/material/sync.svg')). */
 .material-icon {
   display: inline-block;
   width: 24px;
