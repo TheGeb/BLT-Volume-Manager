@@ -8,12 +8,14 @@
   import RepoPage from './routes/repo/RepoPage.svelte';
   import DevTools from './components/DevTools.svelte';
   import Modal from './components/Modal.svelte';
+  import MigrationModal from './components/MigrationModal.svelte';
   import SnapshotPicker from './components/SnapshotPicker.svelte';
   import { get } from 'svelte/store';
   import { showToast } from '$lib/stores/toast';
   import {
     volumes, selectedVolume, volumeOwnerInfo, volumesLoading,
     deleteVolModal, deleteConfirmText, deleteVolLoading, filteredVolumes,
+    deleteRepoNotDeletable, deleteRepoPath, deleteAcknowledged,
     copyVolModal, renameVolModal, copyRenameSource, copyRenameTarget, copyRenameLoading, copyRenameError,
     copySnapshots, copySnapshotsLoading, copySnapshotMode, copySelectedSnapshotIds, copyRestorePointID,
     loadVolumes,
@@ -24,6 +26,7 @@
     confirmDeleteSnapshot
   } from '$lib/stores/snapshots';
   import { themeDark, loading, activeTab, devMode, toggleTheme, loadDevMode, currentAccent, setAccentColor, accentColors } from '$lib/stores/repo';
+  import { openMigrateModal } from '$lib/stores/migration';
   import { fetchVersion } from '$lib/api';
   import type { VersionInfo } from '$lib/api';
   import {
@@ -326,6 +329,9 @@
           <path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/>
         </svg>
       </button>
+      <button class="button-icon" title="Migrate metadata between S3 and etcd backends" on:click={openMigrateModal}>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
+      </button>
       <div class="color-picker-wrapper">
         <button class="button-icon" title="Choose accent color" on:click|stopPropagation={() => showColorPicker = !showColorPicker}>
           <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor">
@@ -396,6 +402,24 @@
   <p style="margin:0 0 16px;color:var(--yellow);font-size:0.9rem;">
     Make sure no other hosts are still using this volume before proceeding.
   </p>
+  {#if $deleteRepoNotDeletable}
+    <div style="border:1px solid color-mix(in srgb, var(--red), transparent 50%);border-radius:8px;padding:10px 12px;margin:0 0 12px;background:color-mix(in srgb, var(--red), transparent 92%);">
+      <p style="margin:0 0 6px;color:var(--red);font-size:0.85rem;font-weight:600;">
+        Backup data cannot be deleted automatically
+      </p>
+      <p style="margin:0 0 6px;color:var(--muted);font-size:0.85rem;">
+        This volume's backup data lives on a remote backend (rest/sftp/rclone)
+        that has no safe automatic delete. You must remove it manually from:
+      </p>
+      <code style="display:block;margin:0 0 8px;font-size:0.8rem;word-break:break-all;color:var(--text);">
+        {$deleteRepoPath}
+      </code>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.85rem;cursor:pointer;color:var(--text);">
+        <input type="checkbox" style="margin-top:2px;" bind:checked={$deleteAcknowledged} />
+        <span>I acknowledge that I will delete the backup data from the remote myself.</span>
+      </label>
+    </div>
+  {/if}
   <p style="margin:0 0 8px;font-size:0.85rem;">
     Type <strong>{$selectedVolume}</strong> to confirm:
   </p>
@@ -405,7 +429,7 @@
   <div class="modal-footer">
     <Button.Root class="button button-secondary" onclick={() => $deleteVolModal = false}>Cancel</Button.Root>
     <Button.Root class="button button-destructive"
-      disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading}
+      disabled={$deleteConfirmText !== $selectedVolume || $deleteVolLoading || ($deleteRepoNotDeletable && !$deleteAcknowledged)}
       onclick={confirmDeleteVolume}>
       {$deleteVolLoading ? 'Deleting...' : 'Delete'}
     </Button.Root>
@@ -548,3 +572,5 @@
     <Button.Root class="button button-secondary" onclick={() => showInfoModal = false}>Close</Button.Root>
   </div>
 </Modal>
+
+<MigrationModal />

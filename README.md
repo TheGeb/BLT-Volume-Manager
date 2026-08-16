@@ -1,6 +1,6 @@
 # BLT Volume Manager
 
-**Backup + Lock + Transfer** — A Docker volume plugin that uses restic to backup volumes to S3 and uses ownership to coordinate access between multiple hosts.
+**Backup + Lock + Transfer** - A Docker volume plugin that uses restic to backup volumes to S3 and uses ownership to coordinate access between multiple hosts.
 
 Features
 
@@ -36,8 +36,26 @@ RESTIC_PASSWORD=changeme
 # Dedicated S3 bucket for owner locks (defaults to the restic bucket if unset)
 # OWNER_LOCK_S3_BUCKET=your-owner-bucket
 
-# Maximum owner hold duration in minutes (default: 10)
-# OWNER_MAX_MINS=10
+# Maximum owner hold duration in minutes (default: 5). For "mount" mode this
+# is the outage-recovery window: the lock is renewed every ~2 min while a volume
+# is attached (S3) or kept alive via keepalive (etcd), and released on graceful
+# detach, so the TTL only matters after an outage (the owner stops renewing).
+# OWNER_MAX_MINS=5
+#
+# Lock mode: "create" (default) holds a permanent owner lock from volume
+# creation until removal; "mount" acquires a TTL lock on each container mount.
+# BLT_LOCK_MODE=create
+#
+# For "mount" mode, etcd is recommended over S3: etcd keeps the lock held
+# (keepalive heartbeat) for the live owner and hands it over cleanly, whereas
+# S3 relies on wall-clock TTL + compare-and-list, which is best-effort under
+# concurrent writers.
+
+# Per-volume owner-lock TTL in minutes (optional). Set the init-time option
+# at volume create to override OWNER_MAX_MINS for that volume only:
+#   docker volume create -d blt-volume-manager --name app-data \
+#     -o init_lock_ttl_mins=30
+# Init-time options only apply at create and are stamped into the volume config.
 
 # Force path-style S3 addressing (set to 1 or true for MinIO, Garage, etc.)
 # S3_FORCE_PATH_STYLE=1
@@ -71,6 +89,15 @@ Next steps
 - Ensure `restic` **v0.17.0 or newer** is installed in the runtime image (the shipped Docker image pins restic 0.19.1). BLT-Volume-Manager relies on restic's documented exit code `10` for "repository does not exist", which restic only reports since v0.17.0. Set `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` (and AWS credentials) for S3. When `RESTIC_FROM_PASSWORD` is unset it defaults to `RESTIC_PASSWORD` (used by volume copy/rename).
 
 A browser-based UI is available when you start the binary with `--http-addr`, for example `--http-addr ":8080"`.
+
+Metadata migration
+
+- A `migrate` subcommand of the web binary (available in the web image too)
+  migrates metadata (owner locks, registered volumes, version counters, restore
+  points) between the S3 and etcd backends. Owner locks are migrated with a
+  refreshed expiry so active locks remain valid. Run `blt-volume-manager-web
+  migrate --from-type etcd --to-type s3 ...`; use `--dry-run` to preview. Full
+  instructions: [docs/migration.md](docs/migration.md).
 
 Installation
 

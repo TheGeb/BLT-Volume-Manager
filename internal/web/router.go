@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/web/migration"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/owner"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/repo"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
@@ -25,6 +26,7 @@ func Register(s *server.BLTService, mux *http.ServeMux) error {
 	registerSnapshotRoutes(s, inner)
 	registerVolumeRoutes(s, inner)
 	registerStatsRoutes(s, inner)
+	registerMigrateRoutes(s, inner)
 	registerDevRoutes(s, inner)
 
 	uiFS, err := initUI()
@@ -99,6 +101,12 @@ func registerStatsRoutes(s *server.BLTService, inner *http.ServeMux) {
 	})
 	inner.HandleFunc("/api/stats/refresh", func(w http.ResponseWriter, r *http.Request) {
 		repo.RefreshStats(s, w, r)
+	})
+}
+
+func registerMigrateRoutes(s *server.BLTService, inner *http.ServeMux) {
+	inner.HandleFunc("/api/migrate", func(w http.ResponseWriter, r *http.Request) {
+		migration.RunMigration(s, w, r)
 	})
 }
 

@@ -396,7 +396,7 @@
                       {/if}
                     {/if}
                   {:else if !loading && !ownerStyles[idx]}
-                    <span class="owner-badge">—</span>
+                    <span class="owner-badge">-</span>
                   {/if}
                 </span>
               {/if}
@@ -565,9 +565,9 @@
     font-size: 0.9rem; font-weight: 600; color: var(--muted);
   }
   .owner-owned { color: var(--accent); }
-  .owner-unclaimed { color: var(--muted); }
+  .owner-unclaimed { color: var(--muted); opacity: 0.2; transition: opacity 0.25s ease; }
+  .tree-row-wrap:hover .owner-unclaimed { opacity: 1; }
   .owner-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .owner-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
   .vol-actions {
     display: flex;

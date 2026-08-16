@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# update-nix-hashes.sh — Update vendorHash or npmDepsHash in flake.nix
+# update-nix-hashes.sh - Update vendorHash or npmDepsHash in flake.nix
 #
 # Usage:
 #   scripts/update-nix-hashes.sh vendor   # update vendorHash

@@ -10,7 +10,12 @@ import (
 
 type Backend = backend.Backend
 
-var NewS3Backend = backend.NewS3Backend
+var (
+	NewS3Backend         = backend.NewS3Backend
+	NewFileBackend       = backend.NewFileBackend
+	DeleteBackendForRepo = backend.DeleteBackendForRepo
+	IsS3Repo             = backend.IsS3Repo
+)
 
 type Option func(*Manager)
 

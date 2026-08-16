@@ -434,7 +434,7 @@
         {/if}
         <span class="snap-meta-item">{new Date(snapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(snapshot.time).toLocaleTimeString()}</span></span>
         <span class="snap-meta-item">Type: <strong>{snapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
-        <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+        <span class="snap-meta-item">Size: {#if snapSizes[snapshot.id]}<strong>{snapSizes[snapshot.id]}</strong>{:else if snapSizeLoading[snapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">-</span>{/if}</span>
       </div>
     </div>
     <button class="button button-xs mode-toggle diff-compare-btn" aria-label="Compare with another snapshot" data-tip="Compare with another snapshot" onclick={onOpenDiffPicker}>
@@ -453,7 +453,7 @@
             {/if}
             <span class="snap-meta-item">{new Date(diffOtherSnapshot.time).toLocaleDateString()} <span class="snap-meta-muted">{new Date(diffOtherSnapshot.time).toLocaleTimeString()}</span></span>
             <span class="snap-meta-item">Type: <strong>{diffOtherSnapshot.tags.includes('hot') ? 'Hot' : 'Cold'}</strong></span>
-            <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">—</span>{/if}</span>
+            <span class="snap-meta-item">Size: {#if snapSizes[diffOtherSnapshot.id]}<strong>{snapSizes[diffOtherSnapshot.id]}</strong>{:else if snapSizeLoading[diffOtherSnapshot.id]}<Spinner size={10} />{:else}<span class="snap-meta-muted">-</span>{/if}</span>
           </div>
         </div>
       </div>

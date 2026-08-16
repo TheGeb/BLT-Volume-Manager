@@ -1,4 +1,4 @@
-import type { Snapshot, OwnerStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult } from './types';
+import type { Snapshot, OwnerStatus, StatsResponse, SnapshotsResponse, BatchDeleteResponse, FileNode, DiffResult, MigrationBackendSpec, MigrationResult } from './types';
 
 function validateSnapshotsResponse(data: unknown): SnapshotsResponse {
 	if (!data || typeof data !== 'object') throw new Error('invalid snapshots response');
@@ -251,12 +251,28 @@ export async function deleteRestorePoint(volume: string): Promise<void> {
   }
 }
 
-export async function deleteVolume(volume: string): Promise<void> {
+export async function deleteVolume(volume: string): Promise<{ status: string; warning?: string }> {
   const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}`, { method: 'DELETE' });
-  if (!resp.ok) {
-    const d = await resp.json() as { error?: string };
-    throw new Error(d.error ?? 'delete failed');
-  }
+  return parseResponse<{ status: string; warning?: string }>(resp);
+}
+
+export interface VolumeDeleteInfo {
+  repo_deletable: boolean;
+  repo_path: string;
+}
+
+export async function fetchVolumeDeleteInfo(volume: string): Promise<VolumeDeleteInfo> {
+  const resp = await fetch(`/api/volume/${encodeURIComponent(volume)}/delete-info`);
+  return parseResponse<VolumeDeleteInfo>(resp);
+}
+
+export async function runMigration(dryRun: boolean, from: MigrationBackendSpec, to: MigrationBackendSpec): Promise<MigrationResult> {
+  const resp = await fetch('/api/migrate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dry_run: dryRun, from, to }),
+  });
+  return parseResponse<MigrationResult>(resp);
 }
 
 export async function checkRepo(volume: string): Promise<string> {

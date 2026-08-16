@@ -126,7 +126,7 @@
                      {#if sn.tags.includes(t)}
                        <span class="type-badge">{t}</span>
                      {/if}
-                   {:else}—
+                   {:else}-
                    {/each}
                  </td>
                  <td style="text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">
@@ -150,7 +150,7 @@
                      </button>
                    {/if}
                  </td>
-                <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '—'}</td>
+                <td style="color:var(--muted);font-size:0.9rem;">{sn.hostname || '-'}</td>
                 <td>{new Date(sn.time).toLocaleDateString()}<br>
                   <span style="font-size:0.85rem;color:var(--muted);">{new Date(sn.time).toLocaleTimeString()}</span>
                 </td>

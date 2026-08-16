@@ -337,7 +337,7 @@ func testAPIFallbackHashComprehensive(t *testing.T, ts *testServer, volName stri
 	}
 	directContent, _ := io.ReadAll(resp.Body)
 
-	// Dump via fake ID + fallbackHash — must match
+	// Dump via fake ID + fallbackHash - must match
 	resp2 := DoRequest(t, ts.URL, "GET",
 		"/api/snapshot-view/fake-id/dump?volume="+volName+"&path=/readme.txt&fallbackHash="+fh, nil)
 	defer resp2.Body.Close()

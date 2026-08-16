@@ -247,6 +247,15 @@ func TestNewManagerLocalPath(t *testing.T) {
 	}
 }
 
+func TestDeleteRepoNoBackendNoop(t *testing.T) {
+	t.Parallel()
+	m := NewManager("/data/restic/vol1")
+	err := m.DeleteRepo(context.Background())
+	if !errors.Is(err, ErrRepoDeleteUnsupported) {
+		t.Errorf("expected ErrRepoDeleteUnsupported for backend-less manager, got %v", err)
+	}
+}
+
 func TestFindSnapshotByHashEmpty(t *testing.T) {
 	t.Parallel()
 	m := NewManager("/nonexistent/repo")

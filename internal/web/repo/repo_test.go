@@ -63,7 +63,7 @@ func TestRepoRouteGuards(t *testing.T) {
 func TestRefreshStats(t *testing.T) {
 	t.Parallel()
 	var b noopBackend
-	s := server.New(cfg.Config{}, b)
+	s := server.New(cfg.Config{}, store.NewS3MetadataStore(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/stats/refresh", nil)
 	rec := httptest.NewRecorder()
 	RefreshStats(s, rec, req)

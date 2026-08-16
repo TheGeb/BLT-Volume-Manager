@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -185,7 +186,7 @@ func TestValidVolumeName(t *testing.T) {
 }
 
 func newTestService(b *mockBackend, restic *mockResticBackend) *server.BLTService {
-	return server.New(cfg.Config{S3Bucket: "test-bucket"}, b,
+	return server.New(cfg.Config{S3Bucket: "test-bucket"}, store.NewS3MetadataStore(b),
 		server.WithResticBackend(restic),
 	)
 }
@@ -291,5 +292,99 @@ func TestDeleteVolume_InvalidName(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("DeleteVolume(%q) = %d, want 400", name, rec.Code)
 		}
+	}
+}
+
+func TestDeleteVolume_UnsupportedBackendWarning(t *testing.T) {
+	t.Parallel()
+	// No restic backend configured -> repo deletion unsupported (rest:,
+	// sftp:, rclone:, ...). Metadata is still removed; the response carries a
+	// warning pointing at the repo path.
+	b := &mockBackend{}
+	s := server.New(cfg.Config{S3Bucket: "test-bucket", ResticBase: "rest:http://backup:8000/repo"}, store.NewS3MetadataStore(b))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/volume/test-vol", nil)
+	rec := httptest.NewRecorder()
+	DeleteVolume(s, rec, req, "test-vol")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 with warning, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Status  string `json:"status"`
+		Warning string `json:"warning"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if resp.Warning == "" {
+		t.Error("expected a warning that backup data must be removed manually")
+	}
+	if !strings.Contains(resp.Warning, "rest:http://backup:8000/repo/restic/test-vol") {
+		t.Errorf("warning should mention the repo path, got %q", resp.Warning)
+	}
+	// Metadata delete still ran.
+	b.mu.Lock()
+	got := append([]string(nil), b.calls...)
+	b.mu.Unlock()
+	if len(got) == 0 {
+		t.Error("expected metadata deletion calls to run")
+	}
+}
+
+func TestDeleteVolumeDeleteInfo(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name      string
+		restic    *mockResticBackend
+		deletable bool
+		repoPath  string
+	}{
+		{"with backend", &mockResticBackend{}, true, "rest:http://backup:8000/repo/restic/test-vol"},
+		{"without backend", nil, false, "rest:http://backup:8000/repo/restic/test-vol"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			var s *server.BLTService
+			b := &mockBackend{}
+			if tt.restic != nil {
+				s = server.New(cfg.Config{S3Bucket: "test-bucket", ResticBase: "rest:http://backup:8000/repo"}, store.NewS3MetadataStore(b),
+					server.WithResticBackend(tt.restic))
+			} else {
+				s = server.New(cfg.Config{S3Bucket: "test-bucket", ResticBase: "rest:http://backup:8000/repo"}, store.NewS3MetadataStore(b))
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/volume/test-vol/delete-info", nil)
+			rec := httptest.NewRecorder()
+			VolumeDeleteInfo(s, rec, req, "test-vol")
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+			var resp struct {
+				RepoDeletable bool   `json:"repo_deletable"`
+				RepoPath      string `json:"repo_path"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("json.Unmarshal: %v", err)
+			}
+			if resp.RepoDeletable != tt.deletable {
+				t.Errorf("repo_deletable = %v, want %v", resp.RepoDeletable, tt.deletable)
+			}
+			if resp.RepoPath != tt.repoPath {
+				t.Errorf("repo_path = %q, want %q", resp.RepoPath, tt.repoPath)
+			}
+		})
+	}
+}
+
+func TestDeleteVolumeDeleteInfoMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+	s := server.New(cfg.Config{S3Bucket: "test-bucket"}, store.NewS3MetadataStore(&mockBackend{}))
+	req := httptest.NewRequest(http.MethodPost, "/api/volume/test-vol/delete-info", nil)
+	rec := httptest.NewRecorder()
+	VolumeDeleteInfo(s, rec, req, "test-vol")
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405, got %d", rec.Code)
 	}
 }

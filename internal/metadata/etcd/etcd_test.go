@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -75,7 +76,7 @@ func TestAcquireLock_Success(t *testing.T) {
 	cleanKeys(t, cli, lockKey)
 	defer cleanKeys(t, cli, lockKey)
 
-	key, err := cli.AcquireLock(ctx, t.Name(), "owner1", 30)
+	key, err := cli.AcquireLock(ctx, t.Name(), "owner1", time.Now().Add(30*time.Second).Unix())
 	if err != nil {
 		t.Fatalf("AcquireLock() error: %v", err)
 	}
@@ -102,13 +103,13 @@ func TestAcquireLock_Conflict(t *testing.T) {
 	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
 
 	// First acquisition should succeed
-	_, err := cli.AcquireLock(ctx, t.Name(), "owner1", 30)
+	_, err := cli.AcquireLock(ctx, t.Name(), "owner1", time.Now().Add(30*time.Second).Unix())
 	if err != nil {
 		t.Fatalf("first AcquireLock() error: %v", err)
 	}
 
 	// Second acquisition should fail with ErrLockConflict
-	_, err = cli.AcquireLock(ctx, t.Name(), "owner2", 30)
+	_, err = cli.AcquireLock(ctx, t.Name(), "owner2", time.Now().Add(30*time.Second).Unix())
 	if err != store.ErrLockConflict {
 		t.Fatalf("expected ErrLockConflict, got %v", err)
 	}
@@ -135,7 +136,7 @@ func TestAcquireLock_Concurrent(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			owner := "owner-" + strings.TrimPrefix(t.Name(), "/")
-			_, err := cli.AcquireLock(ctx, t.Name(), owner, 30)
+			_, err := cli.AcquireLock(ctx, t.Name(), owner, time.Now().Add(30*time.Second).Unix())
 			mu.Lock()
 			if err == nil {
 				wins++
@@ -164,19 +165,19 @@ func TestFindLock(t *testing.T) {
 	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
 
 	// Without a lock, FindLock should return ErrKeyNotFound
-	_, _, _, _, err := cli.FindLock(ctx, t.Name())
+	_, _, _, _, _, err := cli.FindLock(ctx, t.Name())
 	if err != store.ErrKeyNotFound {
 		t.Fatalf("expected ErrKeyNotFound, got %v", err)
 	}
 
 	// Acquire lock
-	_, err = cli.AcquireLock(ctx, t.Name(), "test-owner", 30)
+	_, err = cli.AcquireLock(ctx, t.Name(), "test-owner", time.Now().Add(30*time.Second).Unix())
 	if err != nil {
 		t.Fatalf("AcquireLock() error: %v", err)
 	}
 
 	// Find it
-	key, owner, creation, expiry, err := cli.FindLock(ctx, t.Name())
+	key, owner, creation, expiry, _, err := cli.FindLock(ctx, t.Name())
 	if err != nil {
 		t.Fatalf("FindLock() error: %v", err)
 	}
@@ -405,6 +406,84 @@ func TestVersionStore_EtcdBackend(t *testing.T) {
 	}
 }
 
+// --- SetMigratedOwnerLock tests ---
+
+func TestSetMigratedOwnerLock_Acquire(t *testing.T) {
+	addr := etcdAddr(t)
+	cli := newEtcdClient(t, addr)
+	ctx := context.Background()
+
+	key := store.OwnerKeyspace + t.Name() + "/lock"
+	cleanKeys(t, cli, key)
+	defer cleanKeys(t, cli, key)
+
+	expiry := time.Now().Add(30 * time.Second).Unix()
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "host-1", expiry); err != nil {
+		t.Fatalf("SetMigratedOwnerLock: %v", err)
+	}
+
+	valid, verr := cli.LockIsValid(ctx, key)
+	if verr != nil {
+		t.Fatalf("LockIsValid: %v", verr)
+	}
+	if !valid {
+		t.Fatal("expected lock to be valid")
+	}
+	_, owner, _, gotExpiry, _, ferr := cli.FindLock(ctx, t.Name())
+	if ferr != nil {
+		t.Fatalf("FindLock: %v", ferr)
+	}
+	if owner != "host-1" {
+		t.Errorf("owner = %q, want %q", owner, "host-1")
+	}
+	if gotExpiry != expiry {
+		t.Errorf("expiry = %d, want %d", gotExpiry, expiry)
+	}
+}
+
+func TestSetMigratedOwnerLock_SameOwnerRefreshes(t *testing.T) {
+	addr := etcdAddr(t)
+	cli := newEtcdClient(t, addr)
+	ctx := context.Background()
+
+	key := store.OwnerKeyspace + t.Name() + "/lock"
+	cleanKeys(t, cli, key)
+	defer cleanKeys(t, cli, key)
+
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "host-1", time.Now().Add(time.Hour).Unix()); err != nil {
+		t.Fatalf("SetMigratedOwnerLock: %v", err)
+	}
+	// Re-writing the same owner must not conflict.
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "host-1", time.Now().Add(2*time.Hour).Unix()); err != nil {
+		t.Fatalf("SetMigratedOwnerLock (same owner): %v", err)
+	}
+}
+
+func TestSetMigratedOwnerLock_DifferentOwnerConflicts(t *testing.T) {
+	addr := etcdAddr(t)
+	cli := newEtcdClient(t, addr)
+	ctx := context.Background()
+
+	key := store.OwnerKeyspace + t.Name() + "/lock"
+	cleanKeys(t, cli, key)
+	defer cleanKeys(t, cli, key)
+
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "host-1", time.Now().Add(time.Hour).Unix()); err != nil {
+		t.Fatalf("SetMigratedOwnerLock: %v", err)
+	}
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "host-2", time.Now().Add(time.Hour).Unix()); !errors.Is(err, store.ErrLockConflict) {
+		t.Fatalf("expected ErrLockConflict, got %v", err)
+	}
+	// The original owner's lock must remain intact.
+	_, owner, _, _, _, ferr := cli.FindLock(ctx, t.Name())
+	if ferr != nil {
+		t.Fatalf("FindLock: %v", ferr)
+	}
+	if owner != "host-1" {
+		t.Errorf("owner = %q, want %q", owner, "host-1")
+	}
+}
+
 // --- Lease expiration tests ---
 
 func TestLeaseKeepAliveHeldUntilRelease(t *testing.T) {
@@ -415,7 +494,7 @@ func TestLeaseKeepAliveHeldUntilRelease(t *testing.T) {
 	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
 
 	// Acquire with very short TTL (2 seconds)
-	key, err := cli.AcquireLock(ctx, t.Name(), "owner1", 2)
+	key, err := cli.AcquireLock(ctx, t.Name(), "owner1", time.Now().Add(2*time.Second).Unix())
 	if err != nil {
 		t.Fatalf("AcquireLock() error: %v", err)
 	}

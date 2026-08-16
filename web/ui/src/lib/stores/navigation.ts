@@ -4,7 +4,7 @@ import type { Snapshot } from '../types';
 import { versionTag } from '../util';
 import * as api from '../api';
 import { showToast } from './toast';
-import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading } from './volumes';
+import { selectedVolume, landingShown, loadVolumes, deleteConfirmText, deleteVolModal, deleteVolLoading, deleteRepoNotDeletable, deleteAcknowledged } from './volumes';
 import { activeTab, loadOwnerStatus, loadStats, stats as repoStats, ownerStatus, doSwitchTab } from './repo';
 import { snapshots, loadSnapshots, allSnapshots, currentSnapshot, viewerOpen, diffTargetId, sizes, deleteSnapModal, findSnapshot, findSnapshotByVersion } from './snapshots';
 
@@ -116,12 +116,17 @@ export function switchTab(tab: 'snapshots' | 'repo') {
 export async function confirmDeleteVolume() {
   const vol = get(selectedVolume);
   if (!vol || get(deleteConfirmText) !== vol) return;
+  if (get(deleteRepoNotDeletable) && !get(deleteAcknowledged)) return;
   deleteVolLoading.set(true);
   try {
-    await api.deleteVolume(vol);
+    const result = await api.deleteVolume(vol);
     deleteVolModal.set(false);
     deleteVolLoading.set(false);
-    showToast(`Volume ${vol} deleted`);
+    if (result.warning) {
+      showToast(result.warning, true);
+    } else {
+      showToast(`Volume ${vol} deleted`);
+    }
     selectedVolume.set('');
     landingShown.set(true);
     currentSnapshot.set(null);

@@ -11,6 +11,7 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app/log"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/migrate"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/restic"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/s3"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web"
@@ -18,12 +19,16 @@ import (
 )
 
 func main() {
+	cfg.LoadEnv()
+	// Subcommand: migrate metadata between backends (e.g.
+	// "blt-volume-manager-web migrate --from-type etcd --to-type s3 ...").
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		os.Exit(migrate.Run(os.Args[2:]))
+	}
 	os.Exit(run())
 }
 
 func run() int {
-	cfg.LoadEnv()
-
 	ctx, stop := app.WithShutdown()
 	defer stop()
 
@@ -64,19 +69,28 @@ func run() int {
 
 	mux := http.NewServeMux()
 
-	// Restic data always lives in S3 regardless of the metadata backend.
-	s3Client, err := s3.NewClient(s3.Config{
-		Bucket:         conf.S3Bucket,
-		Endpoint:       conf.S3Endpoint,
-		Region:         conf.S3Region,
-		ForcePathStyle: conf.S3ForcePathStyle,
-	})
-	if err != nil {
-		log.Error("restic_s3_backend_error", err)
-		return 1
+	// Backend used to delete restic repositories on volume removal. S3
+	// repositories delete objects via an S3 client; local file repositories
+	// remove the repository directory. Other backends (rest:, sftp:,
+	// rclone:, ...) have no delete backend and skip repo deletion.
+	var resticBackend restic.Backend
+	if restic.IsS3Repo(conf.ResticBase) {
+		s3Client, err := s3.NewClient(s3.Config{
+			Bucket:         conf.S3Bucket,
+			Endpoint:       conf.S3Endpoint,
+			Region:         conf.S3Region,
+			ForcePathStyle: conf.S3ForcePathStyle,
+		})
+		if err != nil {
+			log.Error("restic_s3_backend_error", err)
+			return 1
+		}
+		resticBackend = restic.NewS3Backend(s3Client)
+	} else {
+		resticBackend = restic.DeleteBackendForRepo(conf.ResticBase, nil)
 	}
 
-	webSrv := server.New(conf, b, server.WithResticBackend(restic.NewS3Backend(s3Client)))
+	webSrv := server.New(conf, b, server.WithResticBackend(resticBackend))
 	if err := web.Register(webSrv, mux); err != nil {
 		log.Errorf("register_web_routes_failed", err, "http_addr=%s", httpAddr)
 		return 1

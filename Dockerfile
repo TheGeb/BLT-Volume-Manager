@@ -45,21 +45,21 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -X github.com/TheGeb/BLT-Volume-Manager/internal/app.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o blt-volume-manager-web ./cmd/web
 
-# Runtime base — provides a shared non-root user for targets that support it
+# Runtime base - provides a shared non-root user for targets that support it
 FROM restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 AS base
 RUN adduser -D -u 1001 appuser
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 USER appuser
 ENTRYPOINT ["/usr/local/bin/blt-volume-manager"]
 
-# Plugin — requires root for Docker socket and volume mount access
+# Plugin - requires root for Docker socket and volume mount access
 FROM base AS plugin
 # The plugin needs root for Docker socket and volume mount access.
 # hadolint ignore=DL3002
 USER root
 COPY --from=build /src/blt-volume-manager-plugin /usr/local/bin/blt-volume-manager
 
-# Web — can run as non-root
+# Web - can run as non-root
 FROM base AS web
 COPY --from=build /src/blt-volume-manager-web /usr/local/bin/blt-volume-manager
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD ["/usr/local/bin/blt-volume-manager", "--health"]

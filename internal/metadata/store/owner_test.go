@@ -926,7 +926,7 @@ func TestAcquireOwnerLock_MultipleVolumes(t *testing.T) {
 func TestLockIsValid(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	s := NewOwnerStore(b)
+	s := NewOwnerStore(NewS3MetadataStore(b))
 	expiry := time.Now().Add(time.Hour).Unix()
 	futureKey := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
 
@@ -987,7 +987,7 @@ func TestLockIsValid(t *testing.T) {
 func TestReleaseLock(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	s := NewOwnerStore(b)
+	s := NewOwnerStore(NewS3MetadataStore(b))
 	key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", time.Now().Add(time.Hour).Unix())
 	_ = b.PutObject(context.Background(), key, []byte(`{}`))
 
@@ -1003,7 +1003,7 @@ func TestAcquireForVolume(t *testing.T) {
 	t.Parallel()
 	t.Run("success with duration", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", 10)
 		if err != nil {
 			t.Fatalf("AcquireForVolume error: %v", err)
@@ -1015,7 +1015,7 @@ func TestAcquireForVolume(t *testing.T) {
 
 	t.Run("permanent when duration is 0", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", 0)
 		if err != nil {
 			t.Fatalf("AcquireForVolume(0) error: %v", err)
@@ -1027,7 +1027,7 @@ func TestAcquireForVolume(t *testing.T) {
 
 	t.Run("permanent when duration is negative", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		expiry, err := s.AcquireForVolume(context.Background(), "myvol", "myhost", -1)
 		if err != nil {
 			t.Fatalf("AcquireForVolume(-1) error: %v", err)
@@ -1039,7 +1039,7 @@ func TestAcquireForVolume(t *testing.T) {
 
 	t.Run("empty owner name", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		_, err := s.AcquireForVolume(context.Background(), "myvol", "", 10)
 		if err == nil {
 			t.Fatal("expected error for empty owner name")
@@ -1051,7 +1051,7 @@ func TestFindForVolume(t *testing.T) {
 	t.Parallel()
 	t.Run("volume with owner", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		expiry := time.Now().Add(time.Hour).Unix()
 		key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
 		_ = b.PutObject(context.Background(), key, []byte(`{}`))
@@ -1073,7 +1073,7 @@ func TestFindForVolume(t *testing.T) {
 
 	t.Run("volume without owner", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		vo, err := s.FindForVolume(context.Background(), "emptyvol")
 		if err != nil {
 			t.Fatalf("FindForVolume error: %v", err)
@@ -1085,7 +1085,7 @@ func TestFindForVolume(t *testing.T) {
 
 	t.Run("list error", func(t *testing.T) {
 		errBackend := &listErrorBackend{}
-		s := NewOwnerStore(errBackend)
+		s := NewOwnerStore(NewS3MetadataStore(errBackend))
 		_, err := s.FindForVolume(context.Background(), "myvol")
 		if err == nil {
 			t.Fatal("expected error from failing backend")
@@ -1102,7 +1102,7 @@ func (l *listErrorBackend) ListObjects(ctx context.Context, prefix string) ([]s3
 func TestDeleteForVolume(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	s := NewOwnerStore(b)
+	s := NewOwnerStore(NewS3MetadataStore(b))
 	expiry := time.Now().Add(time.Hour).Unix()
 	key := fmt.Sprintf("blt-volume-manager/owners/myvol/host-%d-1h.json", expiry-3600)
 	_ = b.PutObject(context.Background(), key, []byte(`{}`))
@@ -1120,7 +1120,7 @@ func TestListAllGrouped(t *testing.T) {
 	t.Parallel()
 	t.Run("multiple volumes with owners", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		expiry := time.Now().Add(time.Hour).Unix()
 
 		// Create owners for vol1 and vol2
@@ -1154,7 +1154,7 @@ func TestListAllGrouped(t *testing.T) {
 
 	t.Run("no owners", func(t *testing.T) {
 		b := newOrderedBackend()
-		s := NewOwnerStore(b)
+		s := NewOwnerStore(NewS3MetadataStore(b))
 		grouped, err := s.ListAllGrouped(context.Background())
 		if err != nil {
 			t.Fatalf("ListAllGrouped error: %v", err)
@@ -1166,7 +1166,7 @@ func TestListAllGrouped(t *testing.T) {
 
 	t.Run("list error", func(t *testing.T) {
 		errBackend := &listErrorBackend{}
-		s := NewOwnerStore(errBackend)
+		s := NewOwnerStore(NewS3MetadataStore(errBackend))
 		_, err := s.ListAllGrouped(context.Background())
 		if err == nil {
 			t.Fatal("expected error from failing backend")
@@ -1177,7 +1177,7 @@ func TestListAllGrouped(t *testing.T) {
 func TestLockVolume(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	s := NewOwnerStore(b)
+	s := NewOwnerStore(NewS3MetadataStore(b))
 	expiry := time.Now().Add(time.Hour).Unix()
 
 	key, err := s.LockVolume(context.Background(), "myvol", "myhost", expiry)
@@ -1194,7 +1194,7 @@ func TestLockVolume(t *testing.T) {
 func TestLockAcquireReleaseCycle(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	s := NewOwnerStore(b)
+	s := NewOwnerStore(NewS3MetadataStore(b))
 
 	// Acquire
 	expiry := time.Now().Add(30 * time.Minute).Unix()

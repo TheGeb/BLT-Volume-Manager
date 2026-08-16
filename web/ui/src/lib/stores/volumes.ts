@@ -12,6 +12,11 @@ export const volumeOwnerInfo = writable<Record<string, VolumeOwnerInfo>>({});
 export const deleteVolModal = writable(false);
 export const deleteConfirmText = writable('');
 export const deleteVolLoading = writable(false);
+// Set when the volume's restic backend has no safe delete primitive (rest:,
+// sftp:, rclone:, ...); the user must acknowledge before deleting.
+export const deleteRepoNotDeletable = writable(false);
+export const deleteRepoPath = writable('');
+export const deleteAcknowledged = writable(false);
 
 export const copyVolModal = writable(false);
 export const renameVolModal = writable(false);
@@ -76,7 +81,21 @@ export function openDeleteVolModal() {
   const vol = get(selectedVolume);
   if (!vol) return;
   deleteConfirmText.set('');
+  deleteRepoNotDeletable.set(false);
+  deleteRepoPath.set('');
+  deleteAcknowledged.set(false);
   deleteVolModal.set(true);
+  void loadDeleteInfo(vol);
+}
+
+async function loadDeleteInfo(vol: string) {
+  try {
+    const info = await api.fetchVolumeDeleteInfo(vol);
+    deleteRepoNotDeletable.set(!info.repo_deletable);
+    deleteRepoPath.set(info.repo_path);
+  } catch {
+    // Default to deletable; no acknowledgment required if we can't check.
+  }
 }
 
 export function openCopyVolModal(vol: string) {
