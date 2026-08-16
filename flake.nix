@@ -18,7 +18,7 @@
           pname = "blt-volume-manager-ui";
           version = version;
           src = ./web/ui;
-          npmDepsHash = "sha256-ErqUzOvgdpo1JWp2HL6QjG8SSvx33DV9YhkW6sEVFPo=";
+          npmDepsHash = "sha256-PMoIJZhErH1AWpLD6sut0gF20gc/SJA3VgU934iYzKk=";
           installPhase = ''
             mkdir -p $out
             cp -r dist/. $out/
