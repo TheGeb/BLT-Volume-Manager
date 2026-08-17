@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TheGeb/BLT-Volume-Manager/internal/migrate"
+	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
@@ -27,14 +29,15 @@ type volumePluginResponse struct {
 
 func setupPluginTest(t *testing.T, backendType string) string {
 	t.Helper()
+	return startPluginDriver(t, t.TempDir(), driverEnv(t, backendType))
+}
 
-	setupLogCapture(t)
-
+// driverEnv starts the storage backends needed by backendType (a Garage S3
+// instance, plus etcd when requested) and returns the driver environment for
+// them.
+func driverEnv(t *testing.T, backendType string) []string {
+	t.Helper()
 	garage := StartGarage(t)
-
-	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
-	dataDir := t.TempDir()
-
 	env := append(os.Environ(),
 		"BLT_LISTEN=1",
 		"RESTIC_REPOSITORY=s3:"+garage.Endpoint+"/"+garage.BucketName,
@@ -46,6 +49,17 @@ func setupPluginTest(t *testing.T, backendType string) string {
 		env = append(env, "BLT_METADATA_BACKEND=etcd")
 		env = append(env, "ETCD_ENDPOINTS="+etcd.Endpoint)
 	}
+	return env
+}
+
+// startPluginDriver boots a driver binary with the given environment and data
+// directory, returning its unix socket path.
+func startPluginDriver(t *testing.T, dataDir string, env []string) string {
+	t.Helper()
+
+	setupLogCapture(t)
+
+	socketPath := filepath.Join(t.TempDir(), "plugin.sock")
 
 	cmd := exec.Command(driverBin, "-data-dir", dataDir, "-socket", socketPath)
 	cmd.Env = env
@@ -232,5 +246,89 @@ func TestPlugin(t *testing.T) {
 			t.Run("FullLifecycle", func(t *testing.T) { testPluginFullLifecycle(t, socket) })
 			t.Run("EdgeCases", func(t *testing.T) { testPluginEdgeCases(t, socket) })
 		})
+	}
+}
+
+// TestPluginMigrationCutover exercises the operator flow the migration tool
+// exists for, in both directions: a host mounts a volume, the metadata is
+// migrated to the other backend, and a fresh host (restarted against the new
+// backend, same data dir) mounts the same volume - the migrated lock must be
+// taken over cleanly instead of blocking the mount.
+func TestPluginMigrationCutover(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		from string
+		to   string
+	}{
+		{"s3ToEtcd", "s3", "etcd"},
+		{"etcdToS3", "etcd", "s3"},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			testPluginMigrationCutover(t, tt.from, tt.to)
+		})
+	}
+}
+
+func testPluginMigrationCutover(t *testing.T, from, to string) {
+	t.Helper()
+	setupLogCapture(t)
+
+	ctx := context.Background()
+
+	// One Garage + one etcd, shared by both driver generations.
+	garage := StartGarage(t)
+	etcd := StartEtcd(t)
+
+	envFor := func(backendType string) []string {
+		env := append(os.Environ(),
+			"BLT_LISTEN=1",
+			"RESTIC_REPOSITORY=s3:"+garage.Endpoint+"/"+garage.BucketName,
+			"S3_ENDPOINT="+garage.Endpoint,
+			"S3_REGION=us-east-1",
+		)
+		if backendType == "etcd" {
+			env = append(env, "BLT_METADATA_BACKEND=etcd", "ETCD_ENDPOINTS="+etcd.Endpoint)
+		}
+		return env
+	}
+	fromCfg, toCfg := s3MetaConfig(garage), etcdMetaConfig(etcd)
+	if from == "etcd" {
+		fromCfg, toCfg = toCfg, fromCfg
+	}
+
+	dataDir := t.TempDir()
+
+	// StartEtcd returns the shared etcd instance, so each direction needs its
+	// own volume name to keep the keyspaces isolated when run in parallel.
+	volName := "mig-vol-" + from + "-to-" + to
+
+	// Original host against the source backend: create and mount the volume.
+	srcSock := startPluginDriver(t, dataDir, envFor(from))
+	pluginOK(t, srcSock, "VolumeDriver.Create", volume.CreateRequest{Name: volName})
+	pluginOK(t, srcSock, "VolumeDriver.Mount", volume.MountRequest{Name: volName, ID: "mig-1"})
+
+	// Copy all metadata to the target backend.
+	if _, err := migrate.MigrateBackends(ctx, fromCfg, toCfg, false); err != nil {
+		t.Fatalf("migrate %s->%s: %v", from, to, err)
+	}
+
+	// Cutover: a fresh host restarted against the target backend (same data
+	// dir, so the persisted volume config is present) mounts the volume. The
+	// migrated lock is a handoff with no live holder and must be taken over.
+	dstSock := startPluginDriver(t, dataDir, envFor(to))
+	pluginOK(t, dstSock, "VolumeDriver.Mount", volume.MountRequest{Name: volName, ID: "mig-2"})
+
+	// After the takeover the target lock must be a live, non-migrated lock.
+	vo, err := store.NewOwnerStore(openMeta(t, toCfg)).FindForVolume(ctx, volName)
+	if err != nil {
+		t.Fatalf("find owner on target: %v", err)
+	}
+	if vo.Owner == "" {
+		t.Fatal("expected the cutover host to own the volume on the target backend")
+	}
+	if vo.Migrated {
+		t.Error("lock must no longer be a migrated handoff after takeover")
 	}
 }

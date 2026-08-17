@@ -369,7 +369,15 @@ func (d *Driver) Mount(r *volume.MountRequest) (res *volume.MountResponse, err e
 		d.mountMu.Unlock()
 
 		if needsLock {
-			lockKey, lockErr := d.ownerStore.CheckAndUpdateLock(context.Background(), name, ownerName(), d.lockExpiry(vi.LockTTLMins))
+			lockExpiry := d.lockExpiry(vi.LockTTLMins)
+			if d.lockMode == appcfg.LockModeCreate {
+				// Create-mode volumes hold a permanent lock from create to
+				// remove. A re-acquired lock (the persisted key was lost or
+				// expired) must be permanent too: renewal is a no-op in this
+				// mode, so a time-limited lock would silently lapse mid-mount.
+				lockExpiry = 0
+			}
+			lockKey, lockErr := d.ownerStore.CheckAndUpdateLock(context.Background(), name, ownerName(), lockExpiry)
 			if lockErr != nil {
 				d.mu.Lock()
 				vi.attached--

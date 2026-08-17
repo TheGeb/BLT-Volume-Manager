@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -25,12 +26,72 @@ func (s *s3OwnerLock) AcquireLock(ctx context.Context, volumeName, owner string,
 	return AcquireOwnerLock(ctx, s.b, OwnerPrefix(volumeName), owner, expiry)
 }
 
-// CheckAndUpdateLock for S3 is the same as AcquireLock: a conflicted S3
-// proposal is either stale (never the winner) or genuinely held, and the
-// compare-and-list acquire already handles both. There is no migration
-// "handoff" flag in the proposal format, so there is nothing extra to take over.
+// CheckAndUpdateLock implements store.OwnerLock. Compared to AcquireLock it
+// may also hand over an existing lock on conflict:
+//
+//   - a lock held by the same owner is released and re-proposed with the
+//     requested expiry - this is how mount-mode renewal re-anchors a lock
+//     (compare-and-list leaves no way to win against one's own earlier
+//     proposal, so the old proposal must go first);
+//   - a lock written by the metadata migration tool (a handoff with no live
+//     holder, marked in the proposal body) is taken over so hosts can mount
+//     migrated volumes after cutover;
+//   - a live lock held by another owner is still refused with ErrLockConflict.
 func (s *s3OwnerLock) CheckAndUpdateLock(ctx context.Context, volumeName, owner string, expiry int64) (string, error) {
-	return s.AcquireLock(ctx, volumeName, owner, expiry)
+	for attempt := 0; attempt < 3; attempt++ {
+		key, err := s.AcquireLock(ctx, volumeName, owner, expiry)
+		if err == nil {
+			return key, nil
+		}
+		if !errors.Is(err, ErrLockConflict) {
+			return "", err
+		}
+		winKey, winOwner, winEntry, ferr := s.findWinner(ctx, volumeName)
+		if ferr != nil {
+			return "", ferr
+		}
+		if winKey == "" {
+			continue // lock vanished; retry acquire
+		}
+		takeOver := winOwner == owner || (winEntry != nil && winEntry.Migrated)
+		if !takeOver {
+			return "", ErrLockConflict
+		}
+		// Either our own proposal (renewal) or a migrated handoff with no
+		// live holder; dropping the winner lets the next proposal win.
+		if rerr := s.b.DeleteObjectsWithPrefix(ctx, OwnerPrefix(volumeName)); rerr != nil {
+			return "", fmt.Errorf("release lock for %q: %w", volumeName, rerr)
+		}
+	}
+	return "", fmt.Errorf("acquire or take over lock %q: too many conflicts", volumeName)
+}
+
+// findWinner lists the volume's lock proposals and returns the winning
+// proposal key, the key-encoded owner, and the parsed proposal body (nil when
+// the body is missing or unparseable - the migrated flag then reads as false).
+func (s *s3OwnerLock) findWinner(ctx context.Context, volumeName string) (string, string, *OwnerEntry, error) {
+	objects, err := s.b.ListObjects(ctx, OwnerPrefix(volumeName))
+	if err != nil {
+		return "", "", nil, ClassifyErr(err, "list owner objects")
+	}
+	objects = RemoveStaleObjects(ctx, s.b, objects, DefaultOwnerTTL)
+
+	key, owner, _, _ := determineOwner(objects)
+	if key == "" {
+		return "", "", nil, nil
+	}
+	data, rerr := s.b.ReadObject(ctx, key)
+	if rerr != nil {
+		if errors.Is(rerr, ErrKeyNotFound) {
+			return "", "", nil, nil // vanished between list and read
+		}
+		return "", "", nil, ClassifyErr(rerr, "read owner object")
+	}
+	var entry OwnerEntry
+	if jerr := json.Unmarshal(data, &entry); jerr != nil {
+		return key, owner, nil, nil
+	}
+	return key, owner, &entry, nil
 }
 
 func (s *s3OwnerLock) LockIsValid(ctx context.Context, key string) (bool, error) {

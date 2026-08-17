@@ -40,9 +40,10 @@ type OwnerLock interface {
 	AcquireLock(ctx context.Context, volumeName, owner string, expiry int64) (lockKey string, err error)
 
 	// CheckAndUpdateLock acquires the lock like AcquireLock, except that on
-	// conflict it may take over a lock written by the metadata migration tool
-	// (a handoff with no live holder). A live lock held by another owner is
-	// still refused with ErrLockConflict.
+	// conflict it may refresh a lock the caller already holds (re-stamping its
+	// expiry for renewal) or take over a lock written by the metadata
+	// migration tool (a handoff with no live holder). A live lock held by
+	// another owner is still refused with ErrLockConflict.
 	CheckAndUpdateLock(ctx context.Context, volumeName, owner string, expiry int64) (lockKey string, err error)
 
 	// LockIsValid reports whether lockKey still represents a valid lock.

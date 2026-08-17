@@ -346,11 +346,18 @@ func (c *EtcdClient) monitorKeepAlive(lockKey string, leaseID clientv3.LeaseID, 
 }
 
 // CheckAndUpdateLock implements store.OwnerLock. It acquires the lock like
-// AcquireLock, but on conflict it inspects the existing lock and, only if it is
-// one written by the metadata migration tool (Migrated - a handoff with no live
-// holder), releases it and re-acquires. A live lock held by another owner is
-// never taken over and returns ErrLockConflict.
+// AcquireLock, but on conflict it may refresh or hand over the existing lock:
+//
+//   - a lock already held by the same owner is refreshed in place (its
+//     recorded expiry is re-stamped, the Migrated flag cleared) and the same
+//     key is returned - this is how mount-mode renewal re-anchors a lock
+//     without creating a takeover window;
+//   - a lock written by the metadata migration tool (Migrated - a handoff
+//     with no live holder) is released and re-acquired;
+//   - a live lock held by another owner is never taken over and returns
+//     ErrLockConflict.
 func (c *EtcdClient) CheckAndUpdateLock(ctx context.Context, volumeName, owner string, expiry int64) (string, error) {
+	lockKey := lockKeyFor(volumeName)
 	for attempt := 0; attempt < 3; attempt++ {
 		key, err := c.AcquireLock(ctx, volumeName, owner, expiry)
 		if err == nil {
@@ -359,12 +366,24 @@ func (c *EtcdClient) CheckAndUpdateLock(ctx context.Context, volumeName, owner s
 		if !errors.Is(err, store.ErrLockConflict) {
 			return "", err
 		}
-		lockKey, _, _, _, migrated, ferr := c.FindLock(ctx, volumeName)
+		_, curOwner, _, _, migrated, ferr := c.FindLock(ctx, volumeName)
 		if ferr != nil {
 			if errors.Is(ferr, store.ErrKeyNotFound) {
 				continue // lock vanished; retry acquire
 			}
 			return "", ferr
+		}
+		if curOwner == owner {
+			// Our own lock: re-stamp in place, keeping the key and its
+			// (keepalive-held) lease.
+			refreshed, rerr := c.refreshOwnLock(ctx, lockKey, expiry)
+			if rerr != nil {
+				return "", fmt.Errorf("refresh own lock %q: %w", lockKey, rerr)
+			}
+			if refreshed {
+				return lockKey, nil
+			}
+			continue // key changed under us; retry acquire
 		}
 		if !migrated {
 			return "", store.ErrLockConflict
@@ -374,6 +393,54 @@ func (c *EtcdClient) CheckAndUpdateLock(ctx context.Context, volumeName, owner s
 		}
 	}
 	return "", fmt.Errorf("acquire or take over lock %q: too many conflicts", volumeName)
+}
+
+// refreshOwnLock re-stamps the recorded expiry of a lock key without touching
+// its lease (the lease is already kept alive by the holder). The value is
+// CAS-updated against its current revision with the existing lease re-attached
+// explicitly, so the refresh can never detach or extend the lease. It returns
+// whether the refresh succeeded (false when the key changed concurrently or
+// vanished, in which case the caller should retry the acquire).
+func (c *EtcdClient) refreshOwnLock(ctx context.Context, lockKey string, expiry int64) (bool, error) {
+	refCtx, cancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
+	defer cancel()
+
+	for attempt := 0; attempt < 3; attempt++ {
+		getResp, gerr := c.client.Get(refCtx, lockKey)
+		if gerr != nil {
+			return false, gerr
+		}
+		if len(getResp.Kvs) == 0 {
+			return false, nil // lock vanished; caller retries
+		}
+		var cur store.OwnerEntry
+		if jerr := json.Unmarshal(getResp.Kvs[0].Value, &cur); jerr != nil {
+			return false, jerr
+		}
+		next := cur
+		next.ExpiryTime = expiry
+		next.Migrated = false // we are a live holder now, not a handoff
+		data, jerr := json.Marshal(next)
+		if jerr != nil {
+			return false, jerr
+		}
+		put := clientv3.OpPut(lockKey, string(data))
+		if lease := getResp.Kvs[0].Lease; lease != 0 {
+			put = clientv3.OpPut(lockKey, string(data), clientv3.WithLease(clientv3.LeaseID(lease)))
+		}
+		rev := getResp.Kvs[0].ModRevision
+		uresp, uerr := c.client.Txn(refCtx).
+			If(clientv3.Compare(clientv3.ModRevision(lockKey), "=", rev)).
+			Then(put).
+			Commit()
+		if uerr != nil {
+			return false, uerr
+		}
+		if uresp.Succeeded {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // FindForVolume implements store.OwnerLock.
@@ -417,7 +484,9 @@ func (c *EtcdClient) LockIsValid(ctx context.Context, lockKey string) (bool, err
 
 	kv := resp.Kvs[0]
 	if kv.Lease > 0 {
-		leaseResp, lerr := c.client.TimeToLive(ctx, clientv3.LeaseID(kv.Lease))
+		ttlCtx, ttlCancel := context.WithTimeout(ctx, c.cfg.RequestTimeout)
+		leaseResp, lerr := c.client.TimeToLive(ttlCtx, clientv3.LeaseID(kv.Lease))
+		ttlCancel()
 		if lerr != nil {
 			return false, fmt.Errorf("check lease TTL: %w", lerr)
 		}

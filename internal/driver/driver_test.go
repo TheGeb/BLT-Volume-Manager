@@ -662,6 +662,62 @@ func TestRemoveLockModeCreate(t *testing.T) {
 	}
 }
 
+// TestMountLockModeCreateReacquiresPermanent verifies that when a create-mode
+// volume's persisted lock is lost (e.g. released out-of-band or expired during
+// a migration cutover), the mount re-acquires a PERMANENT lock - not a
+// time-limited one - since renewal is a no-op in create mode.
+func TestMountLockModeCreateReacquiresPermanent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:   dir,
+		resticPath:   dir,
+		lockMode:     cfg.LockModeCreate,
+		ownerMaxMins: 10,
+		vols:         make(map[string]*VolumeInfo),
+		mountStates:  make(map[string]*volMountState),
+		ownerStore:   store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	if err := d.Create(&volume.CreateRequest{Name: "perm-reacquire", Options: map[string]string{"init_lock_ttl_mins": "15"}}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	volPath := VolumePath(dir, "perm-reacquire")
+	cfg := d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" {
+		t.Fatal("expected persisted lock key")
+	}
+	origKey := cfg.LockKey
+
+	// Simulate lock loss (e.g. released out-of-band during cutover).
+	if err := b.DeleteObject(context.Background(), origKey); err != nil {
+		t.Fatal(err)
+	}
+	// Proposal keys encode the creation second; make sure the mount's
+	// re-acquire lands on a different second than Create.
+	time.Sleep(1100 * time.Millisecond)
+
+	if _, err := d.Mount(&volume.MountRequest{Name: "perm-reacquire", ID: "test"}); err != nil {
+		t.Fatalf("Mount after lock loss must succeed: %v", err)
+	}
+	cfg = d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" || cfg.LockKey == origKey {
+		t.Fatal("expected a fresh persisted lock key after re-acquire")
+	}
+	_, _, _, expiry, err := store.ParseOwnerKey(cfg.LockKey)
+	if err != nil {
+		t.Fatalf("ParseOwnerKey: %v", err)
+	}
+	if expiry != 0 {
+		t.Errorf("re-acquired create-mode lock must be permanent, expiry = %d", expiry)
+	}
+	if valid, verr := d.ownerStore.LockIsValid(context.Background(), cfg.LockKey); verr != nil || !valid {
+		t.Errorf("re-acquired lock invalid: valid=%v err=%v", valid, verr)
+	}
+}
+
 // TestGetLockModeCreateConfigOwned verifies Get reports "owned" when a
 // lock-on-creation volume has a persisted lock but is not in memory.
 func TestGetLockModeCreateConfigOwned(t *testing.T) {

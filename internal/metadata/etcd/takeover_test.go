@@ -98,3 +98,84 @@ func TestCheckAndUpdateLock_Etcd(t *testing.T) {
 		t.Error("lock should no longer be flagged migrated after takeover")
 	}
 }
+
+// A CheckAndUpdateLock against a live lock held by the same owner refreshes it
+// in place: the same key comes back with a re-stamped expiry, the lease is
+// untouched (still alive), and the handoff flag - set when the same lock was
+// previously migrated - is cleared so no other host can take it over.
+func TestCheckAndUpdateLock_Etcd_RefreshesOwnLock(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cli := newEtcdClient(t, etcdAddr(t))
+	cleanKeys(t, cli, lockKeyFor(t.Name()))
+	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
+
+	s := store.NewOwnerStore(cli)
+
+	firstExpiry := time.Now().Add(120 * time.Second).Unix()
+	k1, err := s.CheckAndUpdateLock(ctx, t.Name(), "h-me", firstExpiry)
+	if err != nil {
+		t.Fatalf("CheckAndUpdateLock: %v", err)
+	}
+
+	// Renew with a later expiry - must succeed and return the same key.
+	renewedExpiry := time.Now().Add(300 * time.Second).Unix()
+	k2, err := s.CheckAndUpdateLock(ctx, t.Name(), "h-me", renewedExpiry)
+	if err != nil {
+		t.Fatalf("same-owner refresh must succeed, got %v", err)
+	}
+	if k2 != k1 {
+		t.Errorf("refresh key = %q, want same key %q", k2, k1)
+	}
+	_, owner, _, expiry, migrated, ferr := cli.FindLock(ctx, t.Name())
+	if ferr != nil {
+		t.Fatalf("FindLock: %v", ferr)
+	}
+	if owner != "h-me" {
+		t.Errorf("owner = %q, want h-me", owner)
+	}
+	if expiry < renewedExpiry-5 || expiry > renewedExpiry+5 {
+		t.Errorf("expiry = %d, want ~%d", expiry, renewedExpiry)
+	}
+	if migrated {
+		t.Error("refreshed lock must not remain flagged migrated")
+	}
+	if valid, verr := cli.LockIsValid(ctx, k2); verr != nil || !valid {
+		t.Errorf("refreshed lock invalid: valid=%v err=%v", valid, verr)
+	}
+	// The keepalive-held lease must still be tracked (i.e. not revoked).
+	cli.mu.Lock()
+	_, tracked := cli.lastLeaseIDs[k1]
+	cli.mu.Unlock()
+	if !tracked {
+		t.Error("lease tracked on renewal should still be tracked")
+	}
+}
+
+// A migrated lock held by the same owner (a host that was restarted with the
+// same owner identity) is refreshed in place and cleared of its handoff flag.
+func TestCheckAndUpdateLock_Etcd_RefreshesOwnMigratedLock(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cli := newEtcdClient(t, etcdAddr(t))
+	cleanKeys(t, cli, lockKeyFor(t.Name()))
+	defer cleanKeys(t, cli, lockKeyFor(t.Name()))
+
+	if err := cli.SetMigratedOwnerLock(ctx, t.Name(), "h-me", time.Now().Add(300*time.Second).Unix()); err != nil {
+		t.Fatalf("SetMigratedOwnerLock: %v", err)
+	}
+	k, err := store.NewOwnerStore(cli).CheckAndUpdateLock(ctx, t.Name(), "h-me", time.Now().Add(300*time.Second).Unix())
+	if err != nil {
+		t.Fatalf("refresh own migrated lock: %v", err)
+	}
+	_, _, _, _, migrated, ferr := cli.FindLock(ctx, t.Name())
+	if ferr != nil {
+		t.Fatalf("FindLock: %v", ferr)
+	}
+	if migrated {
+		t.Error("refreshed lock must not remain flagged migrated")
+	}
+	if valid, verr := cli.LockIsValid(ctx, k); verr != nil || !valid {
+		t.Errorf("refreshed lock invalid: valid=%v err=%v", valid, verr)
+	}
+}
