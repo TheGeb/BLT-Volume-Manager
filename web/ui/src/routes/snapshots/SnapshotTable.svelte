@@ -137,7 +137,7 @@
                    {:else}
                      <button type="button" class="size-btn" title="Compute size"
                        onclick={() => onSizeLoaded(sn.id)}>
-<span class="material-icon" role="img" aria-label="Compute size" style="mask: url('/material/calculate.svg') no-repeat center / contain; width:14px;height:14px;"></span>
+<span class="mask-icon" role="img" aria-label="Compute size" style="mask: url('/material/calculate.svg') no-repeat center / contain; width:14px;height:14px;"></span>
                      </button>
                    {/if}
                  </td>

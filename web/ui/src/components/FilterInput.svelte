@@ -16,9 +16,9 @@
   data-tip={fullPath ? 'Full path search (on)' : 'Full path search (off)'}
   onclick={() => fullPath = !fullPath}>
   {#if fullPath}
-    <span class="material-icon" aria-hidden="true" style="mask: url('/material/manage_search.svg') no-repeat center / contain; width:18px;height:18px;"></span>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('/material/manage_search.svg') no-repeat center / contain; width:18px;height:18px;"></span>
   {:else}
-    <span class="material-icon" aria-hidden="true" style="mask: url('{databaseIcon ? '/material/database_search.svg' : '/material/document_search.svg'}') no-repeat center / contain; width:18px;height:18px;"></span>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('{databaseIcon ? '/material/database_search.svg' : '/material/document_search.svg'}') no-repeat center / contain; width:18px;height:18px;"></span>
   {/if}
 </button>
 
