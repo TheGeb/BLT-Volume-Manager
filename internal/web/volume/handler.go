@@ -78,6 +78,16 @@ func VolumeRouter(s *server.BLTService, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if strings.HasSuffix(rawPath, "/delete-info") {
+		volumeName, err := url.PathUnescape(strings.TrimSuffix(rawPath, "/delete-info"))
+		if err != nil || !validVolumeName(volumeName) {
+			server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
+			return
+		}
+		VolumeDeleteInfo(s, w, r, volumeName)
+		return
+	}
+
 	path, err := url.PathUnescape(rawPath)
 	if err != nil || !validVolumeName(path) {
 		server.RespondError(w, server.ErrNotFound, http.StatusNotFound)
@@ -97,13 +107,41 @@ func DeleteVolume(s *server.BLTService, w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	ctx := r.Context()
-	if err := CleanupVolumeData(ctx, s, volumeName); err != nil {
+	warning, err := CleanupVolumeData(ctx, s, volumeName)
+	if err != nil {
 		s.RefreshStats(ctx)
 		server.RespondError(w, fmt.Errorf("cleanup volume data: %w", err), http.StatusInternalServerError)
 		return
 	}
 	s.RefreshStats(ctx)
-	server.RespondJSON(w, server.StatusResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)})
+	type deleteResponse struct {
+		Status  string `json:"status"`
+		Warning string `json:"warning,omitempty"`
+	}
+	resp := deleteResponse{Status: fmt.Sprintf("Volume %q deleted", volumeName)}
+	if warning != "" {
+		resp.Warning = warning
+	}
+	server.RespondJSON(w, resp)
+}
+
+// VolumeDeleteInfo reports whether the restic repository for a volume can be
+// deleted programmatically, and where its data lives. The UI uses this to warn
+// the user (and require an explicit acknowledgment) before deleting a volume
+// whose backup data must be removed manually on the remote.
+func VolumeDeleteInfo(s *server.BLTService, w http.ResponseWriter, r *http.Request, volumeName string) {
+	if r.Method != http.MethodGet {
+		server.RespondError(w, server.ErrMethodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+	type deleteInfoResponse struct {
+		RepoDeletable bool   `json:"repo_deletable"`
+		RepoPath      string `json:"repo_path"`
+	}
+	server.RespondJSON(w, deleteInfoResponse{
+		RepoDeletable: s.ResticRepoDeletable(),
+		RepoPath:      s.ResticRepoPath(volumeName),
+	})
 }
 
 func errorStatus(err error) int {

@@ -119,6 +119,64 @@ func TestValidateConfig_NegativeOwnerMaxMins(t *testing.T) {
 	}
 }
 
+func TestFromEnvLockMode(t *testing.T) {
+	t.Setenv("RESTIC_REPOSITORY", "s3:https://bucket.example.com/repo")
+	t.Setenv("METADATA_S3_BUCKET", "meta")
+
+	t.Setenv("BLT_LOCK_MODE", "create")
+	got, err := FromEnv(t.TempDir())
+	if err != nil {
+		t.Fatalf("FromEnv: %v", err)
+	}
+	if got.LockMode != LockModeCreate {
+		t.Errorf("LockMode = %q, want create", got.LockMode)
+	}
+}
+
+func TestFromEnvLockModeDefault(t *testing.T) {
+	t.Setenv("RESTIC_REPOSITORY", "s3:https://bucket.example.com/repo")
+	t.Setenv("METADATA_S3_BUCKET", "meta")
+	t.Setenv("BLT_LOCK_MODE", "")
+
+	got, err := FromEnv(t.TempDir())
+	if err != nil {
+		t.Fatalf("FromEnv: %v", err)
+	}
+	if got.LockMode != LockModeCreate {
+		t.Errorf("LockMode = %q, want default create", got.LockMode)
+	}
+}
+
+func TestFromEnvLockModeNormalized(t *testing.T) {
+	t.Setenv("RESTIC_REPOSITORY", "s3:https://bucket.example.com/repo")
+	t.Setenv("METADATA_S3_BUCKET", "meta")
+	t.Setenv("BLT_LOCK_MODE", " CREATE ")
+
+	got, err := FromEnv(t.TempDir())
+	if err != nil {
+		t.Fatalf("FromEnv: %v", err)
+	}
+	if got.LockMode != LockModeCreate {
+		t.Errorf("LockMode = %q, want create (normalized)", got.LockMode)
+	}
+}
+
+func TestValidateConfig_InvalidLockMode(t *testing.T) {
+	err := ValidateConfig(Config{ResticBase: "s3:https://bucket.example.com/repo", LockMode: "whenever"})
+	if err == nil {
+		t.Fatal("expected error for invalid lock mode")
+	}
+}
+
+func TestValidateConfig_ValidLockModes(t *testing.T) {
+	for _, mode := range []LockMode{LockModeCreate, LockModeMount, ""} {
+		err := ValidateConfig(Config{ResticBase: "s3:https://bucket.example.com/repo", LockMode: mode})
+		if err != nil {
+			t.Fatalf("unexpected error for lock mode %q: %v", mode, err)
+		}
+	}
+}
+
 func TestValidateConfig_InvalidMetadataBackend(t *testing.T) {
 	err := ValidateConfig(Config{ResticBase: "s3:https://bucket.example.com/repo", MetadataBackend: "redis"})
 	if err == nil {

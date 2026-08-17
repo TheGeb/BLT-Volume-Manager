@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -36,7 +38,7 @@ func (s *BLTService) Shutdown() {
 	s.wg.Wait()
 }
 
-func New(cfg cfg.Config, b store.Backend, opts ...ServiceOption) *BLTService {
+func New(cfg cfg.Config, b store.MetadataStore, opts ...ServiceOption) *BLTService {
 	s := &BLTService{
 		Config:   cfg,
 		owners:   store.NewOwnerStore(b),
@@ -93,17 +95,39 @@ func (s *BLTService) VolumeNames(ctx context.Context) []string {
 	return names
 }
 
-func (s *BLTService) DeleteVolumeData(ctx context.Context, volumeName string) error {
+func (s *BLTService) DeleteVolumeData(ctx context.Context, volumeName string) (warning string, err error) {
 	if err := s.volumes.Delete(ctx, volumeName); err != nil {
-		return err
+		return "", err
 	}
 	if err := s.owners.DeleteForVolume(ctx, volumeName); err != nil {
-		return err
+		return "", err
 	}
 	if err := s.restores.Delete(ctx, volumeName); err != nil {
-		return err
+		return "", err
 	}
-	return s.ResticManager(volumeName).DeleteRepo(ctx)
+	if err := s.ResticManager(volumeName).DeleteRepo(ctx); err != nil {
+		if errors.Is(err, restic.ErrRepoDeleteUnsupported) {
+			return fmt.Sprintf(
+				"backup data for volume %q was not deleted automatically; remove it manually at: %s",
+				volumeName, s.ResticManager(volumeName).Repo()), nil
+		}
+		return "", err
+	}
+	return "", nil
+}
+
+// ResticRepoDeletable reports whether the configured restic storage backend
+// supports programmatic repository deletion (s3 and local files do; rest:,
+// sftp:, rclone:, ... do not).
+func (s *BLTService) ResticRepoDeletable() bool {
+	return s.resticBackend != nil
+}
+
+// ResticRepoPath returns the restic repository location for a volume (used to
+// tell the user where to manually delete data for backends without a delete
+// primitive).
+func (s *BLTService) ResticRepoPath(volumeName string) string {
+	return s.ResticManager(volumeName).Repo()
 }
 
 func (s *BLTService) RegisterVolume(ctx context.Context, volumeName string) error {

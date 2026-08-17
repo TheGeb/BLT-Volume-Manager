@@ -67,3 +67,18 @@ export interface BatchDeleteResponse {
 	failed: number;
 	errors: { id: string; error: string }[];
 }
+
+export interface MigrationBackendSpec {
+	type: 's3' | 'etcd' | '';
+	bucket: string;
+	endpoint: string;
+	region: string;
+	force_path_style: boolean;
+	etcd_endpoints: string[];
+}
+
+export interface MigrationResult {
+	owner_locks: number;
+	keys: number;
+	dry_run: boolean;
+}

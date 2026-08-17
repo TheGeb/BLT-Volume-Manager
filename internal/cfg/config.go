@@ -21,6 +21,11 @@ type Config struct {
 	S3ForcePathStyle bool
 	EtcdEndpoints    []string
 	OwnerMaxMins     int
+	// LockMode controls when a volume owner lock is acquired: LockModeCreate
+	// (the default) holds a lock from volume creation until the volume is
+	// removed; LockModeMount acquires a TTL lock whenever a container mounts
+	// the volume.
+	LockMode LockMode
 }
 
 func FromEnv(dataDir string) (Config, error) {
@@ -29,7 +34,7 @@ func FromEnv(dataDir string) (Config, error) {
 		return Config{}, err
 	}
 
-	ownerMaxMins := 10
+	ownerMaxMins := 5
 	if mv := os.Getenv("OWNER_MAX_MINS"); mv != "" {
 		if v, err := strconv.Atoi(mv); err == nil && v > 0 {
 			ownerMaxMins = v
@@ -38,6 +43,10 @@ func FromEnv(dataDir string) (Config, error) {
 
 	metaBackend := os.Getenv("BLT_METADATA_BACKEND")
 	etcdEndpoints := parseEtcdEndpoints(os.Getenv("ETCD_ENDPOINTS"))
+	lockMode := ParseLockMode(os.Getenv("BLT_LOCK_MODE"))
+	if lockMode == "" {
+		lockMode = LockModeCreate
+	}
 
 	return Config{
 		DataDir:         abs,
@@ -55,6 +64,7 @@ func FromEnv(dataDir string) (Config, error) {
 		}(),
 		EtcdEndpoints: etcdEndpoints,
 		OwnerMaxMins:  ownerMaxMins,
+		LockMode:      lockMode,
 	}, nil
 }
 

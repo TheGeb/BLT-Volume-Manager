@@ -283,11 +283,11 @@
     <div class="toolbar-left">
       <div class="tree-actions">
         <button class="button button-secondary button-xs btn-icon-sm" onclick={expandAllGroups}>
-          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg role="img" aria-label="Expand all" width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
           Expand
         </button>
         <button class="button button-secondary button-xs btn-icon-sm" onclick={collapseAllGroups}>
-          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+          <svg role="img" aria-label="Collapse all" width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
           Collapse
         </button>
         <button class="button button-secondary button-xs btn-icon-sm owner-toggle" onclick={toggleOwnerBorders}>
@@ -306,7 +306,7 @@
           ...hosts.map(h => ({ value: h, label: h })),
         ]}
       />
-      <FilterInput bind:value={searchQuery} bind:fullPath={searchFullPath} placeholder="Filter..." />
+      <FilterInput bind:value={searchQuery} bind:fullPath={searchFullPath} placeholder="Filter..." databaseIcon />
     </div>
   </div>
 
@@ -331,12 +331,12 @@
                 {#if item.isGroup}
                   <button class="tree-group" onclick={() => toggle(item.path)} title={item.path} style="padding-left:{20 + item.depth * 20}px;">
                   <div style="width:22px; display:flex; justify-content:center; align-items:center;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
+                    <svg role="img" aria-label="Expand group" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="chevron"
                       style="transform:rotate({expanded[item.path] ? 0 : -90}deg);opacity:0.5; transition:transform 0.15s;">
                       <path d="M7 10l5 5 5-5H7z"/>
                     </svg>
                   </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
+                    <svg role="img" aria-label="Volume group" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
                     <span class="tree-name">{item.name}</span>
@@ -347,25 +347,21 @@
                     onmousedown={(e) => { if (e.button === 1) { e.preventDefault(); window.open(`/ui/snapshots/${item.path.split('/').map(encodeURIComponent).join('/')}`, '_blank'); } }}
                     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item.path); } }}>
                     <div style="width:22px; display:flex; justify-content:center; align-items:center;"></div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="volume-icon">
-                      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
+                    <span role="img" aria-label="Volume" class="mask-icon volume-icon" style="mask: url('/volume.svg') no-repeat center / contain; width:16px;height:16px;"></span>
                     <span class="tree-name">{item.name}</span>
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <span class="vol-actions" onmouseenter={onActionsEnter} onmouseleave={onActionsLeave}>
                       <button type="button" class="vol-action-btn" aria-label="Copy volume" title="Copy volume"
                         onclick={(e) => { e.stopPropagation(); if (actionsReady) openCopyVolModal(item.path); }}
                         onkeydown={(e) => { e.stopPropagation(); }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg role="img" aria-label="Copy volume" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
                       </button>
                       <button type="button" class="vol-action-btn" aria-label="Rename volume" title="Rename volume"
                         onclick={(e) => { e.stopPropagation(); if (actionsReady) openRenameVolModal(item.path); }}
                         onkeydown={(e) => { e.stopPropagation(); }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg role="img" aria-label="Rename volume" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
                         </svg>
                       </button>
@@ -396,7 +392,7 @@
                       {/if}
                     {/if}
                   {:else if !loading && !ownerStyles[idx]}
-                    <span class="owner-badge">—</span>
+                    <span class="owner-badge">-</span>
                   {/if}
                 </span>
               {/if}
@@ -565,9 +561,9 @@
     font-size: 0.9rem; font-weight: 600; color: var(--muted);
   }
   .owner-owned { color: var(--accent); }
-  .owner-unclaimed { color: var(--muted); }
+  .owner-unclaimed { color: var(--muted); opacity: 0.2; transition: opacity 0.25s ease; }
+  .tree-row-wrap:hover .owner-unclaimed { opacity: 1; }
   .owner-owner { font-size: 0.9rem; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .owner-expiry { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 
   .vol-actions {
     display: flex;

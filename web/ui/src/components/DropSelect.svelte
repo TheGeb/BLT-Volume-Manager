@@ -37,8 +37,8 @@
 {#if multiple}
   <Select.Root type="multiple" value={selected} onValueChange={onSelectedChange} bind:open>
     <Select.Trigger class="dropdown drop-select-trigger {open ? 'open' : ''}" style={triggerStyle}>
-      <Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
+<Select.Value placeholder={selectedLabel}>{selectedLabel}</Select.Value>
+      <svg role="img" aria-label="Open dropdown" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
         <polyline points="6 9 12 15 18 9"/>
       </svg>
     </Select.Trigger>

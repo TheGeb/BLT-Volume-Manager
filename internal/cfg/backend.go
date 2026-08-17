@@ -25,7 +25,7 @@ func (b *s3metaBackend) ReadObject(ctx context.Context, key string) ([]byte, err
 	return data, err
 }
 
-func OpenMetadataBackend(cfg Config) (store.Backend, error) {
+func OpenMetadataBackend(cfg Config) (store.MetadataStore, error) {
 	b, err := openBackend(cfg)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func OpenMetadataBackend(cfg Config) (store.Backend, error) {
 	return b, nil
 }
 
-func openBackend(cfg Config) (store.Backend, error) {
+func openBackend(cfg Config) (store.MetadataStore, error) {
 	backendType := cfg.MetadataBackend
 	if backendType == "" {
 		if cfg.S3Bucket != "" {
@@ -58,7 +58,7 @@ func openBackend(cfg Config) (store.Backend, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &s3metaBackend{Client: client}, nil
+		return store.NewS3MetadataStore(&s3metaBackend{Client: client}), nil
 	case metadata.BackendEtcd:
 		if len(cfg.EtcdEndpoints) == 0 {
 			return nil, fmt.Errorf("ETCD_ENDPOINTS required for etcd metadata backend")

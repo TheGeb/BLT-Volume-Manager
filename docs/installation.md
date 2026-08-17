@@ -1,7 +1,7 @@
 # Installation
 
-BLT Volume Manager can be installed four ways — as a **host binary**, as a
-**container image**, via **`docker plugin install`**, or via **Nix** — and each
+BLT Volume Manager can be installed four ways - as a **host binary**, as a
+**container image**, via **`docker plugin install`**, or via **Nix** - and each
 works in both **rooted** (rootful) and **rootless** Docker. The table below
 summarizes what changes between modes.
 
@@ -15,7 +15,7 @@ summarizes what changes between modes.
 | `BLT_LISTEN` needed? | No | Only when running the **binary** directly |
 
 `docker plugin install` (the image-based, privileged plugin path) is **root-only
-and not supported under rootless Docker** — see [section 3](#3-docker-plugin-install-root-only).
+and not supported under rootless Docker** - see [section 3](#3-docker-plugin-install-root-only).
 For rootless, use the binary (section 1) or container (section 2) methods.
 
 ## Prerequisites (all methods)
@@ -23,7 +23,7 @@ For rootless, use the binary (section 1) or container (section 2) methods.
 - **restic ≥ v0.17.0** (see README). The container image pins restic 0.19.1;
   for binary/Nix installs make sure restic is on `PATH`.
 - Configuration via environment variables (`RESTIC_REPOSITORY`,
-  `RESTIC_PASSWORD`, AWS/S3 credentials, etc.) — see the README's
+  `RESTIC_PASSWORD`, AWS/S3 credentials, etc.) - see the README's
   [Configuration section](../README.md#configuration).
 - Rootless Docker prerequisites: `newuidmap`/`newgidmap`, and `subuid`/`subgid`
   ranges for your user. See the
@@ -70,13 +70,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now blt-volume-manager
 ```
 
-### Rooted — non-root service account
+### Rooted - non-root service account
 
 For **plain volumes the plugin needs no root at all**: the Docker daemon
 performs the actual bind mount, while the plugin only creates directories,
 runs restic, and writes its socket. So even on a rooted daemon you can run the
 plugin as a dedicated unprivileged user. The only root-owned resource it needs
-is the socket directory `/run/docker/plugins` — have systemd create it owned
+is the socket directory `/run/docker/plugins` - have systemd create it owned
 by the service user with `RuntimeDirectory`:
 
 ```ini
@@ -175,7 +175,7 @@ systemctl --user enable --now blt-volume-manager
 This runs the `plugin` image target as a normal container that shares the
 plugin socket and data directories with the host daemon. No `BLT_LISTEN` is
 needed here: inside the container the plugin runs as root, so the helper's
-`MkdirAll("/run/docker/plugins")` succeeds — the bind mount is what makes the
+`MkdirAll("/run/docker/plugins")` succeeds - the bind mount is what makes the
 socket visible to the host.
 
 Build locally, or use a published release image
@@ -209,7 +209,7 @@ docker run -d --name blt-volume-manager --restart always \
   --env-file /etc/blt-volume-manager.env \
   blt-volume-manager-plugin:local
 
-# ZFS — also pass the device node (omit this on hosts without ZFS,
+# ZFS - also pass the device node (omit this on hosts without ZFS,
 # since --device fails if the path doesn't exist)
 docker run -d --name blt-volume-manager --restart always \
   --cap-add SYS_ADMIN --device /dev/zfs:rwm \
@@ -221,7 +221,7 @@ docker run -d --name blt-volume-manager --restart always \
 
 This keeps the default seccomp profile enforced (it allows `mount` only
 because the process holds `CAP_SYS_ADMIN`) and grants no other capabilities or
-devices. Only fall back to `--privileged` if snapshot operations still fail —
+devices. Only fall back to `--privileged` if snapshot operations still fail -
 it's the broad envelope, not the default.
 
 ### Rootless
@@ -239,7 +239,7 @@ docker run -d --name blt-volume-manager --restart always \
 ```
 
 The socket file is created by container root, which maps to your UID in the
-user namespace — so the rootless daemon (same user) can access it.
+user namespace - so the rootless daemon (same user) can access it.
 
 > In rootless, `--privileged` does **not** enable btrfs/ZFS: it only grants
 > capabilities inside the user namespace, not host mount privileges. btrfs/ZFS
@@ -248,7 +248,7 @@ user namespace — so the rootless daemon (same user) can access it.
 ## 3. `docker plugin install` (root-only)
 
 This is Docker's native, image-based plugin mechanism. It only works with
-**rooted** Docker — rootless does not support `docker plugin install`. The
+**rooted** Docker - rootless does not support `docker plugin install`. The
 plugin runs as root with only the privileges its manifest declares.
 
 The repository does not currently ship a ready-made plugin image, but you can
@@ -362,11 +362,11 @@ Precedence: process env (from `docker plugin set`) > `./.env` > `BLT_CONFIG_FILE
 
 The plugin logs a warning (`config_file_permissions_loose`) if the config file
 is accessible by other users (any world read/write bit set); it still loads the
-file, so this is advisory — `chmod 600` the file to silence it.
+file, so this is advisory - `chmod 600` the file to silence it.
 
 When `docker plugin enable` runs, Docker may prompt you to accept the plugin's
 declared privileges (the mounts, `env`, and `CAP_SYS_ADMIN`) before starting
-it — confirm them.
+it - confirm them.
 
 ### Install from a registry
 
@@ -394,22 +394,22 @@ docker volume ls
 
 ### Caveats
 
-- Requires root; unsupported under rootless Docker — use section 1 or 2 there.
+- Requires root; unsupported under rootless Docker - use section 1 or 2 there.
 - Only env vars declared in the plugin's `config.json` `env` array are settable.
 - Env vars are baked in at install time, but the `BLT_CONFIG_FILE` fallback
-  (above) avoids reinstalls — put mutable settings in the mounted config file.
+  (above) avoids reinstalls - put mutable settings in the mounted config file.
 - btrfs/ZFS inside a plugin image are especially fragile (namespace, device,
   and mount propagation constraints). Prefer the host binary (section 1) for
   filesystem-snapshot volumes.
 
 ## 4. Nix
 
-### Rooted — NixOS module
+### Rooted - NixOS module
 
 The flake exports a NixOS module that installs the driver as a hardened
 systemd service. It supports two privilege postures via the `user` option:
 
-- **Plain volumes (default, unprivileged):** set `user` to a service account —
+- **Plain volumes (default, unprivileged):** set `user` to a service account -
   the plugin needs no privileges, and systemd creates `/run/docker/plugins`
   owned by that user. This is the least-privilege setup.
 - **btrfs/ZFS snapshots:** runs as root (CAP_SYS_ADMIN). Use the
@@ -498,7 +498,7 @@ required.
 > `httpAddr` option, as it is passed to the driver which does not support
 > `--http-addr`.
 
-### Rootless — package + user service
+### Rootless - package + user service
 
 Install the driver package and run it as a per-user service (the flake does
 not provide a rootless module):
@@ -545,7 +545,7 @@ the live directory.
 
 - Only for volumes created with the `btrfs=true` or `zfs=true` driver option
   (see below). **Plain volumes are ordinary directories and never touch
-  btrfs/ZFS code** — even if the data dir happens to sit on a btrfs/ZFS
+  btrfs/ZFS code** - even if the data dir happens to sit on a btrfs/ZFS
   filesystem.
 - The btrfs provider shells out to the `btrfs` CLI (`subvolume create /
   snapshot / delete`); the ZFS provider shells out to `zfs` (`create /
@@ -561,11 +561,11 @@ the live directory.
 | Rooted host binary / Nix (root, section 1/4) | Work | Work |
 | Rooted container `docker run` (section 2) | Need `--cap-add SYS_ADMIN` (+ `--device /dev/zfs` for ZFS) | Work |
 | `docker plugin install` (section 3) | Need `CAP_SYS_ADMIN` in manifest | Work |
-| Rootless — any method | **Not supported** | Work |
+| Rootless - any method | **Not supported** | Work |
 
 Rootless cannot use them: btrfs subvolume operations need CAP_SYS_ADMIN, ZFS
 snapshots need a real mount (`mount -t zfs`) and `/dev/zfs`, and a rootless
-process has neither. `--privileged` does not help in rootless — it only grants
+process has neither. `--privileged` does not help in rootless - it only grants
 capabilities inside the user namespace, not host mount privileges. A volume
 created with `btrfs=true`/`zfs=true` under rootless silently degrades to a
 plain directory.
@@ -581,10 +581,10 @@ Prerequisites:
   / a `CAP_SYS_ADMIN` plugin manifest.
 
 ```bash
-# btrfs — data dir must live on a btrfs filesystem
+# btrfs - data dir must live on a btrfs filesystem
 docker volume create -d blt-volume-manager --name app-data -o btrfs=true
 
-# zfs — optionally pin a specific parent dataset
+# zfs - optionally pin a specific parent dataset
 docker volume create -d blt-volume-manager --name app-data \
   -o zfs=true -o zfs-pool=tank/volumes
 ```
@@ -593,10 +593,17 @@ The driver reads the `btrfs`/`zfs`/`zfs-pool` options in `initFsType`
 (`internal/driver/api.go`). Once a volume has an fs type, its cold backups and
 pre-restore snapshots use filesystem snapshots automatically.
 
+> **Init-time options.** `btrfs`, `zfs`, and `zfs-pool` are *init-time*
+> options: they only apply when the volume is first `create`d, are stamped into
+> the volume's config, and are ignored afterwards. Changing them in a later
+> `docker compose up`/`volume create` has no effect on an existing volume. The
+> canonical spelling prefixes them with `init_` (e.g. `-o init_btrfs=true`);
+> the bare legacy spellings above are still accepted.
+
 ### Least privilege / reducing CAP_SYS_ADMIN risk
 
 btrfs subvolume and snapshot ioctls are gated on `CAP_SYS_ADMIN` in the kernel,
-and so is the `mount(2)` call ZFS snapshot access relies on — there is no
+and so is the `mount(2)` call ZFS snapshot access relies on - there is no
 finer-grained capability for either. Since `CAP_SYS_ADMIN` is a broad umbrella
 (mounts, namespaces, etc.), prefer these alternatives when you can:
 
@@ -611,7 +618,7 @@ finer-grained capability for either. Since `CAP_SYS_ADMIN` is a broad umbrella
   ```
   Run the plugin as `blt` (see section 1, non-root service account). The
   delegated user also needs access to `/dev/zfs`. This does **not** work inside
-  a container or `docker plugin install` — delegation is checked against host
+  a container or `docker plugin install` - delegation is checked against host
   process credentials, not container capabilities.
 - **Privilege-separated sidecar.** Give `CAP_SYS_ADMIN` only to a tiny,
   single-purpose process that performs snapshot create/delete over a unix
@@ -620,7 +627,7 @@ finer-grained capability for either. Since `CAP_SYS_ADMIN` is a broad umbrella
 - **If you must grant it in a container/plugin**, keep the blast radius as
   small as the manifest allows: declare only `["CAP_SYS_ADMIN"]`,
   `allowAllDevices: false` with exactly `/dev/zfs` listed, no host PID/IPC
-  access, and a read-only rootfs — do not reach for the whole "privileged"
+  access, and a read-only rootfs - do not reach for the whole "privileged"
   envelope.
 
 ## Verify the plugin works
@@ -646,8 +653,8 @@ journalctl -u blt-volume-manager              # or: docker logs blt-volume-manag
 | `permission denied` creating the socket or `/run/docker/plugins` | Plugin started as wrong user. In rootless it must be the daemon's user, socket under `$XDG_RUNTIME_DIR/docker/plugins`, with `BLT_LISTEN=1`. |
 | Plugin starts but Docker can't find it | Socket is in the wrong dir. Rooted: `/run/docker/plugins`. Rootless: `$XDG_RUNTIME_DIR/docker/plugins`. |
 | Works, but container can't write to a mounted volume | Data dir permissions. In rootless the plugin and daemon both run as your user, so keep the data dir under your home. |
-| `docker plugin install` fails | `docker plugin install` is root-only and unsupported in rootless — use the container (section 2) or binary (section 1) method there. |
-| btrfs/ZFS volume fell back to a plain dir | Missing privileges or CLI. Rooted host binary: install `btrfs`/`zfs` and run as root. Container: add `--cap-add SYS_ADMIN` (+ `--device /dev/zfs` for ZFS), or `--privileged` as a fallback (section 2). Plugin: declare `CAP_SYS_ADMIN` (section 3). Rootless: unsupported — use plain volumes (section 5). |
+| `docker plugin install` fails | `docker plugin install` is root-only and unsupported in rootless - use the container (section 2) or binary (section 1) method there. |
+| btrfs/ZFS volume fell back to a plain dir | Missing privileges or CLI. Rooted host binary: install `btrfs`/`zfs` and run as root. Container: add `--cap-add SYS_ADMIN` (+ `--device /dev/zfs` for ZFS), or `--privileged` as a fallback (section 2). Plugin: declare `CAP_SYS_ADMIN` (section 3). Rootless: unsupported - use plain volumes (section 5). |
 | `btrfs: command not found` / `zfs: command not found` | Install the CLI on the host, or add it to the container/plugin rootfs (section 5). |
 | Log: `config_file_permissions_loose` | The `BLT_CONFIG_FILE` file is world-accessible; `chmod 600` it (the driver still loads it). |
 | Plugin stops after logout | Enable lingering: `loginctl enable-linger "$USER"`. |

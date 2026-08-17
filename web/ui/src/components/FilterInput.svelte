@@ -1,10 +1,11 @@
 <script lang="ts">
-  let { value = $bindable(''), fullPath = $bindable(false), placeholder = 'Filter...', fill = false, onEnter }: {
+  let { value = $bindable(''), fullPath = $bindable(false), placeholder = 'Filter...', fill = false, onEnter, databaseIcon = false }: {
     value?: string;
     fullPath?: boolean;
     placeholder?: string;
     fill?: boolean;
     onEnter?: () => void;
+    databaseIcon?: boolean;
   } = $props();
 </script>
 
@@ -15,13 +16,9 @@
   data-tip={fullPath ? 'Full path search (on)' : 'Full path search (off)'}
   onclick={() => fullPath = !fullPath}>
   {#if fullPath}
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-      <line x1="17" y1="4" x2="7" y2="20"/>
-    </svg>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('/material/manage_search.svg') no-repeat center / contain; width:18px;height:18px;"></span>
   {:else}
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('{databaseIcon ? '/material/database_search.svg' : '/material/document_search.svg'}') no-repeat center / contain; width:18px;height:18px;"></span>
   {/if}
 </button>
 

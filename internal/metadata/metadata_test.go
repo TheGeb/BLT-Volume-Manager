@@ -3,6 +3,7 @@ package metadata_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/metadata/store"
@@ -124,5 +125,14 @@ func TestHostname(t *testing.T) {
 	h := metadata.Hostname()
 	if h == "" {
 		t.Error("expected non-empty hostname")
+	}
+}
+
+func TestMigrateOwnerLockS3Backend(t *testing.T) {
+	t.Parallel()
+	// A plain (non-etcd) backend uses the S3 proposal path; any error
+	// here means the dispatch failed.
+	if err := metadata.MigrateOwnerLock(context.Background(), &MockBackend{}, "vol-a", "host-1", time.Now().Add(time.Hour).Unix()); err != nil {
+		t.Fatalf("MigrateOwnerLock(S3): %v", err)
 	}
 }

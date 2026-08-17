@@ -10,7 +10,7 @@ import (
 
 func newVersionStore(t *testing.T) *VersionStore {
 	t.Helper()
-	return NewVersionStore(newOrderedBackend())
+	return NewVersionStore(NewS3MetadataStore(newOrderedBackend()))
 }
 
 func TestVersionStore_NextTags_VolumeIsolation(t *testing.T) {
@@ -115,7 +115,7 @@ func TestVersionStore_NextTags_Format(t *testing.T) {
 func TestVersionStore_NextTags_Concurrent(t *testing.T) {
 	t.Parallel()
 	b := newOrderedBackend()
-	vs := NewVersionStore(b)
+	vs := NewVersionStore(NewS3MetadataStore(b))
 	ctx := context.Background()
 
 	const workers = 10

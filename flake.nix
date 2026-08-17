@@ -254,7 +254,7 @@
           };
         };
 
-      # Snapshots variant — same module with filesystemSnapshots enabled.
+      # Snapshots variant - same module with filesystemSnapshots enabled.
       nixosModules.blt-volume-manager-snapshots = { lib, ... }: {
         imports = [ self.nixosModules.blt-volume-manager ];
         services.blt-volume-manager.filesystemSnapshots = lib.mkDefault true;

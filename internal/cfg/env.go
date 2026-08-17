@@ -23,6 +23,9 @@ func LoadEnv() {
 }
 
 func warnOnLoosePerms(path string) {
+	// #nosec G703 -- path is BLT_CONFIG_FILE, set by the operator (same trust
+	// level as the process environment); access is a read-only stat used only
+	// to warn about loose file permissions.
 	fi, err := os.Stat(path)
 	if err != nil {
 		return

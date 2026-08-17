@@ -11,6 +11,15 @@
 
   let deleting = false;
 
+  // Permanent (create mode) locks carry no expiry; TTL (mount mode) locks
+  // always carry a positive expiry. Both backends (S3, etcd) report the same.
+  $: lockMode = ownerStatus?.owner
+    ? (ownerStatus.expiry != null && ownerStatus.expiry > 0)
+      ? 'mount'
+      : 'create'
+    : '';
+  $: isPermLock = ownerStatus?.owner ? !(ownerStatus.expiry != null && ownerStatus.expiry > 0) : false;
+
   async function deleteOwner() {
     deleting = true;
     try {
@@ -31,6 +40,19 @@
       </div>
       {#if ownerStatus.owner}
         <div class="panel-info-secondary">Owner: {ownerStatus.owner}</div>
+        <div class="panel-info-secondary lock-mode-row">
+          <span>Lock mode:</span>
+          <span class="lock-mode-badge" data-tooltip={isPermLock
+            ? 'Permanent lock - held from volume creation until the volume is removed from the host.'
+            : 'Temporary lock - re-acquired on each container mount; expires by lock TTL (S3) or is held via keepalive while the owner renews (etcd).'}>
+            {#if isPermLock}
+              <span class="mask-icon" aria-hidden="true" style="mask: url('/material/all_inclusive.svg') no-repeat center / contain;"></span>
+            {:else}
+              <span class="mask-icon" aria-hidden="true" style="mask: url('/material/lock_reset.svg') no-repeat center / contain;"></span>
+            {/if}
+          </span>
+          <span>({lockMode})</span>
+        </div>
       {/if}
       {#if ownerStatus.expiry != null && ownerStatus.expiry > 0}
         <div class="owner-expiry">{formatExpiration(ownerStatus.expiry - Math.floor(Date.now() / 1000))}</div>
@@ -38,7 +60,7 @@
     </div>
     <div class="owner-actions">
       <Button.Root class="button button-block button-destructive" onclick={deleteOwner} disabled={deleting || !ownerStatus.owner}>
-        {deleting ? 'Deleting...' : 'Delete owner'}
+        {deleting ? 'Deleting...' : 'Delete lock'}
       </Button.Root>
     </div>
   {:else}
@@ -57,6 +79,36 @@
     font-size: 0.85rem;
     color: var(--muted);
   }
+
+  .lock-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lock-mode-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+    line-height: 0;
+    transform: translateY(1px);
+    cursor: default;
+  }
+  .lock-mode-badge .mask-icon { width: 20px; height: 20px; display: block; }
+
+  .lock-mode-badge::after {
+    content: attr(data-tooltip);
+    position: absolute; bottom: 100%; left: 50%; z-index: 60;
+    width: max-content; max-width: 240px; white-space: normal;
+    padding: 6px 8px; border-radius: 6px;
+    background: var(--tooltip-bg, rgb(20 20 24 / 96%)); color: var(--tooltip-fg, #f0f0f0);
+    font-size: 0.75rem; line-height: 1.35; font-weight: 400;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
+    opacity: 0; pointer-events: auto; transform: translateX(-50%) translateY(2px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .lock-mode-badge:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   .owner-actions {
     display: flex;

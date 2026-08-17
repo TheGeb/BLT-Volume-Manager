@@ -20,6 +20,12 @@ import (
 // .github/workflows/ci.yml).
 const exitCodeRepoDoesNotExist = 10
 
+// ErrRepoDeleteUnsupported is returned by DeleteRepo when the configured
+// storage backend has no safe primitive for removing a repository's data
+// (rest:, sftp:, rclone:, ...). The volume's metadata is still deleted; the
+// backup data must be removed manually on the remote.
+var ErrRepoDeleteUnsupported = errors.New("repository deletion is not supported for this storage backend")
+
 type HostSnapshots struct {
 	Host      string     `json:"host"`
 	Snapshots []Snapshot `json:"snapshots"`
@@ -144,7 +150,12 @@ func (m *Manager) Unlock(ctx context.Context) error {
 
 func (m *Manager) DeleteRepo(ctx context.Context) error {
 	if m.backend == nil {
-		return fmt.Errorf("no backend configured for repo cleanup")
+		// Backends without a native delete primitive (rest:, sftp:, rclone:,
+		// ...) leave the repository data in place. Volume metadata is still
+		// removed; the orphaned data can be cleaned up out-of-band.
+		log.Warnf("repo_delete_unsupported",
+			"no delete backend configured for repo %q; repository data left in place", m.repo)
+		return ErrRepoDeleteUnsupported
 	}
 	return m.backend.DeleteRepo(ctx, m.repo)
 }

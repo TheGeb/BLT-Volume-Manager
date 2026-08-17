@@ -55,7 +55,7 @@ nix-vendor-hash:
 	@if [ -f scripts/update-nix-hashes.sh ]; then \
 		bash scripts/update-nix-hashes.sh vendor; \
 	else \
-		echo "scripts/update-nix-hashes.sh not found — falling back to inline logic"; \
+		echo "scripts/update-nix-hashes.sh not found - falling back to inline logic"; \
 		$(MAKE) _nix-vendor-hash-legacy; \
 	fi
 
@@ -63,7 +63,7 @@ nix-npm-hash:
 	@if [ -f scripts/update-nix-hashes.sh ]; then \
 		bash scripts/update-nix-hashes.sh npm; \
 	else \
-		echo "scripts/update-nix-hashes.sh not found — falling back to inline logic"; \
+		echo "scripts/update-nix-hashes.sh not found - falling back to inline logic"; \
 		$(MAKE) _nix-npm-hash-legacy; \
 	fi
 
@@ -85,7 +85,7 @@ _nix-vendor-hash-legacy:
 		echo "vendorHash is up to date ($$OLD)"; \
 	else \
 		mv flake.nix.bak flake.nix; \
-		echo "Failed to extract vendorHash — restored original" >&2; \
+		echo "Failed to extract vendorHash - restored original" >&2; \
 		exit 1; \
 	fi; \
 	rm -f flake.nix.bak
@@ -105,7 +105,7 @@ _nix-npm-hash-legacy:
 		echo "npmDepsHash is up to date ($$OLD)"; \
 	else \
 		mv flake.nix.bak flake.nix; \
-		echo "Failed to extract npmDepsHash — restored original" >&2; \
+		echo "Failed to extract npmDepsHash - restored original" >&2; \
 		exit 1; \
 	fi; \
 	rm -f flake.nix.bak
@@ -189,6 +189,7 @@ ui-dev-build: web/ui/node_modules/.install-stamp
 	cd web/ui && npx svelte-check
 	cd web/ui && npm run build
 	mkdir -p internal/web/static
+	cp -r web/ui/dist/* internal/web/static/
 
 build-driver:
 	go build -ldflags "$(LDFLAGS)" -o blt-volume-manager-plugin ./cmd/driver

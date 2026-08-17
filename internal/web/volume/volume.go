@@ -12,9 +12,9 @@ import (
 	"github.com/TheGeb/BLT-Volume-Manager/internal/web/server"
 )
 
-func CleanupVolumeData(ctx context.Context, s *server.BLTService, volumeName string) error {
+func CleanupVolumeData(ctx context.Context, s *server.BLTService, volumeName string) (string, error) {
 	if volumeName == "" {
-		return nil
+		return "", nil
 	}
 	return s.DeleteVolumeData(ctx, volumeName)
 }
@@ -55,7 +55,7 @@ func cleanupTargetRepo(s *server.BLTService, target string) {
 			return
 		}
 	}
-	if err := s.DeleteVolumeData(cleanupCtx, target); err != nil {
+	if _, err := s.DeleteVolumeData(cleanupCtx, target); err != nil {
 		log.Errorf("target_cleanup_failed", err, "volume=%s", target)
 	}
 }
@@ -164,7 +164,7 @@ func RenameVolumeData(ctx context.Context, s *server.BLTService, source, target 
 	// Success - keep the target repo; disable deferred cleanup.
 	initDone = false
 
-	if err := CleanupVolumeData(ctx, s, source); err != nil {
+	if _, err := CleanupVolumeData(ctx, s, source); err != nil {
 		log.Errorf("cleanup_source_after_rename_failed", err, "volume=%s", source)
 		return fmt.Sprintf("Volume %q renamed to %q, but cleaning up the source %q failed: %v", source, target, source, err), nil
 	}

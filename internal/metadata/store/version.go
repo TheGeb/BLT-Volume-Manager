@@ -3,18 +3,22 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
 const VersionKeyspace = "blt-volume-manager/versions/"
 
+// VersionStore is a thin facade over a Backend for reading/writing counters
+// and a VersionAllocator for allocating the next tags. It never inspects the
+// concrete backend type.
 type VersionStore struct {
-	b Backend
+	b     Backend
+	alloc VersionAllocator
 }
 
-func NewVersionStore(b Backend) *VersionStore {
-	return &VersionStore{b: b}
+// NewVersionStore constructs a VersionStore from a fully-wired MetadataStore.
+func NewVersionStore(m MetadataStore) *VersionStore {
+	return &VersionStore{b: m, alloc: m}
 }
 
 type VersionCounter struct {
@@ -22,39 +26,10 @@ type VersionCounter struct {
 	Minor int `json:"minor"`
 }
 
-// S3-only mode note: Version allocation is not safe across independent
-// writers unless a Coordinator (etcd) is configured. S3 operations cannot
-// provide an atomic compare-and-swap for distributed version counters.
-
-// NextTags returns the next version tags for a volume. When the backend
-// implements Coordinator (etcd), the increment is performed atomically
-// with an etcd CAS transaction. Otherwise the existing S3 read-then-write
-// is used, which is not safe across independent writers.
+// NextTags returns the next version tags for a volume. The allocator
+// (etcd CAS or S3 read-then-write) performs the increment.
 func (s *VersionStore) NextTags(ctx context.Context, name string, major bool) ([]string, error) {
-	if coord, ok := s.b.(Coordinator); ok {
-		return coord.NextVersion(ctx, name, major)
-	}
-
-	v, err := s.ReadCounter(ctx, name)
-	if err != nil {
-		if !errors.Is(err, ErrKeyNotFound) {
-			return nil, err
-		}
-		v = &VersionCounter{}
-	}
-	if major {
-		v.Major++
-		v.Minor = 0
-	} else {
-		v.Minor++
-	}
-	if err := s.WriteCounter(ctx, name, *v); err != nil {
-		return nil, err
-	}
-	return []string{
-		fmt.Sprintf("v%d", v.Major),
-		fmt.Sprintf("v%d.%d", v.Major, v.Minor),
-	}, nil
+	return s.alloc.NextVersion(ctx, name, major)
 }
 
 func (s *VersionStore) WriteCounter(ctx context.Context, vol string, v VersionCounter) error {
@@ -68,9 +43,6 @@ func (s *VersionStore) WriteCounter(ctx context.Context, vol string, v VersionCo
 func (s *VersionStore) ReadCounter(ctx context.Context, vol string) (*VersionCounter, error) {
 	data, err := s.b.ReadObject(ctx, VersionKeyspace+vol+".json")
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
-			return nil, ErrKeyNotFound
-		}
 		return nil, err
 	}
 	var v VersionCounter

@@ -140,14 +140,12 @@
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{dirBg};border:{dirBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
     <div style="width:22px; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
+      <svg role="img" aria-label="Toggle directory" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" 
         style={chevronStyle}>
         <path d="M7 10l5 5 5-5H7z"/>
       </svg>
     </div>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-    </svg>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('/material/folder.svg') no-repeat center / contain; width:18px;height:18px;flex-shrink:0;opacity:0.7;"></span>
     {node.name}
   </button>
   {#if localExpanded || everExpanded}
@@ -174,9 +172,7 @@
     <div style="position:absolute;inset:0;margin-left:-{hlIndent}px;width:calc(100% + {hlIndent}px);background:{fileBg};border:{fileBorder};border-radius:4px;pointer-events:none;"></div>
     {/if}
     <div style="width:16px; flex-shrink:0;"></div>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-    </svg>
+    <span class="mask-icon" aria-hidden="true" style="mask: url('/material/draft.svg') no-repeat center / contain; width:16px;height:16px;flex-shrink:0;opacity:0.7;"></span>
     <span>{node.name}</span>
     {#if node.size != null}
       <span style="color:var(--muted);font-size:0.75rem;margin-left:auto;">{formatBytes(node.size)}</span>

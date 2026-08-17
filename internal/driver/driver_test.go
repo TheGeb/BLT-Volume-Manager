@@ -2,12 +2,14 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TheGeb/BLT-Volume-Manager/internal/app"
 	"github.com/TheGeb/BLT-Volume-Manager/internal/cfg"
@@ -59,6 +61,10 @@ func (b *recordingBackend) ListObjects(_ context.Context, prefix string) ([]s3.O
 	defer b.mu.Unlock()
 	var objs []s3.Object
 	for i, k := range b.order {
+		// Only list keys that still exist: a "deleted" object must not appear.
+		if _, ok := b.entries[k]; !ok {
+			continue
+		}
 		if strings.HasPrefix(k, prefix) {
 			key := k
 			mc := int64(i + 1)
@@ -298,6 +304,9 @@ func TestNewDriverDefaults(t *testing.T) {
 	if d.ownerStore != nil {
 		t.Error("expected nil ownerStore (no S3)")
 	}
+	if d.lockMode != cfg.LockModeCreate {
+		t.Errorf("expected default lock mode %q, got %q", cfg.LockModeCreate, d.lockMode)
+	}
 }
 
 func TestList(t *testing.T) {
@@ -431,7 +440,7 @@ func TestConcurrentMountSingleVolume(t *testing.T) {
 		ownerMaxMins: 10,
 		vols:         make(map[string]*VolumeInfo),
 		mountStates:  make(map[string]*volMountState),
-		ownerStore:   store.NewOwnerStore(b),
+		ownerStore:   store.NewOwnerStore(store.NewS3MetadataStore(b)),
 	}
 
 	volPath := VolumePath(dir, "concurrent-test")
@@ -477,5 +486,326 @@ func TestConcurrentMountSingleVolume(t *testing.T) {
 		if err := d.Unmount(&volume.UnmountRequest{Name: "concurrent-test", ID: "test"}); err != nil {
 			t.Fatalf("Unmount: %v", err)
 		}
+	}
+}
+
+// TestCreateInitLockTTL verifies init_lock_ttl_mins is parsed at Create and
+// persisted to the volume config, and that the prefixed form wins over the
+// legacy unprefixed spelling.
+func TestCreateInitLockTTL(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	d := &Driver{
+		volumePath:   dir,
+		resticPath:   dir,
+		lockMode:     cfg.LockModeMount,
+		ownerMaxMins: 10,
+		vols:         make(map[string]*VolumeInfo),
+		mountStates:  make(map[string]*volMountState),
+	}
+
+	req := &volume.CreateRequest{
+		Name:    "ttl-vol",
+		Options: map[string]string{"init_lock_ttl_mins": "25"},
+	}
+	if err := d.Create(req); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	volPath := VolumePath(dir, "ttl-vol")
+	cfg := d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockTTLMins != 25 {
+		t.Fatalf("persisted LockTTLMins = %+v, want 25", cfg)
+	}
+	if got := d.lockExpiry(cfg.LockTTLMins); got != d.lockExpiry(25) {
+		t.Errorf("lockExpiry does not honor persisted TTL")
+	}
+}
+
+func TestOptionTTLMinsResolution(t *testing.T) {
+	t.Parallel()
+	d := &Driver{ownerMaxMins: 10}
+	cases := []struct {
+		name string
+		opts map[string]string
+		want int
+	}{
+		{"defaults to OWNER_MAX_MINS", nil, 10},
+		{"prefixed wins", map[string]string{"init_lock_ttl_mins": "30", "lock_ttl_mins": "5"}, 30},
+		{"invalid ignored", map[string]string{"init_lock_ttl_mins": "abc"}, 10},
+		{"zero ignored", map[string]string{"init_lock_ttl_mins": "0"}, 10},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := d.optionTTLMins(c.opts); got != c.want {
+				t.Errorf("optionTTLMins(%v) = %d, want %d", c.opts, got, c.want)
+			}
+		})
+	}
+}
+
+// TestCreateLockModeCreate verifies that lock-on-creation acquires a permanent
+// lock at Create, persists it in the volume config, and reuses it on Mount.
+func TestCreateLockModeCreate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:  dir,
+		resticPath:  dir,
+		lockMode:    cfg.LockModeCreate,
+		vols:        make(map[string]*VolumeInfo),
+		mountStates: make(map[string]*volMountState),
+		ownerStore:  store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	if err := d.Create(&volume.CreateRequest{Name: "create-vol"}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if n := b.PutCallCount(); n != 1 {
+		t.Fatalf("expected 1 lock PutObject on create, got %d", n)
+	}
+
+	volPath := VolumePath(dir, "create-vol")
+	cfg := d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" {
+		t.Fatal("expected persisted lock key in volume config")
+	}
+
+	if _, err := d.Mount(&volume.MountRequest{Name: "create-vol", ID: "test"}); err != nil {
+		t.Fatalf("Mount: %v", err)
+	}
+	if n := b.PutCallCount(); n != 1 {
+		t.Fatalf("expected no re-acquisition on mount, PutObjects=%d", n)
+	}
+
+	if err := d.Unmount(&volume.UnmountRequest{Name: "create-vol", ID: "test"}); err != nil {
+		t.Fatalf("Unmount: %v", err)
+	}
+}
+
+// TestCreateLockModeCreateDuplicate verifies that a second Create of a volume
+// we already own (Docker re-creates existing volumes) is treated as a success
+// in lock-on-creation mode, reusing the persisted lock.
+func TestCreateLockModeCreateDuplicate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:  dir,
+		resticPath:  dir,
+		lockMode:    cfg.LockModeCreate,
+		vols:        make(map[string]*VolumeInfo),
+		mountStates: make(map[string]*volMountState),
+		ownerStore:  store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	if err := d.Create(&volume.CreateRequest{Name: "dup-vol"}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	if err := d.Create(&volume.CreateRequest{Name: "dup-vol"}); err != nil {
+		t.Fatalf("duplicate Create should succeed for owned volume: %v", err)
+	}
+
+	volPath := VolumePath(dir, "dup-vol")
+	cfg := d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" {
+		t.Fatal("expected persisted lock key after duplicate create")
+	}
+	if _, err := b.ReadObject(context.Background(), cfg.LockKey); err != nil {
+		t.Errorf("lock should still be held after duplicate create: %v", err)
+	}
+}
+
+// TestRemoveLockModeCreate verifies Remove releases a lock persisted in the
+// volume config even after a daemon restart (fresh in-memory state).
+func TestRemoveLockModeCreate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:  dir,
+		resticPath:  dir,
+		lockMode:    cfg.LockModeCreate,
+		vols:        make(map[string]*VolumeInfo),
+		mountStates: make(map[string]*volMountState),
+		ownerStore:  store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	if err := d.Create(&volume.CreateRequest{Name: "rm-vol"}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	volPath := VolumePath(dir, "rm-vol")
+	volCfg := d.readVolumeConfig(volPath)
+	if volCfg == nil || volCfg.LockKey == "" {
+		t.Fatal("expected persisted lock key in volume config")
+	}
+
+	// Simulate a daemon restart: fresh driver, empty in-memory state.
+	d2 := &Driver{
+		volumePath:  dir,
+		resticPath:  dir,
+		lockMode:    cfg.LockModeCreate,
+		vols:        make(map[string]*VolumeInfo),
+		mountStates: make(map[string]*volMountState),
+		ownerStore:  store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+	if err := d2.Remove(&volume.RemoveRequest{Name: "rm-vol"}); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	if _, err := b.ReadObject(context.Background(), volCfg.LockKey); !errors.Is(err, store.ErrKeyNotFound) {
+		t.Errorf("expected lock key to be released after remove, got err=%v", err)
+	}
+}
+
+// TestMountLockModeCreateReacquiresPermanent verifies that when a create-mode
+// volume's persisted lock is lost (e.g. released out-of-band or expired during
+// a migration cutover), the mount re-acquires a PERMANENT lock - not a
+// time-limited one - since renewal is a no-op in create mode.
+func TestMountLockModeCreateReacquiresPermanent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:   dir,
+		resticPath:   dir,
+		lockMode:     cfg.LockModeCreate,
+		ownerMaxMins: 10,
+		vols:         make(map[string]*VolumeInfo),
+		mountStates:  make(map[string]*volMountState),
+		ownerStore:   store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	if err := d.Create(&volume.CreateRequest{Name: "perm-reacquire", Options: map[string]string{"init_lock_ttl_mins": "15"}}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	volPath := VolumePath(dir, "perm-reacquire")
+	cfg := d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" {
+		t.Fatal("expected persisted lock key")
+	}
+	origKey := cfg.LockKey
+
+	// Simulate lock loss (e.g. released out-of-band during cutover).
+	if err := b.DeleteObject(context.Background(), origKey); err != nil {
+		t.Fatal(err)
+	}
+	// Proposal keys encode the creation second; make sure the mount's
+	// re-acquire lands on a different second than Create.
+	time.Sleep(1100 * time.Millisecond)
+
+	if _, err := d.Mount(&volume.MountRequest{Name: "perm-reacquire", ID: "test"}); err != nil {
+		t.Fatalf("Mount after lock loss must succeed: %v", err)
+	}
+	cfg = d.readVolumeConfig(volPath)
+	if cfg == nil || cfg.LockKey == "" || cfg.LockKey == origKey {
+		t.Fatal("expected a fresh persisted lock key after re-acquire")
+	}
+	_, _, _, expiry, err := store.ParseOwnerKey(cfg.LockKey)
+	if err != nil {
+		t.Fatalf("ParseOwnerKey: %v", err)
+	}
+	if expiry != 0 {
+		t.Errorf("re-acquired create-mode lock must be permanent, expiry = %d", expiry)
+	}
+	if valid, verr := d.ownerStore.LockIsValid(context.Background(), cfg.LockKey); verr != nil || !valid {
+		t.Errorf("re-acquired lock invalid: valid=%v err=%v", valid, verr)
+	}
+}
+
+// TestGetLockModeCreateConfigOwned verifies Get reports "owned" when a
+// lock-on-creation volume has a persisted lock but is not in memory.
+func TestGetLockModeCreateConfigOwned(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	d := &Driver{volumePath: dir, lockMode: cfg.LockModeCreate}
+
+	volPath := VolumePath(dir, "get-vol")
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
+		t.Fatal(err)
+	}
+	lockKey := store.OwnerPrefix("get-vol") + "host-1700000000-0.json"
+	if err := d.writeVolumeConfig(volPath, &volumeConfig{LockKey: lockKey}); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := d.Get(&volume.GetRequest{Name: "get-vol"})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	state, ok := resp.Volume.Status["state"].(string)
+	if !ok || state != "owned" {
+		t.Errorf("state = %q, want owned", state)
+	}
+}
+
+// TestMountLockModeMountReacquires verifies lock-on-mount re-acquires the lock
+// when the previously acquired (time-limited) lock has expired.
+func TestMountLockModeMountReacquires(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	b := newRecordingBackend()
+
+	d := &Driver{
+		volumePath:   dir,
+		resticPath:   dir,
+		ownerMaxMins: 10,
+		lockMode:     cfg.LockModeMount,
+		vols:         make(map[string]*VolumeInfo),
+		mountStates:  make(map[string]*volMountState),
+		ownerStore:   store.NewOwnerStore(store.NewS3MetadataStore(b)),
+	}
+
+	volPath := VolumePath(dir, "reacquire-vol")
+	if err := os.MkdirAll(volPath, app.DefaultDirPerm); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := d.Mount(&volume.MountRequest{Name: "reacquire-vol", ID: "test"}); err != nil {
+		t.Fatalf("Mount: %v", err)
+	}
+	if n := b.PutCallCount(); n != 1 {
+		t.Fatalf("expected 1 lock PutObject on first mount, got %d", n)
+	}
+
+	// Expire the acquired lock by rewriting the key's stored entry to one
+	// whose encoded expiry is already past.
+	d.mu.Lock()
+	vi := d.vols["reacquire-vol"]
+	oldKey := vi.LockKey
+	d.mu.Unlock()
+	vol, owner, _, _, err := store.ParseOwnerKey(oldKey)
+	if err != nil {
+		t.Fatalf("ParseOwnerKey: %v", err)
+	}
+	past := time.Now().Add(-time.Hour).Unix()
+	expiredKey, err := store.OwnerProposalKey(vol, owner, past, past+10)
+	if err != nil {
+		t.Fatalf("OwnerProposalKey: %v", err)
+	}
+	_ = b.DeleteObject(context.Background(), oldKey)
+	if err := b.PutObject(context.Background(), expiredKey, []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := d.Unmount(&volume.UnmountRequest{Name: "reacquire-vol", ID: "test"}); err != nil {
+		t.Fatalf("Unmount: %v", err)
+	}
+
+	before := b.PutCallCount()
+	if _, err := d.Mount(&volume.MountRequest{Name: "reacquire-vol", ID: "test"}); err != nil {
+		t.Fatalf("second Mount: %v", err)
+	}
+	if n := b.PutCallCount(); n != before+1 {
+		t.Fatalf("expected re-acquisition on mount after lock expiry, PutObjects=%d (before=%d)", n, before)
+	}
+
+	if err := d.Unmount(&volume.UnmountRequest{Name: "reacquire-vol", ID: "test"}); err != nil {
+		t.Fatalf("Unmount: %v", err)
 	}
 }

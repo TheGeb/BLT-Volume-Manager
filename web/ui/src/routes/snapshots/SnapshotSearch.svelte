@@ -181,7 +181,7 @@
     <Popover.Root bind:open={versionOpen} onOpenChange={handleVersionOpenChange}>
       <Popover.Trigger class="version-trigger {versionActive ? 'version-trigger-active' : ''}">
         {versionLabel}
-        <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+        <svg role="img" aria-label="Open version filter" class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
       </Popover.Trigger>
       <Popover.Content class="version-popover">
         <VersionRangeInputs
@@ -199,7 +199,7 @@
     <Popover.Root open={dateOpen} onOpenChange={(o) => dateOpen = o}>
       <Popover.Trigger class="date-trigger {dateActive ? 'date-trigger-active' : ''}">
         {dateLabel}
-        <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+        <svg role="img" aria-label="Open date filter" class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
       </Popover.Trigger>
       <Popover.Content class="date-popover">
         <DateTimeRange
