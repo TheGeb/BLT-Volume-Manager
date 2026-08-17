@@ -42,6 +42,22 @@
         <polyline points="6 9 12 15 18 9"/>
       </svg>
     </Select.Trigger>
+    <Select.Portal>
+      <Select.Content class="drop-select-content">
+        {#each options as opt, i (i)}
+          <Select.Item class="drop-select-item" value={opt.value} label={opt.label} disabled={opt.disabled ?? false}>
+            {#if selected.includes(opt.value)}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="drop-select-checkmark">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            {:else}
+              <span style="width:14px;display:inline-block;"></span>
+            {/if}
+            {opt.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Portal>
   </Select.Root>
 {:else}
   <Select.Root type="single" {value} {onValueChange} bind:open>
